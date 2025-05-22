@@ -4,6 +4,7 @@ import { Check, Clock, Trash } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export interface Task {
   id: string;
@@ -69,7 +70,7 @@ export function TaskList({ tasks, onTaskComplete, onTaskDelete }: TaskListProps)
               size="icon"
               variant="outline"
               className={cn(
-                "rounded-full h-6 w-6 mr-3 mt-0.5",
+                "rounded-full h-6 w-6 mr-3 mt-0.5 check-pulse",
                 getPriorityColor(task.priority)
               )}
               onClick={() => handleComplete(task.id)}
@@ -101,11 +102,10 @@ export function TaskList({ tasks, onTaskComplete, onTaskDelete }: TaskListProps)
               {task.project && (
                 <Badge 
                   variant="outline"
-                  className="text-xs"
+                  className="text-xs bg-white/10 text-sm px-2 rounded-full backdrop-blur-sm transition-transform hover:shadow hover:scale-[1.02]"
                   style={{
                     borderColor: task.project.color,
                     color: task.project.color,
-                    backgroundColor: 'transparent'
                   }}
                 >
                   {task.project.name}

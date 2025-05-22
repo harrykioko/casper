@@ -1,9 +1,10 @@
 
-import { ExternalLink, Trash } from "lucide-react";
+import { Check, ExternalLink, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export interface ReadingItem {
   id: string;
@@ -21,15 +22,25 @@ interface ReadingListProps {
 }
 
 export function ReadingList({ items, onMarkRead, onDelete }: ReadingListProps) {
+  // Function to extract domain from URL
+  const extractDomain = (url: string) => {
+    try {
+      const domain = new URL(url).hostname;
+      return domain.startsWith('www.') ? domain.substring(4) : domain;
+    } catch {
+      return url;
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       {items.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-center text-zinc-500 dark:text-white/60">
-          <p>No items in your reading list</p>
+          <p>Start by adding your first link</p>
         </div>
       ) : (
         <ScrollArea className="flex-1">
-          <div className="space-y-2 pr-4">
+          <div className="space-y-3 pr-4">
             {items.map((item) => (
               <motion.div 
                 key={item.id}
@@ -42,12 +53,12 @@ export function ReadingList({ items, onMarkRead, onDelete }: ReadingListProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <div className="flex gap-3">
+                <div className="flex gap-3 items-center">
                   {item.favicon && (
                     <img 
                       src={item.favicon} 
                       alt=""
-                      className="w-5 h-5 mt-0.5 rounded-sm object-cover flex-shrink-0"
+                      className="w-5 h-5 rounded-sm object-cover flex-shrink-0 my-auto"
                     />
                   )}
                   
@@ -63,6 +74,26 @@ export function ReadingList({ items, onMarkRead, onDelete }: ReadingListProps) {
                       </h4>
                       
                       <div className="flex gap-1 flex-shrink-0">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <motion.div whileTap={{ scale: 0.9 }}>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className={`h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 ${item.isRead ? 'text-green-500' : 'text-zinc-500 hover:text-green-500'}`}
+                                  onClick={() => onMarkRead(item.id)}
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </Button>
+                              </motion.div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>{item.isRead ? 'Mark as unread' : 'Mark as read'}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        
                         <motion.div whileTap={{ scale: 0.9 }}>
                           <Button
                             size="icon"
@@ -90,19 +121,14 @@ export function ReadingList({ items, onMarkRead, onDelete }: ReadingListProps) {
                     </div>
                     
                     {item.description && (
-                      <p className="text-xs text-zinc-500 dark:text-white/60 line-clamp-2 mt-1">
+                      <p className="text-xs text-zinc-400 dark:text-white/50 line-clamp-2 mt-1">
                         {item.description}
                       </p>
                     )}
                     
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="mt-1 h-auto p-0 text-xs text-[#415AFF] dark:text-[#FF6A79]"
-                      onClick={() => onMarkRead(item.id)}
-                    >
-                      {item.isRead ? 'Mark as unread' : 'Mark as read'}
-                    </Button>
+                    <p className="mt-1 text-xs text-zinc-400 truncate">
+                      {extractDomain(item.url)}
+                    </p>
                   </div>
                 </div>
               </motion.div>

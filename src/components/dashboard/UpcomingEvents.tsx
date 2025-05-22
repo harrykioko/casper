@@ -1,5 +1,6 @@
 
 import { motion } from "framer-motion";
+import { Calendar, MapPin } from "lucide-react";
 
 interface CalendarEvent {
   id: string;
@@ -7,7 +8,7 @@ interface CalendarEvent {
   startTime: string;
   endTime?: string;
   location?: string;
-  category?: string; // Changed from "work" | "social" | "personal" to string
+  category?: string;
 }
 
 interface UpcomingEventsProps {
@@ -50,7 +51,7 @@ export function UpcomingEvents({ events }: UpcomingEventsProps) {
         </div>
       ) : (
         Object.entries(eventsByDate).map(([dateKey, dateEvents], dateIndex) => (
-          <div key={dateKey}>
+          <div key={dateKey} className="mt-6 first:mt-0">
             <h3 className="text-sm font-medium mb-3 text-zinc-700 dark:text-white/80">
               {formatDate(dateEvents[0].startTime)}
             </h3>
@@ -75,7 +76,7 @@ export function UpcomingEvents({ events }: UpcomingEventsProps) {
                 return (
                   <motion.div 
                     key={event.id} 
-                    className="flex glassmorphic rounded-lg overflow-hidden"
+                    className="flex glassmorphic rounded-lg overflow-hidden shadow-md"
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.2, delay: 0.05 * eventIndex }}
@@ -83,13 +84,19 @@ export function UpcomingEvents({ events }: UpcomingEventsProps) {
                     <div className={`w-1 ${categoryColor}`} />
                     <div className="flex-1 p-3">
                       <div className="flex justify-between items-start">
-                        <h4 className="font-medium text-sm text-zinc-800 dark:text-white/90">{event.title}</h4>
-                        <span className="text-xs bg-white/10 dark:bg-black/20 px-2 py-0.5 rounded text-zinc-600 dark:text-white/70">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-3.5 w-3.5 text-white/80" />
+                          <h4 className="font-medium text-sm text-zinc-800 dark:text-white/90">{event.title}</h4>
+                        </div>
+                        <span className="text-xs bg-white/10 dark:bg-black/20 px-2 py-0.5 rounded text-white/80">
                           {formatTime(event.startTime)}
                         </span>
                       </div>
                       {event.location && (
-                        <p className="text-xs text-zinc-500 dark:text-white/60 mt-1">{event.location}</p>
+                        <p className="text-sm text-white/80 leading-tight mt-1 flex items-center">
+                          <MapPin className="h-3 w-3 mr-1" />
+                          {event.location}
+                        </p>
                       )}
                     </div>
                   </motion.div>

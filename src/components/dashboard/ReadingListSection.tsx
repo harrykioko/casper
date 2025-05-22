@@ -1,6 +1,7 @@
 
 import { ReadingItem, ReadingList } from "./ReadingList";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ReadingListSectionProps {
   readingItems: ReadingItem[];
@@ -17,13 +18,22 @@ export function ReadingListSection({
     <div>
       <div className="flex justify-between items-center mb-4">
         <h2 className="section-title">Reading List</h2>
-        <Button 
-          size="sm" 
-          variant="ghost" 
-          className="text-xs font-medium h-7 px-3 hover:text-[#FF6A79]"
-        >
-          + Add Link
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="text-xs font-medium h-7 px-3 hover:text-[#FF6A79] hover:shadow-sm ring-1 ring-white/10"
+              >
+                + Add Link
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Add a new link to your reading list</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
       <div className="max-h-[500px] overflow-auto pr-2">
         <ReadingList 

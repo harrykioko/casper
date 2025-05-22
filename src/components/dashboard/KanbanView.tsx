@@ -2,6 +2,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Task } from "./TaskList";
+import { GripVertical } from "lucide-react";
 
 interface KanbanViewProps { 
   tasks: Task[]; 
@@ -18,13 +19,16 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete }: KanbanViewPr
   const columns = [
     { title: "To Do", tasks: todoTasks },
     { title: "In Progress", tasks: inProgressTasks },
-    { title: "Done", tasks: doneTasks }
+    { title: "Done", tasks: doneTasks, emptyMessage: "Drag a task here to mark it complete" }
   ];
 
   return (
     <div className="grid grid-cols-3 gap-4">
       {columns.map((column) => (
-        <div key={column.title} className="flex flex-col glassmorphic rounded-lg p-4">
+        <div key={column.title} className={cn(
+          "flex flex-col glassmorphic rounded-lg p-4",
+          column.tasks.length === 0 ? "opacity-80" : ""
+        )}>
           <h3 className="font-medium mb-3 text-zinc-800 dark:text-white/90">{column.title}</h3>
           <div className="flex-1 overflow-auto">
             {column.tasks.length > 0 ? (
@@ -32,7 +36,7 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete }: KanbanViewPr
                 {column.tasks.map(task => (
                   <motion.div
                     key={task.id}
-                    className="p-3 rounded-md glassmorphic"
+                    className="p-3 rounded-xl glassmorphic shadow-lg ring-1 ring-white/10 bg-white/5 backdrop-blur relative"
                     whileHover={{ scale: 1.02 }}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -62,12 +66,15 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete }: KanbanViewPr
                         </Button>
                       </div>
                     </div>
+                    <div className="absolute top-2 right-2 cursor-grab opacity-30 hover:opacity-70">
+                      <GripVertical className="h-4 w-4" />
+                    </div>
                   </motion.div>
                 ))}
               </div>
             ) : (
               <div className="text-center p-4 text-sm text-zinc-500 dark:text-white/60">
-                No tasks
+                {column.emptyMessage || "No tasks"}
               </div>
             )}
           </div>
@@ -75,4 +82,9 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete }: KanbanViewPr
       ))}
     </div>
   );
+}
+
+// Helper function to conditionally join class names
+function cn(...classes: (string | boolean | undefined)[]) {
+  return classes.filter(Boolean).join(' ');
 }

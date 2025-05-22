@@ -3,6 +3,7 @@ import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TodayCalendar } from "./TodayCalendar";
 import { UpcomingEvents } from "./UpcomingEvents";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CalendarEvent {
   id: string;
@@ -47,11 +48,18 @@ export function CalendarSidebar({ events }: CalendarSidebarProps) {
       <div className="mt-8">
         <div className="flex justify-between items-center mb-4">
           <h2 className="section-title">Upcoming</h2>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="icon" className="h-6 w-6">
-              <CalendarIcon className="h-4 w-4" />
-            </Button>
-          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-6 w-6 hover:shadow-sm ring-1 ring-white/10 rounded-full bg-white/5">
+                  <CalendarIcon className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>View full calendar</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
         <UpcomingEvents events={upcomingEvents} />
       </div>
