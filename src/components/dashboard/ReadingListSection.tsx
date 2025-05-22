@@ -1,19 +1,25 @@
 
+import { useState } from "react";
 import { ReadingItem, ReadingList } from "./ReadingList";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
 
 interface ReadingListSectionProps {
   readingItems: ReadingItem[];
   onMarkRead: (id: string) => void;
   onDeleteReadingItem: (id: string) => void;
+  onAddReadingItem: (item: Omit<ReadingItem, 'id'>) => void;
 }
 
 export function ReadingListSection({ 
   readingItems, 
   onMarkRead, 
-  onDeleteReadingItem 
+  onDeleteReadingItem,
+  onAddReadingItem
 }: ReadingListSectionProps) {
+  const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
+
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
@@ -25,6 +31,7 @@ export function ReadingListSection({
                 size="sm" 
                 variant="ghost" 
                 className="text-xs font-medium h-7 px-3 hover:text-[#FF6A79] hover:shadow-sm ring-1 ring-white/10"
+                onClick={() => setAddLinkDialogOpen(true)}
               >
                 + Add Link
               </Button>
@@ -42,6 +49,12 @@ export function ReadingListSection({
           onDelete={onDeleteReadingItem}
         />
       </div>
+
+      <AddLinkDialog 
+        open={addLinkDialogOpen} 
+        onOpenChange={setAddLinkDialogOpen} 
+        onAddLink={onAddReadingItem}
+      />
     </div>
   );
 }

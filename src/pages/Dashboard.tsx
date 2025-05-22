@@ -8,14 +8,17 @@ import { useReadingItemsManager } from "@/hooks/useReadingItemsManager";
 import { useCommandModal } from "@/hooks/useCommandModal";
 import { useDashboardKeyboardShortcuts } from "@/hooks/useDashboardKeyboardShortcuts";
 import { mockEvents } from "@/data/mockData";
+import { useState } from "react";
+import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   
   // Use custom hooks to manage state and handlers
   const { tasks, handleAddTask, handleCompleteTask, handleDeleteTask, handleUpdateTaskStatus } = useTasksManager();
-  const { readingItems, handleMarkRead, handleDeleteReadingItem } = useReadingItemsManager();
+  const { readingItems, handleMarkRead, handleDeleteReadingItem, handleAddReadingItem } = useReadingItemsManager();
   const { isCommandModalOpen, openCommandModal, closeCommandModal } = useCommandModal();
+  const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
   
   // Set up keyboard shortcuts
   useDashboardKeyboardShortcuts({ openCommandModal });
@@ -34,6 +37,7 @@ export default function Dashboard() {
           onUpdateTaskStatus={handleUpdateTaskStatus}
           onMarkRead={handleMarkRead}
           onDeleteReadingItem={handleDeleteReadingItem}
+          onAddReadingItem={handleAddReadingItem}
         />
         
         {/* Right Sidebar - Calendar and Upcoming */}
@@ -46,6 +50,14 @@ export default function Dashboard() {
         onClose={closeCommandModal} 
         onAddTask={handleAddTask}
         onNavigate={navigate}
+        onAddLink={() => setAddLinkDialogOpen(true)}
+      />
+
+      {/* Add Link Dialog */}
+      <AddLinkDialog
+        open={addLinkDialogOpen}
+        onOpenChange={setAddLinkDialogOpen}
+        onAddLink={handleAddReadingItem}
       />
     </div>
   );

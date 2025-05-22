@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
-import { LayoutDashboard, FolderKanban, MessageSquareText, BookOpen, Settings } from "lucide-react";
+import { LayoutDashboard, FolderKanban, MessageSquareText, BookOpen, Settings, Link } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface CommandModalProps {
@@ -9,9 +9,10 @@ interface CommandModalProps {
   onClose: () => void;
   onAddTask?: (task: string) => void;
   onNavigate?: (path: string) => void;
+  onAddLink?: () => void;
 }
 
-export function CommandModal({ isOpen, onClose, onAddTask, onNavigate }: CommandModalProps) {
+export function CommandModal({ isOpen, onClose, onAddTask, onNavigate, onAddLink }: CommandModalProps) {
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -53,6 +54,9 @@ export function CommandModal({ isOpen, onClose, onAddTask, onNavigate }: Command
       onClose();
     } else if (value === "add-task" && inputValue) {
       onAddTask?.(inputValue);
+      onClose();
+    } else if (value === "add-link") {
+      onAddLink?.();
       onClose();
     }
   };
@@ -115,6 +119,13 @@ export function CommandModal({ isOpen, onClose, onAddTask, onNavigate }: Command
                   <CommandItem value="navigate:/settings" onSelect={handleSelect} className="hover:bg-[#415AFF]/10">
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
+                  </CommandItem>
+                </CommandGroup>
+
+                <CommandGroup heading="Quick Actions">
+                  <CommandItem value="add-link" onSelect={handleSelect} className="hover:bg-[#FF6A79]/10">
+                    <Link className="mr-2 h-4 w-4" />
+                    <span>Add Link to Reading List</span>
                   </CommandItem>
                 </CommandGroup>
               </CommandList>

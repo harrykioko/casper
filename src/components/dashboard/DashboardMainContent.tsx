@@ -16,6 +16,7 @@ interface DashboardMainContentProps {
   onUpdateTaskStatus: (id: string, status: "todo" | "inprogress" | "done") => void;
   onMarkRead: (id: string) => void;
   onDeleteReadingItem: (id: string) => void;
+  onAddReadingItem: (item: Omit<ReadingItem, 'id'>) => void;
 }
 
 export function DashboardMainContent({
@@ -27,7 +28,8 @@ export function DashboardMainContent({
   onTaskDelete,
   onUpdateTaskStatus,
   onMarkRead,
-  onDeleteReadingItem
+  onDeleteReadingItem,
+  onAddReadingItem
 }: DashboardMainContentProps) {
   return (
     <div className="flex-1 p-8">
@@ -49,6 +51,7 @@ export function DashboardMainContent({
           readingItems={readingItems}
           onMarkRead={onMarkRead}
           onDeleteReadingItem={onDeleteReadingItem}
+          onAddReadingItem={onAddReadingItem}
         />
       </div>
     </div>

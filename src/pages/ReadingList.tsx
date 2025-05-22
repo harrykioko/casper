@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { CommandModal } from "@/components/modals/CommandModal";
 import { ReadingItem } from "@/components/dashboard/ReadingList";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
+import { v4 as uuidv4 } from "uuid";
 
 // Mock reading items
 const mockReadingItems: ReadingItem[] = [
@@ -57,6 +59,7 @@ export default function ReadingList() {
   const [readingItems, setReadingItems] = useState<ReadingItem[]>(mockReadingItems);
   const [searchQuery, setSearchQuery] = useState("");
   const [isCommandModalOpen, setIsCommandModalOpen] = useState(false);
+  const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
   
   // Filter reading items based on search query
   const filteredItems = readingItems.filter(item => 
@@ -78,6 +81,15 @@ export default function ReadingList() {
   // Handle deleting item
   const handleDelete = (id: string) => {
     setReadingItems(items => items.filter(item => item.id !== id));
+  };
+
+  // Handle adding a new link
+  const handleAddLink = (linkData: Omit<ReadingItem, 'id'>) => {
+    const newItem: ReadingItem = {
+      ...linkData,
+      id: uuidv4()
+    };
+    setReadingItems(items => [newItem, ...items]);
   };
   
   // Command modal handling
@@ -102,7 +114,11 @@ export default function ReadingList() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Reading List</h1>
           <div className="flex gap-3">
-            <Button variant="outline" className="gap-2">
+            <Button 
+              variant="outline" 
+              className="gap-2" 
+              onClick={() => setAddLinkDialogOpen(true)}
+            >
               <Plus className="h-4 w-4" />
               <span>Save Link</span>
             </Button>
@@ -219,6 +235,13 @@ export default function ReadingList() {
         isOpen={isCommandModalOpen} 
         onClose={closeCommandModal}
         onNavigate={navigate}
+      />
+
+      {/* Add Link Dialog */}
+      <AddLinkDialog
+        open={addLinkDialogOpen}
+        onOpenChange={setAddLinkDialogOpen}
+        onAddLink={handleAddLink}
       />
     </div>
   );
