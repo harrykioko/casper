@@ -1,5 +1,5 @@
 
-import { Task } from "@/components/dashboard/TaskList";
+import { Task } from "@/components/dashboard/TaskSection";
 import { ReadingItem } from "@/components/dashboard/ReadingList";
 
 // Mock tasks data for the initial view
@@ -8,6 +8,7 @@ export const mockTasks: Task[] = [
     id: "1",
     content: "Complete Casper MVP design",
     completed: false,
+    status: "todo",
     project: {
       id: "p1",
       name: "Casper",
@@ -20,6 +21,7 @@ export const mockTasks: Task[] = [
     id: "2",
     content: "Review PRD document",
     completed: true,
+    status: "done",
     project: {
       id: "p1",
       name: "Casper",
@@ -32,6 +34,7 @@ export const mockTasks: Task[] = [
     id: "3",
     content: "Set up Supabase tables",
     completed: false,
+    status: "todo",
     project: {
       id: "p1",
       name: "Casper",
@@ -44,6 +47,7 @@ export const mockTasks: Task[] = [
     id: "4",
     content: "Research Outlook API integration",
     completed: false,
+    status: "todo",
     project: {
       id: "p2",
       name: "Research",

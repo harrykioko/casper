@@ -1,12 +1,25 @@
 
 import { useState } from "react";
 import { TaskInput } from "@/components/dashboard/TaskInput";
-import { TaskList, Task } from "@/components/dashboard/TaskList";
+import { TaskList } from "@/components/dashboard/TaskList";
 import { KanbanView } from "@/components/dashboard/KanbanView";
 import { ListFilter, Columns } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+export type Task = {
+  id: string;
+  content: string;
+  completed: boolean;
+  status?: "todo" | "inprogress" | "done";
+  project?: {
+    id: string;
+    name: string;
+    color: string;
+  };
+  priority?: "high" | "medium" | "low";
+  scheduledFor?: string;
+};
 
 type ViewMode = "list" | "kanban";
 
@@ -15,7 +28,7 @@ interface TaskSectionProps {
   onAddTask: (content: string) => void;
   onTaskComplete: (id: string) => void;
   onTaskDelete: (id: string) => void;
-  onUpdateTaskStatus: (id: string, completed: boolean) => void;
+  onUpdateTaskStatus: (id: string, status: "todo" | "inprogress" | "done") => void;
 }
 
 export function TaskSection({ 

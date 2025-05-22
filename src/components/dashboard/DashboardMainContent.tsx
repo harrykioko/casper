@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Task } from "@/components/dashboard/TaskList";
+import { Task } from "@/components/dashboard/TaskSection";
 import { ReadingItem } from "@/components/dashboard/ReadingList";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { TaskSection } from "@/components/dashboard/TaskSection";
@@ -13,7 +13,7 @@ interface DashboardMainContentProps {
   onAddTask: (content: string) => void;
   onTaskComplete: (id: string) => void;
   onTaskDelete: (id: string) => void;
-  onUpdateTaskStatus: (id: string, completed: boolean) => void;
+  onUpdateTaskStatus: (id: string, status: "todo" | "inprogress" | "done") => void;
   onMarkRead: (id: string) => void;
   onDeleteReadingItem: (id: string) => void;
 }

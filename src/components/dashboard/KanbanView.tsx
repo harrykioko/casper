@@ -1,38 +1,39 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Task } from "./TaskList";
+import { Task } from "./TaskSection";
 import { GripVertical, MoveHorizontal } from "lucide-react";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
-import { useState } from "react";
 import { toast } from "@/hooks/use-toast";
 
 interface KanbanViewProps { 
   tasks: Task[]; 
   onTaskComplete: (id: string) => void; 
   onTaskDelete: (id: string) => void; 
-  onUpdateTaskStatus: (id: string, completed: boolean) => void;
+  onUpdateTaskStatus: (id: string, status: "todo" | "inprogress" | "done") => void;
 }
 
 type KanbanColumn = {
-  id: string;
+  id: "todo" | "inprogress" | "done";
   title: string;
-  tasks: Task[];
   emptyMessage?: string;
-}
+};
 
 export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskStatus }: KanbanViewProps) {
-  // Group tasks by status
-  const todoTasks = tasks.filter(task => !task.completed);
-  const doneTasks = tasks.filter(task => task.completed);
-  const inProgressTasks: Task[] = []; // In a real app, you'd have an in-progress state
+  // Define our columns
+  const columns: KanbanColumn[] = [
+    { id: "todo", title: "To Do" },
+    { id: "inprogress", title: "In Progress" },
+    { id: "done", title: "Done", emptyMessage: "Drag a task here to mark it complete" }
+  ];
 
-  // Set up columns for drag and drop
-  const [columns, setColumns] = useState<KanbanColumn[]>([
-    { id: "todo", title: "To Do", tasks: todoTasks },
-    { id: "inprogress", title: "In Progress", tasks: inProgressTasks },
-    { id: "done", title: "Done", tasks: doneTasks, emptyMessage: "Drag a task here to mark it complete" }
-  ]);
+  // Filter tasks for each column based on status
+  const getColumnTasks = (columnId: "todo" | "inprogress" | "done") => {
+    if (columnId === "todo") {
+      return tasks.filter(task => !task.status || task.status === "todo");
+    }
+    return tasks.filter(task => task.status === columnId);
+  };
 
   // Handle drag end event
   const handleDragEnd = (result: any) => {
@@ -51,42 +52,18 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
     const task = tasks.find(t => t.id === draggableId);
     if (!task) return;
 
-    // Create a new array of columns
-    const newColumns = [...columns];
-    
-    // Remove from source column
-    const sourceColumn = newColumns.find(col => col.id === source.droppableId);
-    if (!sourceColumn) return;
-    
-    sourceColumn.tasks = sourceColumn.tasks.filter(t => t.id !== draggableId);
-    
-    // Add to destination column
-    const destColumn = newColumns.find(col => col.id === destination.droppableId);
-    if (!destColumn) return;
-    
-    // Create a copy of the task to avoid mutating the original
-    const updatedTask = {...task};
-
     // Update task status based on destination column
-    if (destColumn.id === "done" && !updatedTask.completed) {
-      updatedTask.completed = true;
-      onUpdateTaskStatus(updatedTask.id, true);
-      toast({
-        title: "Task completed",
-        description: "Your task has been marked as complete.",
-      });
-    } else if (destColumn.id !== "done" && updatedTask.completed) {
-      updatedTask.completed = false;
-      onUpdateTaskStatus(updatedTask.id, false);
+    if (destination.droppableId !== source.droppableId) {
+      const newStatus = destination.droppableId as "todo" | "inprogress" | "done";
+      onUpdateTaskStatus(task.id, newStatus);
+      
+      if (newStatus === "done" && !task.completed) {
+        toast({
+          title: "Task completed",
+          description: "Your task has been marked as complete.",
+        });
+      }
     }
-    
-    // Insert task at destination position
-    const destTasks = Array.from(destColumn.tasks);
-    destTasks.splice(destination.index, 0, updatedTask);
-    destColumn.tasks = destTasks;
-    
-    // Update columns state
-    setColumns(newColumns);
   };
 
   return (
@@ -100,7 +77,7 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
                 {...provided.droppableProps}
                 className={cn(
                   "flex flex-col glassmorphic rounded-lg p-4",
-                  column.tasks.length === 0 ? "opacity-80" : "",
+                  getColumnTasks(column.id).length === 0 ? "opacity-80" : "",
                   snapshot.isDraggingOver ? "ring-2 ring-primary/40" : ""
                 )}
               >
@@ -108,9 +85,9 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
                   {column.title}
                 </h3>
                 <div className="flex-1 overflow-auto min-h-[200px]">
-                  {column.tasks.length > 0 ? (
+                  {getColumnTasks(column.id).length > 0 ? (
                     <div className="space-y-2">
-                      {column.tasks.map((task, index) => (
+                      {getColumnTasks(column.id).map((task, index) => (
                         <Draggable 
                           key={task.id} 
                           draggableId={task.id} 
