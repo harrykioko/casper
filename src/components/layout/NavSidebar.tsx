@@ -58,9 +58,15 @@ export function NavSidebar() {
       )}
     >
       <div className="flex flex-col items-center gap-1 mb-8">
-        <div className="h-8 w-8 rounded-full bg-gradient-to-r from-[#FF6A79] to-[#415AFF] flex items-center justify-center text-white font-bold">
-          C
-        </div>
+        {expanded ? (
+          <div className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#FF6A79] to-[#415AFF]">
+            Casper
+          </div>
+        ) : (
+          <div className="h-8 w-8 rounded-full bg-gradient-to-r from-[#FF6A79] to-[#415AFF] flex items-center justify-center text-white font-bold">
+            C
+          </div>
+        )}
       </div>
       
       <div className="flex flex-col items-center gap-4 w-full">
@@ -170,3 +176,4 @@ export function NavSidebar() {
     </div>
   );
 }
+
