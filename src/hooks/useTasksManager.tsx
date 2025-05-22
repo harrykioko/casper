@@ -25,10 +25,17 @@ export function useTasksManager() {
     setTasks(tasks.filter(task => task.id !== id));
   };
 
+  const handleUpdateTaskStatus = (id: string, completed: boolean) => {
+    setTasks(tasks.map(task => 
+      task.id === id ? { ...task, completed } : task
+    ));
+  };
+
   return {
     tasks,
     handleAddTask,
     handleCompleteTask,
-    handleDeleteTask
+    handleDeleteTask,
+    handleUpdateTaskStatus
   };
 }
