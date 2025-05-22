@@ -68,7 +68,7 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4 min-h-[400px]">
         {columns.map((column) => (
           <Droppable key={column.id} droppableId={column.id}>
             {(provided, snapshot) => (
@@ -76,77 +76,71 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
                 ref={provided.innerRef}
                 {...provided.droppableProps}
                 className={cn(
-                  "flex flex-col glassmorphic rounded-lg p-4",
-                  getColumnTasks(column.id).length === 0 ? "opacity-80" : "",
+                  "flex flex-col glassmorphic rounded-lg p-4 space-y-2 relative",
                   snapshot.isDraggingOver ? "ring-2 ring-primary/40" : ""
                 )}
+                style={{ minHeight: 250 }}
               >
                 <h3 className="font-medium mb-3 text-zinc-800 dark:text-white/90 flex items-center gap-1">
                   {column.title}
                 </h3>
-                <div className="flex-1 overflow-auto min-h-[200px]">
-                  {getColumnTasks(column.id).length > 0 ? (
-                    <div className="space-y-2">
-                      {getColumnTasks(column.id).map((task, index) => (
-                        <Draggable 
-                          key={task.id} 
-                          draggableId={task.id} 
-                          index={index}
-                        >
-                          {(provided, snapshot) => (
-                            <motion.div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              className={cn(
-                                "p-3 rounded-xl glassmorphic shadow-lg ring-1 ring-white/10 bg-white/5 backdrop-blur relative",
-                                snapshot.isDragging ? "opacity-90 scale-105" : ""
-                              )}
-                              whileHover={{ scale: 1.02 }}
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                            >
-                              <div className="flex">
-                                <div className="flex-1">
-                                  <p className="text-sm text-zinc-800 dark:text-white/90">{task.content}</p>
-                                  {task.project && (
-                                    <div className="flex items-center mt-2">
-                                      <div 
-                                        className="w-2 h-2 rounded-full mr-1"
-                                        style={{ backgroundColor: task.project.color }}
-                                      />
-                                      <span className="text-xs text-zinc-500 dark:text-white/60">{task.project.name}</span>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex items-center">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => onTaskComplete(task.id)}
-                                    className="h-6 w-6 rounded-full"
-                                  >
-                                    <span className="sr-only">Toggle completion</span>
-                                    <div className={`w-4 h-4 rounded-full border ${task.completed ? 'bg-primary border-primary' : 'border-zinc-400 dark:border-white/60'}`} />
-                                  </Button>
-                                </div>
-                              </div>
-                              <div 
-                                {...provided.dragHandleProps}
-                                className="absolute top-2 right-2 cursor-grab opacity-30 hover:opacity-70 flex items-center gap-1"
-                              >
-                                <MoveHorizontal className="h-3 w-3" />
-                                <GripVertical className="h-4 w-4" />
-                              </div>
-                            </motion.div>
+                
+                <div className="flex-1 overflow-visible min-h-[200px] space-y-2">
+                  {getColumnTasks(column.id).map((task, index) => (
+                    <Draggable 
+                      key={task.id} 
+                      draggableId={task.id} 
+                      index={index}
+                    >
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.draggableProps}
+                          {...provided.dragHandleProps}
+                          className={cn(
+                            "p-3 rounded-xl glassmorphic shadow-lg ring-1 ring-white/10 bg-white/5 backdrop-blur relative",
+                            snapshot.isDragging ? "shadow-xl z-50" : ""
                           )}
-                        </Draggable>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center p-4 text-sm text-zinc-500 dark:text-white/60">
-                      {column.emptyMessage || "No tasks"}
-                    </div>
-                  )}
+                          style={{
+                            ...provided.draggableProps.style,
+                            transform: snapshot.isDragging 
+                              ? provided.draggableProps.style?.transform 
+                              : "none"
+                          }}
+                        >
+                          <div className="flex">
+                            <div className="flex-1">
+                              <p className="text-sm text-zinc-800 dark:text-white/90">{task.content}</p>
+                              {task.project && (
+                                <div className="flex items-center mt-2">
+                                  <div 
+                                    className="w-2 h-2 rounded-full mr-1"
+                                    style={{ backgroundColor: task.project.color }}
+                                  />
+                                  <span className="text-xs text-zinc-500 dark:text-white/60">{task.project.name}</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onTaskComplete(task.id)}
+                                className="h-6 w-6 rounded-full"
+                              >
+                                <span className="sr-only">Toggle completion</span>
+                                <div className={`w-4 h-4 rounded-full border ${task.completed ? 'bg-primary border-primary' : 'border-zinc-400 dark:border-white/60'}`} />
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="absolute top-2 right-2 cursor-grab opacity-30 hover:opacity-70 flex items-center gap-1">
+                            <MoveHorizontal className="h-3 w-3" />
+                            <GripVertical className="h-4 w-4" />
+                          </div>
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
                   {provided.placeholder}
                 </div>
               </div>

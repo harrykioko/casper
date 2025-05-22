@@ -29,7 +29,7 @@ export function useTasksManager() {
         return {
           ...task,
           completed,
-          status: completed ? "done" : "todo"
+          status: completed ? "done" : task.status === "done" ? "todo" : task.status
         };
       }
       return task;
