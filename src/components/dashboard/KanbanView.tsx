@@ -133,9 +133,8 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
                               </Button>
                             </div>
                           </div>
-                          <div className="absolute top-2 right-2 cursor-grab opacity-30 hover:opacity-70 flex items-center gap-1">
+                          <div className="absolute top-2 right-2 cursor-grab opacity-30 hover:opacity-70">
                             <MoveHorizontal className="h-3 w-3" />
-                            <GripVertical className="h-4 w-4" />
                           </div>
                         </div>
                       )}
