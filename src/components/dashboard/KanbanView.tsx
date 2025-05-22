@@ -11,6 +11,7 @@ interface KanbanViewProps {
   onTaskComplete: (id: string) => void; 
   onTaskDelete: (id: string) => void; 
   onUpdateTaskStatus: (id: string, status: "todo" | "inprogress" | "done") => void;
+  onTaskClick: (task: Task) => void;
 }
 
 type KanbanColumn = {
@@ -19,7 +20,7 @@ type KanbanColumn = {
   emptyMessage?: string;
 };
 
-export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskStatus }: KanbanViewProps) {
+export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskStatus, onTaskClick }: KanbanViewProps) {
   // Define our columns
   const columns: KanbanColumn[] = [
     { id: "todo", title: "To Do" },
@@ -98,7 +99,7 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
                           className={cn(
-                            "p-3 rounded-xl glassmorphic shadow-lg ring-1 ring-white/10 bg-white/5 backdrop-blur relative",
+                            "p-3 rounded-xl glassmorphic shadow-lg ring-1 ring-white/10 bg-white/5 backdrop-blur relative cursor-pointer",
                             snapshot.isDragging ? "shadow-xl z-50" : ""
                           )}
                           style={{
@@ -107,6 +108,7 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
                               ? provided.draggableProps.style?.transform 
                               : "none"
                           }}
+                          onClick={() => onTaskClick(task)}
                         >
                           <div className="flex">
                             <div className="flex-1">
@@ -125,7 +127,10 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => onTaskComplete(task.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Prevent opening the task dialog
+                                  onTaskComplete(task.id);
+                                }}
                                 className="h-6 w-6 rounded-full"
                               >
                                 <span className="sr-only">Toggle completion</span>

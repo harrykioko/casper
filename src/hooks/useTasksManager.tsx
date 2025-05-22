@@ -55,11 +55,21 @@ export function useTasksManager() {
     }));
   };
 
+  const handleUpdateTask = (updatedTask: Task) => {
+    setTasks(tasks.map(task => {
+      if (task.id === updatedTask.id) {
+        return updatedTask;
+      }
+      return task;
+    }));
+  };
+
   return {
     tasks,
     handleAddTask,
     handleCompleteTask,
     handleDeleteTask,
-    handleUpdateTaskStatus
+    handleUpdateTaskStatus,
+    handleUpdateTask
   };
 }

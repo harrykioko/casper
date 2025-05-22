@@ -6,6 +6,7 @@ import { KanbanView } from "@/components/dashboard/KanbanView";
 import { ListFilter, Columns } from "lucide-react";
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
 
 export type Task = {
   id: string;
@@ -39,10 +40,31 @@ export function TaskSection({
   onUpdateTaskStatus
 }: TaskSectionProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [taskDetailsOpen, setTaskDetailsOpen] = useState(false);
 
   // Toggle between list and kanban views
   const toggleViewMode = (mode: ViewMode) => {
     setViewMode(mode);
+  };
+
+  // Handler for opening the task details modal
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setTaskDetailsOpen(true);
+  };
+
+  // Handler for updating a task
+  const handleUpdateTask = (updatedTask: Task) => {
+    // Update status if changed
+    if (updatedTask.status !== selectedTask?.status) {
+      onUpdateTaskStatus(updatedTask.id, updatedTask.status || "todo");
+    }
+    
+    // Update completion status if changed
+    if (updatedTask.completed !== selectedTask?.completed) {
+      onTaskComplete(updatedTask.id);
+    }
   };
 
   return (
@@ -104,7 +126,8 @@ export function TaskSection({
           <TaskList 
             tasks={tasks} 
             onTaskComplete={onTaskComplete} 
-            onTaskDelete={onTaskDelete} 
+            onTaskDelete={onTaskDelete}
+            onTaskClick={handleTaskClick}
           />
         ) : (
           <KanbanView 
@@ -112,9 +135,19 @@ export function TaskSection({
             onTaskComplete={onTaskComplete} 
             onTaskDelete={onTaskDelete}
             onUpdateTaskStatus={onUpdateTaskStatus}
+            onTaskClick={handleTaskClick}
           />
         )}
       </div>
+
+      {/* Task Details Dialog */}
+      <TaskDetailsDialog
+        open={taskDetailsOpen}
+        onOpenChange={setTaskDetailsOpen}
+        task={selectedTask}
+        onUpdateTask={handleUpdateTask}
+        onDeleteTask={onTaskDelete}
+      />
     </>
   );
 }

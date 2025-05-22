@@ -16,7 +16,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   
   // Use custom hooks to manage state and handlers
-  const { tasks, handleAddTask, handleCompleteTask, handleDeleteTask, handleUpdateTaskStatus } = useTasksManager();
+  const { tasks, handleAddTask, handleCompleteTask, handleDeleteTask, handleUpdateTaskStatus, handleUpdateTask } = useTasksManager();
   const { readingItems, handleMarkRead, handleDeleteReadingItem, handleAddReadingItem } = useReadingItemsManager();
   const { isCommandModalOpen, openCommandModal, closeCommandModal } = useCommandModal();
   const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
@@ -44,6 +44,7 @@ export default function Dashboard() {
           onTaskComplete={handleCompleteTask}
           onTaskDelete={handleDeleteTask}
           onUpdateTaskStatus={handleUpdateTaskStatus}
+          onUpdateTask={handleUpdateTask}
           onMarkRead={handleMarkRead}
           onDeleteReadingItem={handleDeleteReadingItem}
           onAddReadingItem={handleAddReadingItem}

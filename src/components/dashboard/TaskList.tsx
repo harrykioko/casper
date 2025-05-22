@@ -17,18 +17,21 @@ export interface Task {
   };
   priority?: "low" | "medium" | "high";
   scheduledFor?: string;
+  status?: "todo" | "inprogress" | "done";
 }
 
 interface TaskListProps {
   tasks: Task[];
   onTaskComplete: (id: string) => void;
   onTaskDelete: (id: string) => void;
+  onTaskClick: (task: Task) => void;
 }
 
-export function TaskList({ tasks, onTaskComplete, onTaskDelete }: TaskListProps) {
+export function TaskList({ tasks, onTaskComplete, onTaskDelete, onTaskClick }: TaskListProps) {
   const [showConfetti, setShowConfetti] = useState<string | null>(null);
   
-  const handleComplete = (id: string) => {
+  const handleComplete = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation(); // Stop event bubbling to prevent opening the task dialog
     setShowConfetti(id);
     onTaskComplete(id);
     
@@ -36,6 +39,11 @@ export function TaskList({ tasks, onTaskComplete, onTaskDelete }: TaskListProps)
     setTimeout(() => {
       setShowConfetti(null);
     }, 1000);
+  };
+
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation(); // Stop event bubbling
+    onTaskDelete(id);
   };
 
   const getPriorityColor = (priority?: "low" | "medium" | "high") => {
@@ -61,9 +69,10 @@ export function TaskList({ tasks, onTaskComplete, onTaskDelete }: TaskListProps)
         <li 
           key={task.id}
           className={cn(
-            "group flex items-start p-3 rounded-lg hover:glassmorphic transition-all duration-200",
+            "group flex items-start p-3 rounded-lg hover:glassmorphic transition-all duration-200 cursor-pointer",
             task.completed && "opacity-50"
           )}
+          onClick={() => onTaskClick(task)}
         >
           <div className="relative">
             <Button
@@ -73,7 +82,7 @@ export function TaskList({ tasks, onTaskComplete, onTaskDelete }: TaskListProps)
                 "rounded-full h-6 w-6 mr-3 mt-0.5 check-pulse",
                 getPriorityColor(task.priority)
               )}
-              onClick={() => handleComplete(task.id)}
+              onClick={(e) => handleComplete(e, task.id)}
             >
               {task.completed && <Check className="h-3 w-3" />}
               {showConfetti === task.id && (
@@ -123,7 +132,7 @@ export function TaskList({ tasks, onTaskComplete, onTaskDelete }: TaskListProps)
             size="icon"
             variant="ghost"
             className="opacity-0 group-hover:opacity-100 h-7 w-7 rounded-full"
-            onClick={() => onTaskDelete(task.id)}
+            onClick={(e) => handleDelete(e, task.id)}
           >
             <Trash className="h-3.5 w-3.5" />
           </Button>

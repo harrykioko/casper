@@ -14,6 +14,7 @@ interface DashboardMainContentProps {
   onTaskComplete: (id: string) => void;
   onTaskDelete: (id: string) => void;
   onUpdateTaskStatus: (id: string, status: "todo" | "inprogress" | "done") => void;
+  onUpdateTask: (task: Task) => void;
   onMarkRead: (id: string) => void;
   onDeleteReadingItem: (id: string) => void;
   onAddReadingItem: (item: Omit<ReadingItem, 'id'>) => void;
@@ -27,6 +28,7 @@ export function DashboardMainContent({
   onTaskComplete,
   onTaskDelete,
   onUpdateTaskStatus,
+  onUpdateTask,
   onMarkRead,
   onDeleteReadingItem,
   onAddReadingItem
