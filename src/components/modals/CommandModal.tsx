@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
-import { LayoutDashboard, FolderKanban, MessageSquareText, BookOpen, Settings, Link } from "lucide-react";
+import { LayoutDashboard, FolderKanban, MessageSquareText, BookOpen, Settings, Link, Plus, CheckSquare } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface CommandModalProps {
@@ -10,9 +10,17 @@ interface CommandModalProps {
   onAddTask?: (task: string) => void;
   onNavigate?: (path: string) => void;
   onAddLink?: () => void;
+  onAddPrompt?: () => void;
 }
 
-export function CommandModal({ isOpen, onClose, onAddTask, onNavigate, onAddLink }: CommandModalProps) {
+export function CommandModal({ 
+  isOpen, 
+  onClose, 
+  onAddTask, 
+  onNavigate, 
+  onAddLink,
+  onAddPrompt 
+}: CommandModalProps) {
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -58,6 +66,15 @@ export function CommandModal({ isOpen, onClose, onAddTask, onNavigate, onAddLink
     } else if (value === "add-link") {
       onAddLink?.();
       onClose();
+    } else if (value === "add-prompt") {
+      onAddPrompt?.();
+      onClose();
+    } else if (value === "quick-task") {
+      onNavigate?.("/");
+      setTimeout(() => {
+        onAddTask?.("New task");
+      }, 100);
+      onClose();
     }
   };
   
@@ -94,7 +111,8 @@ export function CommandModal({ isOpen, onClose, onAddTask, onNavigate, onAddLink
                 {inputValue && (
                   <CommandGroup heading="Action">
                     <CommandItem value="add-task" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
-                      Add task: {inputValue}
+                      <CheckSquare className="mr-2 h-4 w-4" />
+                      <span>Add task: {inputValue}</span>
                     </CommandItem>
                   </CommandGroup>
                 )}
@@ -123,6 +141,14 @@ export function CommandModal({ isOpen, onClose, onAddTask, onNavigate, onAddLink
                 </CommandGroup>
 
                 <CommandGroup heading="Quick Actions">
+                  <CommandItem value="quick-task" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
+                    <Plus className="mr-2 h-4 w-4" />
+                    <span>New Task</span>
+                  </CommandItem>
+                  <CommandItem value="add-prompt" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
+                    <MessageSquareText className="mr-2 h-4 w-4" />
+                    <span>New Prompt</span>
+                  </CommandItem>
                   <CommandItem value="add-link" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
                     <Link className="mr-2 h-4 w-4" />
                     <span>Add Link to Reading List</span>

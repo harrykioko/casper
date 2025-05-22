@@ -23,6 +23,11 @@ export default function Dashboard() {
   // Set up keyboard shortcuts
   useDashboardKeyboardShortcuts({ openCommandModal });
   
+  // Handle navigation to prompts page for new prompt
+  const handleAddPrompt = () => {
+    navigate('/prompts', { state: { openNewPrompt: true } });
+  };
+  
   return (
     <div className="min-h-screen" tabIndex={0}>
       <div className="flex">
@@ -51,6 +56,7 @@ export default function Dashboard() {
         onAddTask={handleAddTask}
         onNavigate={navigate}
         onAddLink={() => setAddLinkDialogOpen(true)}
+        onAddPrompt={handleAddPrompt}
       />
 
       {/* Add Link Dialog */}

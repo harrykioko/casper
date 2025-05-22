@@ -1,6 +1,6 @@
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { MessageSquareText, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,10 +56,21 @@ const mockPrompts: Prompt[] = [
 
 export default function Prompts() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [prompts, setPrompts] = useState<Prompt[]>(mockPrompts);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isCommandModalOpen, setIsCommandModalOpen] = useState(false);
+  
+  // Handle new prompt action from Command+K
+  useEffect(() => {
+    if (location.state?.openNewPrompt) {
+      // Reset the state to prevent reopening on refresh
+      navigate(location.pathname, { replace: true });
+      // Here you would open your new prompt dialog
+      handleNewPrompt();
+    }
+  }, [location.state, navigate]);
   
   // Extract all unique tags
   const allTags = Array.from(new Set(prompts.flatMap(prompt => prompt.tags)));
@@ -97,6 +108,14 @@ export default function Prompts() {
     }
   };
   
+  // Handle adding a new prompt 
+  const handleNewPrompt = () => {
+    console.log("Creating new prompt");
+    // Here you would open a modal to create a new prompt
+    // For now, we'll just log it
+    // In a real implementation, this would open a dialog
+  };
+  
   return (
     <div 
       className="p-8 pl-24 min-h-screen"
@@ -107,7 +126,11 @@ export default function Prompts() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Prompt Library</h1>
           <div className="flex gap-3">
-            <Button variant="outline" className="gap-2">
+            <Button 
+              variant="outline" 
+              className="gap-2"
+              onClick={handleNewPrompt}
+            >
               <Plus className="h-4 w-4" />
               <span>New Prompt</span>
             </Button>
