@@ -1,6 +1,6 @@
 
-import { useState } from "react";
-import { Check, Calendar, Trash, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Check, Calendar, Trash, X, Edit } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns";
 import { Task } from "@/components/dashboard/TaskSection";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 interface TaskDetailsDialogProps {
   open: boolean;
@@ -31,14 +32,14 @@ export function TaskDetailsDialog({
   const [selectedProject, setSelectedProject] = useState<Task["project"] | undefined>(undefined);
   
   // Initialize form when task changes
-  useState(() => {
+  useEffect(() => {
     if (task) {
       setContent(task.content);
       setStatus(task.status || "todo");
       setSelectedProject(task.project);
       setScheduledFor(task.scheduledFor ? new Date(task.scheduledFor) : undefined);
     }
-  });
+  }, [task]);
 
   const handleSave = () => {
     if (!task) return;
@@ -62,6 +63,23 @@ export function TaskDetailsDialog({
     onOpenChange(false);
   };
 
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (open) {
+        if (e.key === "Escape") {
+          onOpenChange(false);
+        } else if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+          e.preventDefault();
+          handleSave();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onOpenChange, handleSave]);
+
   // Mock projects - in a real app, these would come from a projects store
   const mockProjects = [
     { id: "1", name: "Personal", color: "#FF6B6B" },
@@ -71,10 +89,10 @@ export function TaskDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md glassmorphic backdrop-blur-md bg-white/10 dark:bg-gray-900/30 rounded-xl p-6 shadow-xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Check className="h-4 w-4" /> Edit Task
+      <DialogContent className="sm:max-w-md glassmorphic bg-white/5 backdrop-blur-md rounded-xl p-6 shadow-xl ring-1 ring-white/10 animate-fade-in">
+        <DialogHeader className="border-b border-white/10 mb-4 pb-3">
+          <DialogTitle className="text-lg font-semibold tracking-tight flex items-center gap-2">
+            <Edit className="h-4 w-4" /> Edit Task
           </DialogTitle>
         </DialogHeader>
 
@@ -82,20 +100,20 @@ export function TaskDetailsDialog({
           <div className="space-y-4 py-2">
             {/* Task Content */}
             <div className="space-y-2">
-              <label htmlFor="task-content" className="text-sm font-medium">
+              <label htmlFor="task-content" className="text-sm font-medium block">
                 Task
               </label>
               <Textarea
                 id="task-content"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                className="min-h-[80px] resize-none focus-visible:ring-0 focus-visible:ring-offset-0 border-gray-300 dark:border-gray-700"
+                className="min-h-[80px] resize-none w-full bg-white/5 border border-white/10 rounded-md text-sm px-3 py-2 placeholder-white/40 focus-visible:ring-1 focus-visible:ring-white/20 focus-visible:ring-offset-0 focus-visible:outline-none"
               />
             </div>
 
             {/* Project Selection */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Project</label>
+              <label className="text-sm font-medium block">Project</label>
               <div className="flex flex-wrap gap-2">
                 {mockProjects.map((project) => (
                   <Button
@@ -103,17 +121,18 @@ export function TaskDetailsDialog({
                     type="button"
                     variant="outline"
                     className={cn(
-                      "h-8 px-3 border-2",
+                      "h-8 px-3 text-sm rounded-full",
                       selectedProject?.id === project.id
-                        ? "border-primary"
-                        : "border-transparent"
+                        ? "bg-gradient-to-r from-pink-500 to-purple-500 text-white border-transparent"
+                        : "bg-white/5 hover:bg-white/15 border border-white/10"
                     )}
                     onClick={() => setSelectedProject(project)}
-                    style={{
-                      backgroundColor: `${project.color}20`, // 20% opacity
-                      color: project.color,
-                    }}
+                    style={selectedProject?.id !== project.id ? {} : undefined}
                   >
+                    <div 
+                      className="w-2 h-2 rounded-full mr-1.5 inline-block"
+                      style={{backgroundColor: project.color}}
+                    />
                     {project.name}
                   </Button>
                 ))}
@@ -122,10 +141,10 @@ export function TaskDetailsDialog({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8"
+                    className="h-8 w-8 bg-white/5 hover:bg-white/10 rounded-full"
                     onClick={() => setSelectedProject(undefined)}
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3.5 w-3.5" />
                     <span className="sr-only">Clear selection</span>
                   </Button>
                 )}
@@ -134,21 +153,21 @@ export function TaskDetailsDialog({
 
             {/* Due Date Selection */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Due Date</label>
+              <label className="text-sm font-medium block">Due Date</label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !scheduledFor && "text-muted-foreground"
+                      "w-full justify-start text-left relative pl-10 bg-white/5 border border-white/10 hover:bg-white/10 rounded-md text-sm py-2",
+                      !scheduledFor && "text-white/40"
                     )}
                   >
-                    <Calendar className="mr-2 h-4 w-4" />
+                    <Calendar className="absolute left-3 top-2 h-4 w-4 text-white/40" />
                     {scheduledFor ? format(scheduledFor, "PPP") : "Select a date"}
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0 bg-white/10 backdrop-blur-md border border-white/10" align="start">
                   <CalendarComponent
                     mode="single"
                     selected={scheduledFor}
@@ -162,14 +181,16 @@ export function TaskDetailsDialog({
 
             {/* Status Selection */}
             <div className="space-y-2">
-              <label className="text-sm font-medium">Status</label>
+              <label className="text-sm font-medium block">Status</label>
               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   className={cn(
-                    "h-8 px-3",
-                    status === "todo" ? "bg-blue-100 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800" : ""
+                    "h-8 px-3 rounded-full text-sm font-medium",
+                    status === "todo" 
+                      ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-inner border-transparent" 
+                      : "bg-white/5 hover:bg-white/15 border border-white/10"
                   )}
                   onClick={() => setStatus("todo")}
                 >
@@ -179,8 +200,10 @@ export function TaskDetailsDialog({
                   type="button"
                   variant="outline"
                   className={cn(
-                    "h-8 px-3",
-                    status === "inprogress" ? "bg-amber-100 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800" : ""
+                    "h-8 px-3 rounded-full text-sm font-medium",
+                    status === "inprogress" 
+                      ? "bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-inner border-transparent" 
+                      : "bg-white/5 hover:bg-white/15 border border-white/10"
                   )}
                   onClick={() => setStatus("inprogress")}
                 >
@@ -190,8 +213,10 @@ export function TaskDetailsDialog({
                   type="button"
                   variant="outline"
                   className={cn(
-                    "h-8 px-3",
-                    status === "done" ? "bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800" : ""
+                    "h-8 px-3 rounded-full text-sm font-medium",
+                    status === "done" 
+                      ? "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-inner border-transparent" 
+                      : "bg-white/5 hover:bg-white/15 border border-white/10"
                   )}
                   onClick={() => setStatus("done")}
                 >
@@ -202,11 +227,11 @@ export function TaskDetailsDialog({
           </div>
         )}
 
-        <DialogFooter className="sm:justify-between gap-2">
+        <DialogFooter className="sm:justify-between gap-2 mt-4 pt-2">
           <Button
             variant="ghost"
             onClick={handleDelete}
-            className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+            className="text-red-500 hover:text-red-600 hover:underline text-sm hover:bg-transparent"
           >
             <Trash className="mr-2 h-4 w-4" />
             Delete
@@ -216,12 +241,13 @@ export function TaskDetailsDialog({
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
+              className="text-white/70 hover:text-white text-sm hover:bg-white/5"
             >
               Cancel
             </Button>
             <Button 
               variant="outline"
-              className="bg-gray-100 hover:bg-gray-200 text-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-white border-gray-300 dark:border-gray-700"
+              className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-medium border-white/10"
               onClick={handleSave}
             >
               Save Changes
