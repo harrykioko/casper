@@ -66,7 +66,7 @@ export function CommandModal({ isOpen, onClose, onAddTask, onNavigate, onAddLink
       {isOpen && (
         <>
           <motion.div 
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" 
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" 
             onClick={onClose}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -93,37 +93,37 @@ export function CommandModal({ isOpen, onClose, onAddTask, onNavigate, onAddLink
                 
                 {inputValue && (
                   <CommandGroup heading="Action">
-                    <CommandItem value="add-task" onSelect={handleSelect} className="hover:bg-[#FF6A79]/10">
+                    <CommandItem value="add-task" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
                       Add task: {inputValue}
                     </CommandItem>
                   </CommandGroup>
                 )}
                 
                 <CommandGroup heading="Navigation">
-                  <CommandItem value="navigate:/" onSelect={handleSelect} className="hover:bg-[#415AFF]/10">
+                  <CommandItem value="navigate:/" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
                     <LayoutDashboard className="mr-2 h-4 w-4" />
                     <span>Dashboard</span>
                   </CommandItem>
-                  <CommandItem value="navigate:/projects" onSelect={handleSelect} className="hover:bg-[#415AFF]/10">
+                  <CommandItem value="navigate:/projects" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
                     <FolderKanban className="mr-2 h-4 w-4" />
                     <span>Projects</span>
                   </CommandItem>
-                  <CommandItem value="navigate:/prompts" onSelect={handleSelect} className="hover:bg-[#415AFF]/10">
+                  <CommandItem value="navigate:/prompts" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
                     <MessageSquareText className="mr-2 h-4 w-4" />
                     <span>Prompt Library</span>
                   </CommandItem>
-                  <CommandItem value="navigate:/reading-list" onSelect={handleSelect} className="hover:bg-[#415AFF]/10">
+                  <CommandItem value="navigate:/reading-list" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
                     <BookOpen className="mr-2 h-4 w-4" />
                     <span>Reading List</span>
                   </CommandItem>
-                  <CommandItem value="navigate:/settings" onSelect={handleSelect} className="hover:bg-[#415AFF]/10">
+                  <CommandItem value="navigate:/settings" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
                   </CommandItem>
                 </CommandGroup>
 
                 <CommandGroup heading="Quick Actions">
-                  <CommandItem value="add-link" onSelect={handleSelect} className="hover:bg-[#FF6A79]/10">
+                  <CommandItem value="add-link" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
                     <Link className="mr-2 h-4 w-4" />
                     <span>Add Link to Reading List</span>
                   </CommandItem>
