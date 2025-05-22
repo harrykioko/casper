@@ -37,7 +37,26 @@ export function TaskDetailsDialog({
       setContent(task.content);
       setStatus(task.status || "todo");
       setSelectedProject(task.project);
-      setScheduledFor(task.scheduledFor ? new Date(task.scheduledFor) : undefined);
+      
+      // Only try to parse the date if it's a valid date string format
+      if (task.scheduledFor) {
+        try {
+          // Try to parse the date - this will fail for strings like "Today", "Tomorrow"
+          const date = new Date(task.scheduledFor);
+          
+          // Check if the date is valid
+          if (!isNaN(date.getTime())) {
+            setScheduledFor(date);
+          } else {
+            setScheduledFor(undefined);
+          }
+        } catch (error) {
+          console.error("Error parsing date:", error);
+          setScheduledFor(undefined);
+        }
+      } else {
+        setScheduledFor(undefined);
+      }
     }
   }, [task]);
 
@@ -50,7 +69,8 @@ export function TaskDetailsDialog({
       status,
       completed: status === "done",
       project: selectedProject,
-      scheduledFor: scheduledFor ? format(scheduledFor, "PPP") : undefined
+      // Only save the date if it's valid
+      scheduledFor: scheduledFor ? scheduledFor.toISOString() : undefined
     };
     
     onUpdateTask(updatedTask);
@@ -173,10 +193,22 @@ export function TaskDetailsDialog({
                     selected={scheduledFor}
                     onSelect={setScheduledFor}
                     initialFocus
-                    className={cn("p-3 pointer-events-auto")}
+                    className="p-3 pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
+              {/* Add option to clear the date */}
+              {scheduledFor && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs text-white/60 hover:text-white"
+                  onClick={() => setScheduledFor(undefined)}
+                >
+                  Clear date
+                </Button>
+              )}
             </div>
 
             {/* Status Selection */}

@@ -15,7 +15,7 @@ export const mockTasks: Task[] = [
       color: "#FF1464"
     },
     priority: "high",
-    scheduledFor: "Today"
+    scheduledFor: new Date().toISOString() // Today
   },
   {
     id: "2",
@@ -28,7 +28,7 @@ export const mockTasks: Task[] = [
       color: "#FF1464"
     },
     priority: "medium",
-    scheduledFor: "Yesterday"
+    scheduledFor: new Date(Date.now() - 86400000).toISOString() // Yesterday
   },
   {
     id: "3",
@@ -41,7 +41,7 @@ export const mockTasks: Task[] = [
       color: "#FF1464"
     },
     priority: "low",
-    scheduledFor: "Tomorrow"
+    scheduledFor: new Date(Date.now() + 86400000).toISOString() // Tomorrow
   },
   {
     id: "4",
