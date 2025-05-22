@@ -11,6 +11,7 @@ interface KanbanViewProps {
   tasks: Task[]; 
   onTaskComplete: (id: string) => void; 
   onTaskDelete: (id: string) => void; 
+  onUpdateTaskStatus: (id: string, completed: boolean) => void;
 }
 
 type KanbanColumn = {
@@ -20,7 +21,7 @@ type KanbanColumn = {
   emptyMessage?: string;
 }
 
-export function KanbanView({ tasks, onTaskComplete, onTaskDelete }: KanbanViewProps) {
+export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskStatus }: KanbanViewProps) {
   // Group tasks by status
   const todoTasks = tasks.filter(task => !task.completed);
   const doneTasks = tasks.filter(task => task.completed);
@@ -69,14 +70,14 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete }: KanbanViewPr
     // Update task status based on destination column
     if (destColumn.id === "done" && !updatedTask.completed) {
       updatedTask.completed = true;
-      onTaskComplete(updatedTask.id);
+      onUpdateTaskStatus(updatedTask.id, true);
       toast({
         title: "Task completed",
         description: "Your task has been marked as complete.",
       });
     } else if (destColumn.id !== "done" && updatedTask.completed) {
       updatedTask.completed = false;
-      onTaskComplete(updatedTask.id);
+      onUpdateTaskStatus(updatedTask.id, false);
     }
     
     // Insert task at destination position
