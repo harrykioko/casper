@@ -15,13 +15,15 @@ interface TaskSectionProps {
   onAddTask: (content: string) => void;
   onTaskComplete: (id: string) => void;
   onTaskDelete: (id: string) => void;
+  onUpdateTaskStatus: (id: string, completed: boolean) => void;
 }
 
 export function TaskSection({ 
   tasks, 
   onAddTask, 
   onTaskComplete, 
-  onTaskDelete 
+  onTaskDelete,
+  onUpdateTaskStatus
 }: TaskSectionProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
 
@@ -95,7 +97,8 @@ export function TaskSection({
           <KanbanView 
             tasks={tasks} 
             onTaskComplete={onTaskComplete} 
-            onTaskDelete={onTaskDelete} 
+            onTaskDelete={onTaskDelete}
+            onUpdateTaskStatus={onUpdateTaskStatus}
           />
         )}
       </div>
