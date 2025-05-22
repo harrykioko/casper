@@ -113,7 +113,7 @@ export function AddLinkDialog({ open, onOpenChange, onAddLink }: AddLinkDialogPr
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 onBlur={handleUrlBlur}
-                className="pr-10"
+                className="pr-10 focus-visible:ring-0 focus-visible:ring-offset-0 border-gray-300 dark:border-gray-700 focus-visible:border-gray-400 dark:focus-visible:border-gray-500 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
                 disabled={isLoading}
                 autoFocus
               />
