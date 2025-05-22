@@ -23,7 +23,6 @@ interface ReadingListProps {
 export function ReadingList({ items, onMarkRead, onDelete }: ReadingListProps) {
   return (
     <div className="h-full flex flex-col">
-      <h3 className="section-title mb-4">Reading List</h3>
       {items.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-center text-zinc-500 dark:text-white/60">
           <p>No items in your reading list</p>

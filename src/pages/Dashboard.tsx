@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { TaskInput } from "@/components/dashboard/TaskInput";
 import { TaskList, Task } from "@/components/dashboard/TaskList";
@@ -264,7 +263,7 @@ export default function Dashboard() {
               )}
             </div>
 
-            {/* Reading List Section */}
+            {/* Reading List Section - Removed redundant title */}
             <div>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="section-title">Reading List</h2>
