@@ -16,15 +16,9 @@ interface AddLinkDialogProps {
 export function AddLinkDialog({ open, onOpenChange, onAddLink }: AddLinkDialogProps) {
   const [url, setUrl] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [metadata, setMetadata] = useState<{
-    title?: string;
-    description?: string;
-    favicon?: string;
-  }>({});
 
   const resetForm = () => {
     setUrl("");
-    setMetadata({});
     setIsLoading(false);
   };
 
@@ -44,15 +38,13 @@ export function AddLinkDialog({ open, onOpenChange, onAddLink }: AddLinkDialogPr
     try {
       setIsLoading(true);
       
-      // In a real app, we would fetch metadata from a backend service
-      // For now, we'll simulate a delay and generate some fake metadata
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      // Create new link - in a real app, we might fetch metadata from a backend
+      // but here we'll just use the URL directly
       const newLink: Omit<ReadingItem, 'id'> = {
         url,
-        title: metadata.title || url,
-        description: metadata.description,
-        favicon: metadata.favicon,
+        title: url,
+        description: null,
+        favicon: null,
         isRead: false
       };
 
@@ -68,34 +60,6 @@ export function AddLinkDialog({ open, onOpenChange, onAddLink }: AddLinkDialogPr
     }
   };
 
-  const handleUrlBlur = async () => {
-    if (!url) return;
-    
-    try {
-      // Validate URL
-      new URL(url);
-      
-      setIsLoading(true);
-      
-      // In a real app, we would fetch metadata from a backend
-      // For now, simulate fetching metadata with a delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Generate fake metadata based on the domain
-      const domain = new URL(url).hostname;
-      setMetadata({
-        title: `Content from ${domain}`,
-        description: `This is a webpage from ${domain} that you've saved to read later.`,
-        favicon: `https://${domain}/favicon.ico`
-      });
-    } catch (error) {
-      // Invalid URL or error fetching metadata
-      console.error("Error fetching metadata:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -106,32 +70,18 @@ export function AddLinkDialog({ open, onOpenChange, onAddLink }: AddLinkDialogPr
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <div className="relative">
-              <Input
-                placeholder="Enter URL (https://...)"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onBlur={handleUrlBlur}
-                className="pr-10 focus-visible:ring-0 focus-visible:ring-offset-0 border-gray-300 dark:border-gray-700 focus-visible:border-gray-400 dark:focus-visible:border-gray-500 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
-                disabled={isLoading}
-                autoFocus
-              />
-              {isLoading && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                </div>
-              )}
-            </div>
-            
-            {metadata.title && (
-              <div className="p-3 border rounded-md bg-muted/30 space-y-2">
-                <p className="text-sm font-medium line-clamp-1">{metadata.title}</p>
-                {metadata.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2">
-                    {metadata.description}
-                  </p>
-                )}
+          <div className="relative">
+            <Input
+              placeholder="Enter URL (https://...)"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              className="pr-10 focus-visible:ring-0 focus-visible:ring-offset-0 border-gray-300 dark:border-gray-700 focus-visible:border-gray-400 dark:focus-visible:border-gray-500 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+              disabled={isLoading}
+              autoFocus
+            />
+            {isLoading && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <Loader2 className="h-4 w-4 animate-spin" />
               </div>
             )}
           </div>
