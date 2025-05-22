@@ -94,6 +94,19 @@
 
   body {
     @apply bg-background text-foreground font-sans;
+    background-image: url('/lovable-uploads/3460b5b1-9924-4d6c-9ea8-fd92ffbcc2cc.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
+
+  .dark body {
+    background-image: url('/lovable-uploads/31735e6f-b6bd-4462-aa84-7215f5ba0b93.png');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
   }
 
   .glassmorphic {
