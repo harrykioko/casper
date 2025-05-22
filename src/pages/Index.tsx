@@ -4,7 +4,9 @@ import Dashboard from "./Dashboard";
 const Index = () => {
   return (
     <div className="p-6">
-      <Dashboard />
+      <div className="max-w-7xl mx-auto">
+        <Dashboard />
+      </div>
     </div>
   );
 };

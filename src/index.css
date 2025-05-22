@@ -45,45 +45,53 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Color accents */
+    --coral: 352 100% 70%;
+    --blue: 230 100% 62%;
   }
 
   .dark {
     --background: 240 10% 4%;
-    --foreground: 210 40% 98%;
+    --foreground: 0 0% 90%;
 
     --card: 240 10% 6%;
-    --card-foreground: 210 40% 98%;
+    --card-foreground: 0 0% 90%;
 
     --popover: 240 10% 6%;
-    --popover-foreground: 210 40% 98%;
+    --popover-foreground: 0 0% 90%;
 
     --primary: 342 100% 54%;
-    --primary-foreground: 210 40% 98%;
+    --primary-foreground: 0 0% 90%;
 
     --secondary: 240 5% 12%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary-foreground: 0 0% 90%;
 
     --muted: 240 5% 12%;
     --muted-foreground: 215 20.2% 65.1%;
 
     --accent: 240 5% 12%;
-    --accent-foreground: 210 40% 98%;
+    --accent-foreground: 0 0% 90%;
 
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 90%;
 
     --border: 240 5% 12%;
     --input: 240 5% 12%;
     --ring: 342 100% 54%;
 
     --sidebar-background: 240 10% 4%;
-    --sidebar-foreground: 210 40% 98%;
+    --sidebar-foreground: 0 0% 90%;
     --sidebar-primary: 342 100% 54%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 5% 12%;
-    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-accent-foreground: 0 0% 90%;
     --sidebar-border: 240 5% 12%;
     --sidebar-ring: 342 100% 54%;
+    
+    /* Color accents */
+    --coral: 352 100% 70%;
+    --blue: 230 100% 62%;
   }
 }
 
@@ -109,12 +117,31 @@
     background-attachment: fixed;
   }
 
+  /* Glassmorphism */
   .glassmorphic {
-    @apply bg-white/5 backdrop-blur-md border border-white/10;
+    @apply bg-white/5 backdrop-blur-md border border-white/10 shadow-md ring-1 ring-white/10;
   }
 
   .dark .glassmorphic {
-    @apply bg-black/20 backdrop-blur-md border border-white/10;
+    @apply bg-black/20 backdrop-blur-md border border-white/10 shadow-md ring-1 ring-white/10;
+  }
+  
+  /* Typography */
+  .section-title {
+    @apply text-sm uppercase tracking-widest font-medium text-zinc-500 dark:text-white/60;
+  }
+  
+  .card-title {
+    @apply font-semibold tracking-tight;
+  }
+  
+  /* Transitions */
+  .hover-scale {
+    @apply transition-all duration-200 hover:scale-105 hover:shadow-lg;
+  }
+  
+  .check-pulse {
+    @apply transition-transform duration-200 hover:scale-110 active:scale-90;
   }
 }
 
@@ -138,4 +165,15 @@
 
 .dark ::-webkit-scrollbar-thumb {
   @apply bg-muted/50 rounded-full;
+}
+
+/* Avatar with gradient border */
+.avatar-gradient {
+  @apply relative;
+}
+
+.avatar-gradient::before {
+  content: '';
+  @apply absolute inset-0 rounded-full bg-gradient-to-r from-[#FF6A79] to-[#415AFF] -z-10 blur-sm;
+  padding: 2px;
 }

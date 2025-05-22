@@ -52,12 +52,13 @@ export function NavSidebar() {
   return (
     <div 
       className={cn(
-        "fixed inset-y-0 left-0 bg-sidebar flex flex-col items-center py-8 border-r border-border transition-all duration-300 z-10", 
-        expanded ? "w-64" : "w-16"
+        "fixed inset-y-0 left-0 flex flex-col items-center py-8 border-r border-white/10 transition-all duration-300 z-10 backdrop-blur-md", 
+        expanded ? "w-64" : "w-16",
+        theme === "dark" ? "bg-black/50" : "bg-white/60"
       )}
     >
       <div className="flex flex-col items-center gap-1 mb-8">
-        <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center text-white font-bold">
+        <div className="h-8 w-8 rounded-full bg-gradient-to-r from-[#FF6A79] to-[#415AFF] flex items-center justify-center text-white font-bold">
           C
         </div>
       </div>
@@ -69,15 +70,17 @@ export function NavSidebar() {
               <Link
                 to={item.path}
                 className={cn(
-                  "relative flex h-10 items-center rounded-md transition-colors hover:bg-accent",
+                  "relative flex h-10 items-center rounded-md transition-colors",
                   expanded ? "w-[90%] px-4 justify-start" : "w-10 justify-center",
-                  item.active && "bg-accent text-accent-foreground"
+                  item.active 
+                    ? "text-white dark:text-white/90 font-medium" 
+                    : "text-zinc-700 dark:text-white/70 hover:text-[#FF6A79] dark:hover:text-[#FF6A79]"
                 )}
               >
                 <item.icon className="h-5 w-5 flex-shrink-0" />
                 {item.active && (
                   <span className={cn(
-                    "absolute top-1/2 -translate-y-1/2 w-1 h-5 bg-primary rounded-r-full",
+                    "absolute top-1/2 -translate-y-1/2 w-1 h-5 bg-gradient-to-b from-[#FF6A79] to-[#415AFF] rounded-r-full",
                     expanded ? "left-0" : "-left-1"
                   )} />
                 )}
@@ -87,7 +90,7 @@ export function NavSidebar() {
               </Link>
             </TooltipTrigger>
             {!expanded && (
-              <TooltipContent side="right">
+              <TooltipContent side="right" className="glassmorphic">
                 {item.label}
               </TooltipContent>
             )}
@@ -101,9 +104,11 @@ export function NavSidebar() {
             <Link 
               to="/settings" 
               className={cn(
-                "flex h-10 items-center rounded-md transition-colors hover:bg-accent",
+                "flex h-10 items-center rounded-md transition-colors",
                 expanded ? "w-[90%] px-4 justify-start" : "w-10 justify-center",
-                location.pathname.startsWith("/settings") && "bg-accent text-accent-foreground"
+                location.pathname.startsWith("/settings") 
+                  ? "text-white dark:text-white/90 font-medium" 
+                  : "text-zinc-700 dark:text-white/70 hover:text-[#FF6A79] dark:hover:text-[#FF6A79]"
               )}
             >
               <Settings className="h-5 w-5 flex-shrink-0" />
@@ -113,7 +118,7 @@ export function NavSidebar() {
             </Link>
           </TooltipTrigger>
           {!expanded && (
-            <TooltipContent side="right">
+            <TooltipContent side="right" className="glassmorphic">
               Settings
             </TooltipContent>
           )}
@@ -126,7 +131,10 @@ export function NavSidebar() {
               size="icon"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               aria-label="Toggle theme"
-              className={expanded ? "w-[90%] justify-start px-4" : ""}
+              className={cn(
+                "text-zinc-700 dark:text-white/70 hover:text-[#415AFF] dark:hover:text-[#415AFF]",
+                expanded ? "w-[90%] justify-start px-4" : ""
+              )}
             >
               {theme === "dark" ? (
                 <Sun className="h-5 w-5 flex-shrink-0" />
@@ -139,7 +147,7 @@ export function NavSidebar() {
             </Button>
           </TooltipTrigger>
           {!expanded && (
-            <TooltipContent side="right">
+            <TooltipContent side="right" className="glassmorphic">
               {theme === "dark" ? "Light Mode" : "Dark Mode"}
             </TooltipContent>
           )}
@@ -149,7 +157,7 @@ export function NavSidebar() {
           variant="ghost"
           size="icon"
           onClick={toggleSidebar}
-          className="mt-4"
+          className="mt-4 text-zinc-700 dark:text-white/70 hover:text-[#415AFF] dark:hover:text-[#415AFF]"
           aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
         >
           {expanded ? (

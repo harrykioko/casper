@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
 import { LayoutDashboard, FolderKanban, MessageSquareText, BookOpen, Settings } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface CommandModalProps {
   isOpen: boolean;
@@ -57,52 +58,70 @@ export function CommandModal({ isOpen, onClose, onAddTask, onNavigate }: Command
   };
   
   return (
-    <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={onClose} />
-      <div className="command-modal">
-        <Command>
-          <CommandInput 
-            placeholder="Type a command or search..." 
-            ref={inputRef}
-            value={inputValue}
-            onValueChange={handleInputChange}
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" 
+            onClick={onClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
           />
-          <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
-            
-            {inputValue && (
-              <CommandGroup heading="Action">
-                <CommandItem value="add-task" onSelect={handleSelect}>
-                  Add task: {inputValue}
-                </CommandItem>
-              </CommandGroup>
-            )}
-            
-            <CommandGroup heading="Navigation">
-              <CommandItem value="navigate:/" onSelect={handleSelect}>
-                <LayoutDashboard className="mr-2 h-4 w-4" />
-                <span>Dashboard</span>
-              </CommandItem>
-              <CommandItem value="navigate:/projects" onSelect={handleSelect}>
-                <FolderKanban className="mr-2 h-4 w-4" />
-                <span>Projects</span>
-              </CommandItem>
-              <CommandItem value="navigate:/prompts" onSelect={handleSelect}>
-                <MessageSquareText className="mr-2 h-4 w-4" />
-                <span>Prompt Library</span>
-              </CommandItem>
-              <CommandItem value="navigate:/reading-list" onSelect={handleSelect}>
-                <BookOpen className="mr-2 h-4 w-4" />
-                <span>Reading List</span>
-              </CommandItem>
-              <CommandItem value="navigate:/settings" onSelect={handleSelect}>
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </div>
-    </>
+          <motion.div 
+            className="command-modal"
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          >
+            <Command className="rounded-lg overflow-hidden">
+              <CommandInput 
+                placeholder="Type a command or search..." 
+                ref={inputRef}
+                value={inputValue}
+                onValueChange={handleInputChange}
+                className="text-zinc-800 dark:text-white/90"
+              />
+              <CommandList className="max-h-[300px] overflow-auto">
+                <CommandEmpty className="text-zinc-500 dark:text-white/60">No results found.</CommandEmpty>
+                
+                {inputValue && (
+                  <CommandGroup heading="Action">
+                    <CommandItem value="add-task" onSelect={handleSelect} className="hover:bg-[#FF6A79]/10">
+                      Add task: {inputValue}
+                    </CommandItem>
+                  </CommandGroup>
+                )}
+                
+                <CommandGroup heading="Navigation">
+                  <CommandItem value="navigate:/" onSelect={handleSelect} className="hover:bg-[#415AFF]/10">
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    <span>Dashboard</span>
+                  </CommandItem>
+                  <CommandItem value="navigate:/projects" onSelect={handleSelect} className="hover:bg-[#415AFF]/10">
+                    <FolderKanban className="mr-2 h-4 w-4" />
+                    <span>Projects</span>
+                  </CommandItem>
+                  <CommandItem value="navigate:/prompts" onSelect={handleSelect} className="hover:bg-[#415AFF]/10">
+                    <MessageSquareText className="mr-2 h-4 w-4" />
+                    <span>Prompt Library</span>
+                  </CommandItem>
+                  <CommandItem value="navigate:/reading-list" onSelect={handleSelect} className="hover:bg-[#415AFF]/10">
+                    <BookOpen className="mr-2 h-4 w-4" />
+                    <span>Reading List</span>
+                  </CommandItem>
+                  <CommandItem value="navigate:/settings" onSelect={handleSelect} className="hover:bg-[#415AFF]/10">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </CommandItem>
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }

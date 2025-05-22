@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
+import { AnimatePresence } from "framer-motion";
 
 import { NavSidebar } from "@/components/layout/NavSidebar";
 import { SidebarStateProvider, useSidebarState } from "@/contexts/SidebarStateContext";
@@ -44,15 +45,17 @@ const MainContent = () => {
   
   return (
     <div className={`flex-1 transition-all duration-300 ${expanded ? 'ml-64' : 'ml-16'}`}>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/projects" element={<Projects />} />
-        <Route path="/projects/:id" element={<ProjectDetail />} />
-        <Route path="/prompts" element={<Prompts />} />
-        <Route path="/reading-list" element={<ReadingList />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <AnimatePresence mode="wait">
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/projects/:id" element={<ProjectDetail />} />
+          <Route path="/prompts" element={<Prompts />} />
+          <Route path="/reading-list" element={<ReadingList />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </AnimatePresence>
     </div>
   );
 };

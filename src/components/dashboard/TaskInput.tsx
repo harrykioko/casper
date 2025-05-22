@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Plus } from "lucide-react";
+import { motion } from "framer-motion";
 
 export function TaskInput({ onAddTask }: { onAddTask: (task: string) => void }) {
   const [task, setTask] = useState("");
@@ -21,25 +22,27 @@ export function TaskInput({ onAddTask }: { onAddTask: (task: string) => void }) 
     <form 
       onSubmit={handleSubmit} 
       className={cn(
-        "w-full flex items-center gap-2 p-3 rounded-lg transition-all duration-200",
+        "w-full flex items-center gap-2 p-3 rounded-lg transition-all duration-300",
         isFocused ? "glassmorphic" : "bg-transparent"
       )}
     >
-      <Button 
-        type="submit" 
-        size="icon" 
-        variant={isFocused ? "default" : "ghost"} 
-        className={cn(
-          "rounded-full h-8 w-8 flex-shrink-0",
-          isFocused && "bg-gradient-primary hover:bg-gradient-primary"
-        )}
-      >
-        <Plus className="h-4 w-4" />
-      </Button>
+      <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
+        <Button 
+          type="submit" 
+          size="icon" 
+          variant={isFocused ? "default" : "ghost"} 
+          className={cn(
+            "rounded-full h-8 w-8 flex-shrink-0 transition-all",
+            isFocused && "bg-gradient-to-r from-[#FF6A79] to-[#415AFF] hover:from-[#FF6A79] hover:to-[#415AFF]"
+          )}
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+      </motion.div>
       <Input
         type="text"
         placeholder="Add a new task..."
-        className="border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none"
+        className="border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none text-zinc-800 dark:text-white/90"
         value={task}
         onChange={(e) => setTask(e.target.value)}
         onFocus={() => setIsFocused(true)}
