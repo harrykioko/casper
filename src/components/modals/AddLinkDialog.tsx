@@ -145,7 +145,12 @@ export function AddLinkDialog({ open, onOpenChange, onAddLink }: AddLinkDialogPr
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={!url || isLoading}>
+            <Button 
+              type="submit" 
+              disabled={!url || isLoading}
+              variant="outline"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-white border-gray-300 dark:border-gray-700"
+            >
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
