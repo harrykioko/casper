@@ -10,6 +10,7 @@ import { useDashboardKeyboardShortcuts } from "@/hooks/useDashboardKeyboardShort
 import { mockEvents } from "@/data/mockData";
 import { useState } from "react";
 import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
+import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const { readingItems, handleMarkRead, handleDeleteReadingItem, handleAddReadingItem } = useReadingItemsManager();
   const { isCommandModalOpen, openCommandModal, closeCommandModal } = useCommandModal();
   const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
+  const [addTaskDialogOpen, setAddTaskDialogOpen] = useState(false);
   
   // Set up keyboard shortcuts
   useDashboardKeyboardShortcuts({ openCommandModal });
@@ -36,7 +38,9 @@ export default function Dashboard() {
           tasks={tasks}
           readingItems={readingItems}
           openCommandModal={openCommandModal}
-          onAddTask={handleAddTask}
+          onAddTask={(content) => {
+            setAddTaskDialogOpen(true);
+          }}
           onTaskComplete={handleCompleteTask}
           onTaskDelete={handleDeleteTask}
           onUpdateTaskStatus={handleUpdateTaskStatus}
@@ -53,7 +57,7 @@ export default function Dashboard() {
       <CommandModal 
         isOpen={isCommandModalOpen} 
         onClose={closeCommandModal} 
-        onAddTask={handleAddTask}
+        onAddTask={() => setAddTaskDialogOpen(true)}
         onNavigate={navigate}
         onAddLink={() => setAddLinkDialogOpen(true)}
         onAddPrompt={handleAddPrompt}
@@ -64,6 +68,13 @@ export default function Dashboard() {
         open={addLinkDialogOpen}
         onOpenChange={setAddLinkDialogOpen}
         onAddLink={handleAddReadingItem}
+      />
+
+      {/* Add Task Dialog */}
+      <AddTaskDialog
+        open={addTaskDialogOpen}
+        onOpenChange={setAddTaskDialogOpen}
+        onAddTask={handleAddTask}
       />
     </div>
   );

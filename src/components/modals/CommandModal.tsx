@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 interface CommandModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddTask?: (task: string) => void;
+  onAddTask?: () => void;
   onNavigate?: (path: string) => void;
   onAddLink?: () => void;
   onAddPrompt?: () => void;
@@ -60,8 +60,8 @@ export function CommandModal({
       const path = value.replace("navigate:", "");
       onNavigate?.(path);
       onClose();
-    } else if (value === "add-task" && inputValue) {
-      onAddTask?.(inputValue);
+    } else if (value === "add-task") {
+      onAddTask?.();
       onClose();
     } else if (value === "add-link") {
       onAddLink?.();
@@ -70,10 +70,7 @@ export function CommandModal({
       onAddPrompt?.();
       onClose();
     } else if (value === "quick-task") {
-      onNavigate?.("/");
-      setTimeout(() => {
-        onAddTask?.("New task");
-      }, 100);
+      onAddTask?.();
       onClose();
     }
   };
@@ -112,7 +109,7 @@ export function CommandModal({
                   <CommandGroup heading="Action">
                     <CommandItem value="add-task" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
                       <CheckSquare className="mr-2 h-4 w-4" />
-                      <span>Add task: {inputValue}</span>
+                      <span>Create task: {inputValue}</span>
                     </CommandItem>
                   </CommandGroup>
                 )}
