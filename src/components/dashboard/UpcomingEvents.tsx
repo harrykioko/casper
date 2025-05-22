@@ -7,7 +7,7 @@ interface CalendarEvent {
   startTime: string;
   endTime?: string;
   location?: string;
-  category?: "work" | "social" | "personal";
+  category?: string; // Changed from "work" | "social" | "personal" to string
 }
 
 interface UpcomingEventsProps {
