@@ -1,4 +1,3 @@
-
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { 
@@ -25,9 +24,9 @@ export function NavSidebar() {
   const navItems = [
     { 
       icon: LayoutDashboard, 
-      path: "/", 
+      path: "/dashboard", 
       label: "Dashboard",
-      active: location.pathname === "/" 
+      active: location.pathname === "/dashboard" 
     },
     { 
       icon: FolderKanban, 
@@ -176,4 +175,3 @@ export function NavSidebar() {
     </div>
   );
 }
-
