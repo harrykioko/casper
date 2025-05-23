@@ -116,6 +116,14 @@
     background-repeat: no-repeat;
     background-attachment: fixed;
   }
+  
+  .landing-page body {
+    background-image: url('/lovable-uploads/d31f963e-ec8c-497f-a00f-505ab514001b.png');
+  }
+  
+  .landing-page.dark body {
+    background-image: url('/lovable-uploads/fe8fb808-832c-4bfb-8451-75b8a83d0d14.png');
+  }
 
   /* Glassmorphism */
   .glassmorphic {

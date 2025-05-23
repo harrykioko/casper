@@ -3,13 +3,15 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
 import { AnimatePresence } from "framer-motion";
+import { useEffect } from "react";
 
 import { NavSidebar } from "@/components/layout/NavSidebar";
 import { SidebarStateProvider, useSidebarState } from "@/contexts/SidebarStateContext";
-import Index from "./pages/Index";
+import Landing from "./pages/Landing";
+import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import Prompts from "./pages/Prompts";
@@ -28,15 +30,45 @@ const App = () => {
           <Sonner />
           <SidebarStateProvider>
             <BrowserRouter>
-              <div className="min-h-screen flex">
-                <NavSidebar />
-                <MainContent />
-              </div>
+              <AppContent />
             </BrowserRouter>
           </SidebarStateProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>
+  );
+};
+
+const AppContent = () => {
+  const location = useLocation();
+  const isLandingPage = location.pathname === '/';
+
+  // Add class to body based on current route
+  useEffect(() => {
+    if (isLandingPage) {
+      document.body.classList.add('landing-page');
+    } else {
+      document.body.classList.remove('landing-page');
+    }
+  }, [isLandingPage]);
+
+  if (isLandingPage) {
+    // Landing page without sidebar
+    return (
+      <AnimatePresence mode="wait">
+        <Routes>
+          <Route path="/" element={<Landing />} />
+        </Routes>
+      </AnimatePresence>
+    );
+  }
+
+  // App pages with sidebar
+  return (
+    <div className="min-h-screen flex">
+      <NavSidebar />
+      <MainContent />
+    </div>
   );
 };
 
@@ -47,7 +79,7 @@ const MainContent = () => {
     <div className={`flex-1 transition-all duration-300 ${expanded ? 'ml-64' : 'ml-16'}`}>
       <AnimatePresence mode="wait">
         <Routes>
-          <Route path="/" element={<Index />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/prompts" element={<Prompts />} />
