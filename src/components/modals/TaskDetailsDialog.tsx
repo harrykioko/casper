@@ -1,10 +1,12 @@
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { Trash, Edit } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Task } from "@/components/dashboard/TaskSection";
 import { TaskDetailsForm } from "./task-details/TaskDetailsForm";
+import { useTaskDetails } from "@/hooks/useTaskDetails";
+import { toast } from "@/hooks/use-toast";
 
 interface TaskDetailsDialogProps {
   open: boolean;
@@ -21,61 +23,41 @@ export function TaskDetailsDialog({
   onUpdateTask, 
   onDeleteTask 
 }: TaskDetailsDialogProps) {
-  const [content, setContent] = useState("");
-  const [status, setStatus] = useState<"todo" | "inprogress" | "done">("todo");
-  const [scheduledFor, setScheduledFor] = useState<Date | undefined>(undefined);
-  const [selectedProject, setSelectedProject] = useState<Task["project"] | undefined>(undefined);
-  
-  // Initialize form when task changes
-  useEffect(() => {
-    if (task) {
-      setContent(task.content);
-      setStatus(task.status || "todo");
-      setSelectedProject(task.project);
-      
-      // Only try to parse the date if it's a valid date string format
-      if (task.scheduledFor) {
-        try {
-          // Try to parse the date - this will fail for strings like "Today", "Tomorrow"
-          const date = new Date(task.scheduledFor);
-          
-          // Check if the date is valid
-          if (!isNaN(date.getTime())) {
-            setScheduledFor(date);
-          } else {
-            setScheduledFor(undefined);
-          }
-        } catch (error) {
-          console.error("Error parsing date:", error);
-          setScheduledFor(undefined);
-        }
-      } else {
-        setScheduledFor(undefined);
-      }
-    }
-  }, [task]);
+  const {
+    content,
+    setContent,
+    status,
+    setStatus,
+    scheduledFor,
+    setScheduledFor,
+    selectedProject,
+    setSelectedProject,
+    createUpdatedTask
+  } = useTaskDetails({ task });
 
   const handleSave = () => {
     if (!task) return;
     
-    const updatedTask: Task = {
-      ...task,
-      content,
-      status,
-      completed: status === "done",
-      project: selectedProject,
-      // Only save the date if it's valid
-      scheduledFor: scheduledFor ? scheduledFor.toISOString() : undefined
-    };
+    const updatedTask = createUpdatedTask();
+    if (!updatedTask) return;
     
     onUpdateTask(updatedTask);
     onOpenChange(false);
+    toast({
+      title: "Task updated",
+      description: "Your task has been successfully updated."
+    });
   };
 
   const handleDelete = () => {
     if (!task) return;
     onDeleteTask(task.id);
     onOpenChange(false);
+    toast({
+      title: "Task deleted",
+      description: "Your task has been successfully deleted.",
+      variant: "destructive"
+    });
   };
 
   // Handle keyboard shortcuts
