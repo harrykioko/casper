@@ -117,12 +117,21 @@
     background-attachment: fixed;
   }
   
-  .landing-page body {
-    background-image: url('/lovable-uploads/bd84c194-088f-4a07-9ded-12d2912321b7.png');
+  /* Landing page backgrounds with higher specificity */
+  body.landing-page {
+    background-image: url('/lovable-uploads/bd84c194-088f-4a07-9ded-12d2912321b7.png') !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed !important;
   }
   
-  .landing-page.dark body {
-    background-image: url('/lovable-uploads/c075e2b8-d755-4916-96e8-8729bc01fe90.png');
+  body.landing-page.dark {
+    background-image: url('/lovable-uploads/c075e2b8-d755-4916-96e8-8729bc01fe90.png') !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-repeat: no-repeat !important;
+    background-attachment: fixed !important;
   }
 
   /* Glassmorphism */
