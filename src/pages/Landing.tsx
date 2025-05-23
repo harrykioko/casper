@@ -24,10 +24,13 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen w-full overflow-hidden relative">
-      {/* Dark radial background with gradient overlay */}
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0f] to-[#121212]"></div>
-      </div>
+      {/* Custom background for landing page */}
+      <div 
+        className="absolute inset-0 -z-10 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: `url('/lovable-uploads/6b1600fa-ac63-4959-a5f9-335e57be0781.png')`
+        }}
+      ></div>
       
       {/* Top Navigation */}
       <nav className="absolute top-0 right-0 p-6 z-10">
