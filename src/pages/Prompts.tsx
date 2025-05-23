@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { MessageSquareText, Plus, Search, Eye } from "lucide-react";
+import { MessageSquareText, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -206,12 +206,20 @@ export default function Prompts() {
           {filteredPrompts.map((prompt) => (
             <Card
               key={prompt.id}
-              className="hover:glassmorphic transition-all duration-200 cursor-pointer overflow-hidden group relative"
+              className="hover:glassmorphic transition-all duration-150 ease-in-out cursor-pointer overflow-hidden hover:shadow-lg hover:scale-[1.01] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-cyan-500"
               onClick={() => handleViewPrompt(prompt)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleViewPrompt(prompt);
+                }
+              }}
             >
               <div className="p-6">
                 <div className="flex items-center gap-2 mb-2">
-                  <MessageSquareText className="h-4 w-4 text-muted-foreground" />
+                  <MessageSquareText className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
                   <h3 className="font-medium">{prompt.title}</h3>
                 </div>
                 <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
@@ -223,14 +231,6 @@ export default function Prompts() {
                       {tag}
                     </Badge>
                   ))}
-                </div>
-                
-                {/* Hover overlay */}
-                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <Button variant="secondary" size="sm" className="gap-2">
-                    <Eye className="h-4 w-4" />
-                    View Details
-                  </Button>
                 </div>
               </div>
             </Card>
