@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -94,10 +95,10 @@ export default function Auth() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
-          <div className="rounded-2xl bg-white/5 dark:bg-zinc-900/20 backdrop-blur-xl shadow-2xl ring-1 ring-white/10 p-8">
+          <div className="rounded-2xl bg-white/3 dark:bg-zinc-900/15 backdrop-blur-xl shadow-2xl ring-1 ring-white/10 p-8">
             {/* Casper Logo */}
             <div className="text-center mb-8">
-              <div className="text-sm md:text-base font-semibold tracking-[0.25em] text-muted-foreground uppercase mb-2">
+              <div className="text-lg md:text-xl font-semibold tracking-[0.25em] text-muted-foreground uppercase mb-2">
                 Casper
               </div>
             </div>
