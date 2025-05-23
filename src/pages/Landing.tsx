@@ -1,13 +1,35 @@
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/hooks/use-theme';
 import { Button } from '@/components/ui/button';
+import { LoginModal } from '@/components/landing/LoginModal';
+import { FeatureCard } from '@/components/landing/FeatureCard';
+import { PreviewCard } from '@/components/landing/PreviewCard';
+import { useAuth } from '@/contexts/AuthContext';
+import { CheckCircle, Target, Zap, Globe, Calendar, BookOpen, Lightbulb, Settings } from 'lucide-react';
 
 export default function Landing() {
   const { theme } = useTheme();
   const navigate = useNavigate();
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const { user, loading } = useAuth();
+
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (!loading && user) {
+      navigate('/dashboard');
+    }
+  }, [user, loading, navigate]);
+
+  // Show loading state while checking auth
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   const fadeUpVariants = {
     hidden: { opacity: 0, y: 30 },

@@ -5,6 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/hooks/use-theme";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AnimatePresence } from "framer-motion";
 import { useEffect } from "react";
 
@@ -26,15 +28,17 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider defaultTheme="dark">
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <SidebarStateProvider>
-            <BrowserRouter>
-              <AppContent />
-            </BrowserRouter>
-          </SidebarStateProvider>
-        </TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <SidebarStateProvider>
+              <BrowserRouter>
+                <AppContent />
+              </BrowserRouter>
+            </SidebarStateProvider>
+          </TooltipProvider>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
@@ -67,12 +71,14 @@ const AppContent = () => {
     );
   }
 
-  // App pages with sidebar
+  // App pages with sidebar - all protected
   return (
-    <div className="min-h-screen flex">
-      <NavSidebar />
-      <MainContent />
-    </div>
+    <ProtectedRoute>
+      <div className="min-h-screen flex">
+        <NavSidebar />
+        <MainContent />
+      </div>
+    </ProtectedRoute>
   );
 };
 
