@@ -33,10 +33,10 @@ export default function Landing() {
       ></div>
       
       {/* Top Navigation */}
-      <nav className="absolute top-6 right-6 z-10">
+      <nav className="absolute top-0 right-0 p-6 z-10">
         <Button
           variant="ghost"
-          className="text-sm text-muted-foreground hover:text-foreground transition"
+          className="text-sm text-muted-foreground hover:text-foreground transition px-4 py-2"
           onClick={() => setIsLoginModalOpen(true)}
         >
           Log In
@@ -47,12 +47,12 @@ export default function Landing() {
       <section className="min-h-screen flex flex-col items-center justify-center px-4 md:px-8 relative">
         <motion.div 
           className="text-center max-w-4xl mx-auto"
-          initial="hidden"a
+          initial="hidden"
           animate="visible"
         >
           {/* Casper Wordmark */}
           <motion.div 
-            className="text-3xl md:text-4xl font-bold tracking-[0.3em] text-primary uppercase mb-4"
+            className="text-sm md:text-base font-semibold tracking-[0.25em] text-muted-foreground uppercase mb-4"
             variants={fadeUpVariants}
             custom={0}
           >
@@ -61,7 +61,7 @@ export default function Landing() {
 
           {/* Main Headline */}
           <motion.h1 
-            className="text-4xl md:text-5xl font-semibold tracking-tight text-center"
+            className="text-5xl md:text-6xl font-bold tracking-tight text-center"
             variants={fadeUpVariants}
             custom={1}
           >
@@ -70,21 +70,36 @@ export default function Landing() {
 
           {/* Subheadline */}
           <motion.p 
-            className="text-base md:text-lg text-muted-foreground mt-2"
+            className="text-xl md:text-2xl text-muted-foreground mt-4 text-center"
             variants={fadeUpVariants}
             custom={2}
           >
             One place for your tasks, prompts, and priorities. Built for flow.
           </motion.p>
 
-          {/* UI Preview Panel */}
+          {/* CTA Button */}
           <motion.div 
-            className="mt-16 max-w-5xl mx-auto rounded-2xl shadow-2xl overflow-hidden bg-white/5 backdrop-blur-xl ring-1 ring-white/10"
+            className="mt-8"
             variants={fadeUpVariants}
             custom={3}
+          >
+            <Button 
+              size="lg" 
+              className="glassmorphic text-lg px-6 py-4 font-semibold transition hover:scale-[1.03] bg-primary hover:bg-primary/90"
+              onClick={() => setIsLoginModalOpen(true)}
+            >
+              Create Account
+            </Button>
+          </motion.div>
+
+          {/* UI Preview Panel */}
+          <motion.div 
+            className="relative mt-12 max-w-5xl mx-auto rounded-2xl shadow-2xl overflow-hidden bg-white/5 backdrop-blur-xl ring-1 ring-white/10"
+            variants={fadeUpVariants}
+            custom={4}
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6, duration: 1, ease: "easeOut" }}
+            transition={{ delay: 0.8, duration: 1, ease: "easeOut" }}
             whileHover={{ scale: 1.02, transition: { duration: 0.3 } }}
           >
             <img 
