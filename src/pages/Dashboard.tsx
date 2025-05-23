@@ -38,9 +38,7 @@ export default function Dashboard() {
           tasks={tasks}
           readingItems={readingItems}
           openCommandModal={openCommandModal}
-          onAddTask={(content) => {
-            setAddTaskDialogOpen(true);
-          }}
+          onAddTask={handleAddTask}
           onTaskComplete={handleCompleteTask}
           onTaskDelete={handleDeleteTask}
           onUpdateTaskStatus={handleUpdateTaskStatus}
