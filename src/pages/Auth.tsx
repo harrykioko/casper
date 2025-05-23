@@ -1,5 +1,4 @@
 
-
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -89,20 +88,28 @@ export default function Auth() {
       ></div>
 
       {/* Auth Form Container */}
-      <div className="min-h-screen flex items-center justify-center px-4">
+      <div className="min-h-screen flex flex-col items-center justify-center px-4">
+        {/* Casper Wordmark - Moved outside the card */}
+        <motion.div
+          className="text-center text-muted-foreground text-sm tracking-[0.2em] uppercase mb-8"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+          CASPER
+        </motion.div>
+        
         <motion.div 
-          className="max-w-md w-full mx-auto mt-24"
+          className="max-w-md w-full mx-auto"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
           <div className="rounded-2xl bg-white/3 dark:bg-zinc-900/15 backdrop-blur-xl shadow-2xl ring-1 ring-white/10 p-8">
-            {/* Casper Logo */}
-            <div className="text-center mb-8">
-              <div className="text-2xl md:text-3xl font-semibold tracking-[0.25em] text-muted-foreground uppercase mb-2">
-                Casper
-              </div>
-            </div>
+            {/* Form Section Header */}
+            <h2 className="text-center text-muted-foreground text-lg font-medium mb-6">
+              {isLogin ? "Log In" : "Create Account"}
+            </h2>
 
             <AnimatePresence mode="wait">
               <motion.div
@@ -205,4 +212,3 @@ export default function Auth() {
     </div>
   );
 }
-
