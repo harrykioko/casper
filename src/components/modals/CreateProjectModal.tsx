@@ -138,7 +138,7 @@ export function CreateProjectModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg rounded-2xl bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border border-gray-200 dark:border-gray-800">
+      <DialogContent className="max-w-lg rounded-2xl bg-white/10 dark:bg-zinc-900/30 backdrop-blur-sm ring-1 ring-white/10 dark:ring-white/5 shadow-2xl transition-all">
         <AnimatePresence mode="wait">
           {showSuccess ? (
             <motion.div
@@ -169,10 +169,10 @@ export function CreateProjectModal({
           ) : (
             <motion.div
               key="form"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
             >
               <DialogHeader>
                 <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">
@@ -181,10 +181,10 @@ export function CreateProjectModal({
               </DialogHeader>
 
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-6">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 divide-y divide-muted/20">
                   {/* Basics Section */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium text-muted-foreground border-b border-muted/20 pb-2">
+                  <div className="space-y-4 pt-0">
+                    <h3 className="text-sm font-medium text-muted-foreground">
                       Basics
                     </h3>
                     
@@ -200,7 +200,7 @@ export function CreateProjectModal({
                             <Input
                               {...field}
                               placeholder="Enter project name"
-                              className="rounded-md border-muted bg-background focus:ring-cyan-500"
+                              className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-cyan-500 transition"
                               autoFocus
                             />
                           </FormControl>
@@ -221,7 +221,7 @@ export function CreateProjectModal({
                             <Textarea
                               {...field}
                               placeholder="Describe your project (optional)"
-                              className="rounded-md border-muted bg-background focus:ring-cyan-500 min-h-[80px]"
+                              className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-cyan-500 transition min-h-[80px]"
                               rows={3}
                             />
                           </FormControl>
@@ -235,8 +235,8 @@ export function CreateProjectModal({
                   </div>
 
                   {/* Meta Section */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-medium text-muted-foreground border-b border-muted/20 pb-2">
+                  <div className="space-y-4 pt-6">
+                    <h3 className="text-sm font-medium text-muted-foreground">
                       Meta
                     </h3>
 
@@ -255,10 +255,8 @@ export function CreateProjectModal({
                                   key={swatch.value}
                                   type="button"
                                   className={cn(
-                                    "w-8 h-8 rounded-full border-2 transition-all",
-                                    field.value === swatch.value
-                                      ? "border-gray-900 dark:border-gray-100 scale-110"
-                                      : "border-gray-300 dark:border-gray-600 hover:scale-105"
+                                    "w-6 h-6 rounded-full border-2 border-white/10 ring-offset-2 focus:outline-none focus:ring-2 focus:ring-[#FF1464] transition-all",
+                                    field.value === swatch.value && `ring-2 ring-[${swatch.value}]`
                                   )}
                                   style={{ backgroundColor: swatch.value }}
                                   onClick={() => field.onChange(swatch.value)}
@@ -285,10 +283,7 @@ export function CreateProjectModal({
                               <FormControl>
                                 <Button
                                   variant="outline"
-                                  className={cn(
-                                    "w-full pl-3 text-left font-normal rounded-md border-muted bg-background",
-                                    !field.value && "text-muted-foreground"
-                                  )}
+                                  className="w-full pl-3 text-left font-normal bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-cyan-500 transition"
                                 >
                                   {field.value ? (
                                     format(field.value, "PPP")
@@ -320,9 +315,9 @@ export function CreateProjectModal({
                   </div>
 
                   {/* Resources Section */}
-                  <div className="space-y-4">
+                  <div className="space-y-4 pt-6">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium text-muted-foreground border-b border-muted/20 pb-2 flex-1">
+                      <h3 className="text-sm font-medium text-muted-foreground">
                         Resources (optional)
                       </h3>
                     </div>
@@ -330,50 +325,52 @@ export function CreateProjectModal({
                     {fields.length > 0 && (
                       <div className="space-y-3">
                         {fields.map((field, index) => (
-                          <div key={field.id} className="flex gap-2 items-start">
-                            <div className="flex-1 space-y-2">
-                              <FormField
-                                control={form.control}
-                                name={`resources.${index}.title`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        placeholder="Resource title"
-                                        className="rounded-md border-muted bg-background focus:ring-cyan-500"
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={form.control}
-                                name={`resources.${index}.url`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        placeholder="https://..."
-                                        className="rounded-md border-muted bg-background focus:ring-cyan-500"
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
+                          <div key={field.id} className="bg-white/5 dark:bg-zinc-800/30 p-4 rounded-md">
+                            <div className="flex gap-2 items-start">
+                              <div className="flex-1 space-y-2">
+                                <FormField
+                                  control={form.control}
+                                  name={`resources.${index}.title`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          placeholder="Resource title"
+                                          className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-cyan-500 transition"
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={form.control}
+                                  name={`resources.${index}.url`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormControl>
+                                        <Input
+                                          {...field}
+                                          placeholder="https://..."
+                                          className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-cyan-500 transition"
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => remove(index)}
+                                className="mt-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
                             </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => remove(index)}
-                              className="mt-1 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
                           </div>
                         ))}
                       </div>
@@ -383,18 +380,18 @@ export function CreateProjectModal({
                       type="button"
                       variant="outline"
                       onClick={addResource}
-                      className="w-full gap-2 rounded-md border-muted text-muted-foreground hover:text-foreground"
+                      className="w-full py-2 px-3 flex items-center justify-center text-sm font-medium text-muted-foreground bg-white/5 hover:bg-white/10 rounded-md border border-white/10 transition"
                     >
-                      <Plus className="h-4 w-4" />
+                      <Plus className="h-4 w-4 mr-2" />
                       Add Another Link
                     </Button>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex flex-col gap-2 pt-4">
+                  <div className="flex flex-col gap-2 pt-6 mt-6">
                     <Button
                       type="submit"
-                      className="w-full bg-cyan-500 text-white hover:bg-cyan-600 rounded-md font-medium py-2.5 transition-all duration-200"
+                      className="w-full py-2 rounded-md bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium transition shadow"
                       disabled={form.formState.isSubmitting}
                     >
                       {form.formState.isSubmitting ? "Creating..." : "Create Project"}
@@ -403,7 +400,7 @@ export function CreateProjectModal({
                       type="button"
                       variant="ghost"
                       onClick={() => onOpenChange(false)}
-                      className="w-full text-muted-foreground hover:text-foreground"
+                      className="w-full text-sm text-muted-foreground hover:text-foreground transition"
                     >
                       Cancel
                     </Button>
