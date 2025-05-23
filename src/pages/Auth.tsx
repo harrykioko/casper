@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -111,11 +110,6 @@ export default function Auth() {
                 exit={{ opacity: 0, x: isLogin ? 20 : -20 }}
                 transition={{ duration: 0.3 }}
               >
-                {/* Form Title */}
-                <h2 className="text-2xl font-bold text-center mb-6 text-foreground">
-                  {isLogin ? 'Log In' : 'Create Account'}
-                </h2>
-
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {/* Email Input */}
