@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Github } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export function AuthForm() {
@@ -101,31 +100,6 @@ export function AuthForm() {
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleOAuthSignIn = async (provider: 'github') => {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: provider,
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`
-        }
-      });
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to sign in with OAuth",
-        variant: "destructive"
-      });
     }
   };
 
@@ -226,32 +200,6 @@ export function AuthForm() {
                 )}
               </Button>
             </form>
-
-            {/* OAuth Section */}
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-white/10"></div>
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-transparent px-2 text-muted-foreground">
-                    Or continue with
-                  </span>
-                </div>
-              </div>
-              
-              <div className="mt-4">
-                <Button 
-                  type="button"
-                  variant="outline" 
-                  className="w-full glassmorphic hover:bg-slate-600/40"
-                  onClick={() => handleOAuthSignIn('github')}
-                >
-                  <Github className="mr-2 h-4 w-4" />
-                  GitHub
-                </Button>
-              </div>
-            </div>
 
             {/* Toggle Mode */}
             <div className="text-center mt-6">
