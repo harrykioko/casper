@@ -119,7 +119,7 @@
   
   /* Landing page backgrounds with higher specificity */
   body.landing-page {
-    background-image: url('/lovable-uploads/bd84c194-088f-4a07-9ded-12d2912321b7.png') !important;
+    background-image: url('/lovable-uploads/f89c30f9-7ca5-4ede-9aab-6e11d70a3262.png') !important;
     background-size: cover !important;
     background-position: center !important;
     background-repeat: no-repeat !important;
@@ -127,7 +127,7 @@
   }
   
   body.landing-page.dark {
-    background-image: url('/lovable-uploads/c075e2b8-d755-4916-96e8-8729bc01fe90.png') !important;
+    background-image: url('/lovable-uploads/30373aa5-7291-461b-be8f-2c638b379cc0.png') !important;
     background-size: cover !important;
     background-position: center !important;
     background-repeat: no-repeat !important;
