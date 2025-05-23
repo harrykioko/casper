@@ -99,7 +99,7 @@ export function CommandModal({
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
           >
-            <Command className="rounded-lg overflow-hidden">
+            <Command className="max-w-lg rounded-2xl bg-white/10 dark:bg-zinc-900/30 backdrop-blur-sm ring-1 ring-white/10 dark:ring-white/5 shadow-2xl transition-all overflow-hidden">
               <CommandInput 
                 placeholder="Type a command or search..." 
                 ref={inputRef}

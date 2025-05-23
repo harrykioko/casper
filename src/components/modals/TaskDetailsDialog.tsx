@@ -79,9 +79,7 @@ export function TaskDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className="max-w-md mx-auto w-full bg-white/5 backdrop-blur-md rounded-xl p-6 shadow-xl ring-1 ring-white/10 transition-all duration-200 ease-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
-      >
+      <DialogContent className="max-w-lg rounded-2xl bg-white/10 dark:bg-zinc-900/30 backdrop-blur-sm ring-1 ring-white/10 dark:ring-white/5 shadow-2xl transition-all">
         <DialogHeader className="border-b border-white/10 mb-4 pb-3">
           <DialogTitle className="text-lg font-semibold tracking-tight flex items-center gap-2">
             <Edit className="w-4 h-4 text-white/60" /> Edit Task
