@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle, Copy, MessageSquareText, Link2 } from "lucide-react";
+import { ArrowLeft, CheckCircle, Copy, MessageSquareText, Link2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CardTitle, Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -109,6 +109,18 @@ export default function ProjectDetail() {
     }
   };
   
+  const getBadgeColorForSchedule = (scheduledFor: string) => {
+    if (scheduledFor === 'Today') return 'bg-indigo-500/10 text-indigo-500 border-indigo-200/50';
+    if (scheduledFor === 'Yesterday') return 'bg-zinc-400/10 text-zinc-500 border-zinc-200/50';
+    return 'bg-teal-500/10 text-teal-500 border-teal-200/50'; // Future
+  };
+
+  const getPriorityBorderColor = (priority: string) => {
+    if (priority === 'high') return 'border-red-500';
+    if (priority === 'medium') return 'border-yellow-500';
+    return 'border-green-500'; // low
+  };
+  
   return (
     <div 
       className="p-8 pl-24 min-h-screen"
@@ -116,47 +128,53 @@ export default function ProjectDetail() {
       onKeyDown={handleKeyDown}
     >
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full"
-              onClick={() => navigate("/projects")}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <div 
-                className="h-6 w-6 rounded-md" 
-                style={{ backgroundColor: project.color }}
-              />
-              {project.name}
-            </h1>
-          </div>
-          <Button 
-            variant="outline"
-            className="glassmorphic"
-            onClick={openCommandModal}
-          >
-            <span className="sr-only">Command</span>
-            <kbd className="text-xs bg-muted px-2 py-0.5 rounded">⌘K</kbd>
-          </Button>
-        </div>
-        
-        {/* Project context */}
-        <Card className="mb-6 glassmorphic">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center justify-between">
-              <span>Project Context</span>
+        {/* Sticky header */}
+        <div className="sticky top-0 z-30 w-full -mx-8 px-6 py-3 bg-white/60 dark:bg-zinc-900/50 backdrop-blur-sm border-b border-black/10 dark:border-white/10">
+          <div className="max-w-7xl mx-auto flex justify-between items-center">
+            <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
-                onClick={copyContextToClipboard}
+                className="rounded-full"
+                onClick={() => navigate("/projects")}
               >
-                <Copy className="h-4 w-4" />
+                <ArrowLeft className="h-5 w-5" />
               </Button>
+              <h1 className="text-xl font-semibold flex items-center gap-2">
+                <div 
+                  className="h-4 w-4 rounded-md" 
+                  style={{ backgroundColor: project.color }}
+                />
+                {project.name}
+              </h1>
+            </div>
+            <Button 
+              variant="outline"
+              className="glassmorphic"
+              onClick={openCommandModal}
+            >
+              <span className="sr-only">Command</span>
+              <kbd className="text-xs bg-muted px-2 py-0.5 rounded">⌘K</kbd>
+            </Button>
+          </div>
+        </div>
+        <div className="h-0.5 w-full -mx-8 mb-6" style={{ backgroundColor: project.color }}></div>
+        
+        {/* Project context */}
+        <Card className="mb-6 glassmorphic relative group">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg flex items-center justify-between">
+              <span>Project Context</span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 transition active:scale-95"
+                  onClick={copyContextToClipboard}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -168,13 +186,19 @@ export default function ProjectDetail() {
           </CardContent>
         </Card>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid lg:grid-cols-3 gap-6">
           {/* Project Tasks */}
-          <Card className="md:col-span-2">
+          <Card className="lg:col-span-2 relative rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur-sm ring-1 ring-black/5 dark:ring-white/10 hover:shadow-md/10 transition group">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center">
                 <CheckCircle className="mr-2 h-5 w-5" />
                 Tasks
+                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition">
+                  <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                    <Plus className="h-3.5 w-3.5" />
+                    Task
+                  </Button>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -185,19 +209,18 @@ export default function ProjectDetail() {
                   {tasks.map(task => (
                     <li 
                       key={task.id}
-                      className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors"
+                      className={`flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors border-l-4 pl-3 ${getPriorityBorderColor(task.priority)}`}
                     >
-                      <div className={`h-2 w-2 rounded-full ${
-                        task.priority === "high" ? "bg-red-500" : 
-                        task.priority === "medium" ? "bg-yellow-500" : "bg-green-500"
-                      }`} />
                       <span 
                         className={`flex-1 ${task.completed ? "line-through text-muted-foreground" : ""}`}
                       >
                         {task.content}
                       </span>
                       {task.scheduledFor && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${getBadgeColorForSchedule(task.scheduledFor)}`}
+                        >
                           {task.scheduledFor}
                         </Badge>
                       )}
@@ -210,11 +233,17 @@ export default function ProjectDetail() {
           
           <div className="space-y-6">
             {/* Project Prompts */}
-            <Card>
+            <Card className="relative rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur-sm ring-1 ring-black/5 dark:ring-white/10 hover:shadow-md/10 transition hover:translate-y-[-2px] group">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center">
                   <MessageSquareText className="mr-2 h-5 w-5" />
                   Prompts
+                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition">
+                    <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                      <Plus className="h-3.5 w-3.5" />
+                      Prompt
+                    </Button>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -225,12 +254,21 @@ export default function ProjectDetail() {
                     {mockPrompts.map(prompt => (
                       <li 
                         key={prompt.id}
-                        className="p-2 rounded-md hover:bg-accent/30 transition-colors cursor-pointer"
+                        className="p-3 rounded-md hover:bg-accent/30 transition-colors cursor-pointer flex items-start justify-between"
                       >
-                        <h4 className="font-medium text-sm">{prompt.title}</h4>
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
-                          {prompt.preview}
-                        </p>
+                        <div>
+                          <h4 className="font-medium text-sm">{prompt.title}</h4>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {prompt.preview}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0 mt-1 opacity-0 group-hover:opacity-100 hover:opacity-100 transition active:scale-95"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
                       </li>
                     ))}
                   </ul>
@@ -239,11 +277,17 @@ export default function ProjectDetail() {
             </Card>
             
             {/* Project Links */}
-            <Card>
+            <Card className="relative rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur-sm ring-1 ring-black/5 dark:ring-white/10 hover:shadow-md/10 transition hover:translate-y-[-2px] group">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center">
                   <Link2 className="mr-2 h-5 w-5" />
                   Resources
+                  <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition">
+                    <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                      <Plus className="h-3.5 w-3.5" />
+                      Resource
+                    </Button>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -257,10 +301,10 @@ export default function ProjectDetail() {
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 p-2 rounded-md hover:bg-accent/30 transition-colors text-sm"
+                          className="flex items-center gap-2 p-3 rounded-md hover:bg-accent/30 transition-colors text-sm group/link"
                         >
-                          <Link2 className="h-3.5 w-3.5" />
-                          <span>{link.title}</span>
+                          <Link2 className="h-3.5 w-3.5 shrink-0" />
+                          <span className="group-hover/link:underline">{link.title}</span>
                         </a>
                       </li>
                     ))}
