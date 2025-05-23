@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import { NavSidebar } from "@/components/layout/NavSidebar";
 import { SidebarStateProvider, useSidebarState } from "@/contexts/SidebarStateContext";
 import Landing from "./pages/Landing";
+import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
@@ -42,6 +43,7 @@ const App = () => {
 const AppContent = () => {
   const location = useLocation();
   const isLandingPage = location.pathname === '/';
+  const isAuthPage = location.pathname === '/auth';
 
   // Add class to body based on current route
   useEffect(() => {
@@ -52,12 +54,13 @@ const AppContent = () => {
     }
   }, [isLandingPage]);
 
-  if (isLandingPage) {
-    // Landing page without sidebar
+  if (isLandingPage || isAuthPage) {
+    // Landing and Auth pages without sidebar
     return (
       <AnimatePresence mode="wait">
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/auth" element={<Auth />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>

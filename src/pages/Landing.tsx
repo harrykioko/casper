@@ -1,13 +1,13 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/hooks/use-theme';
 import { Button } from '@/components/ui/button';
-import { LoginModal } from '@/components/landing/LoginModal';
 
 export default function Landing() {
   const { theme } = useTheme();
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const navigate = useNavigate();
 
   const fadeUpVariants = {
     hidden: { opacity: 0, y: 30 },
@@ -37,7 +37,7 @@ export default function Landing() {
         <Button
           variant="ghost"
           className="text-sm text-muted-foreground hover:text-foreground transition px-4 py-2"
-          onClick={() => setIsLoginModalOpen(true)}
+          onClick={() => navigate('/auth')}
         >
           Log In
         </Button>
@@ -61,7 +61,7 @@ export default function Landing() {
 
           {/* Main Headline */}
           <motion.h1 
-            className="text-5xl md:text-6xl font-bold tracking-tight text-center"
+            className="text-3xl md:text-4xl font-bold tracking-tight text-center"
             variants={fadeUpVariants}
             custom={1}
           >
@@ -102,8 +102,6 @@ export default function Landing() {
           </motion.div>
         </motion.div>
       </section>
-
-      <LoginModal open={isLoginModalOpen} onOpenChange={setIsLoginModalOpen} />
     </div>
   );
 }
