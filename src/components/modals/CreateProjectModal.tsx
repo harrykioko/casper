@@ -137,7 +137,7 @@ export function CreateProjectModal({
                   <div className="flex flex-col gap-2 pt-6 mt-6">
                     <Button
                       type="submit"
-                      className="w-full py-2 rounded-md bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium transition shadow"
+                      className="w-full py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition shadow"
                       disabled={form.formState.isSubmitting}
                     >
                       {form.formState.isSubmitting ? "Creating..." : "Create Project"}

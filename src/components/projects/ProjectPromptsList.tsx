@@ -171,7 +171,7 @@ export function ProjectPromptsList({ prompts, onAddPrompt }: ProjectPromptsListP
                 </Button>
                 <Button
                   type="submit"
-                  className="w-full py-2 rounded-md bg-cyan-500 hover:bg-cyan-600 text-white text-sm font-medium transition shadow"
+                  className="w-full py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition shadow"
                 >
                   Add Prompt
                 </Button>

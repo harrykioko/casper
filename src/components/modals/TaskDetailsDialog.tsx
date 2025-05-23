@@ -121,7 +121,7 @@ export function TaskDetailsDialog({
             </Button>
             <Button 
               onClick={handleSave}
-              className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-medium border-white/10"
+              className="w-full py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition shadow"
             >
               Save Changes
             </Button>

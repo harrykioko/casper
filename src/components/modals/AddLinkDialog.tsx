@@ -98,8 +98,7 @@ export function AddLinkDialog({ open, onOpenChange, onAddLink }: AddLinkDialogPr
             <Button 
               type="submit" 
               disabled={!url || isLoading}
-              variant="outline"
-              className="bg-gray-100 hover:bg-gray-200 text-gray-800 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-white border-gray-300 dark:border-gray-700"
+              className="w-full py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition shadow"
             >
               {isLoading ? (
                 <>
