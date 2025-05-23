@@ -77,20 +77,27 @@ export default function Landing() {
             One place for your tasks, prompts, and priorities. Built for flow.
           </motion.p>
 
-          {/* UI Preview Panel */}
+          {/* UI Preview Panel - Enhanced with animations */}
           <motion.div 
-            className="relative mt-16 max-w-5xl mx-auto rounded-2xl shadow-2xl overflow-hidden bg-white/5 backdrop-blur-xl ring-1 ring-white/10"
-            variants={fadeUpVariants}
-            custom={3}
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6, duration: 1, ease: "easeOut" }}
-            whileHover={{ scale: 1.02, transition: { duration: 0.3 } }}
+            className="mt-16 max-w-5xl mx-auto rounded-2xl shadow-2xl overflow-hidden bg-white/5 backdrop-blur-xl ring-1 ring-white/10"
+            initial={{ opacity: 0, y: 40, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ delay: 0.3, duration: 0.6, ease: "easeOut" }}
+            whileHover={{ scale: 1.01 }}
           >
-            <img 
+            <motion.img 
               src="/lovable-uploads/b10e4c17-6c58-4c6d-8399-51098459811e.png"
               alt="Casper Dashboard Preview"
               className="rounded-2xl w-full"
+              animate={{ 
+                rotate: [0, 0.3, -0.3, 0], 
+                y: [0, -1.5, 1.5, 0] 
+              }}
+              transition={{ 
+                repeat: Infinity, 
+                duration: 12, 
+                ease: "easeInOut" 
+              }}
             />
           </motion.div>
         </motion.div>
