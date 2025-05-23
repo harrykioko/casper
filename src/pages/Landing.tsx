@@ -77,29 +77,14 @@ export default function Landing() {
             One place for your tasks, prompts, and priorities. Built for flow.
           </motion.p>
 
-          {/* CTA Button */}
-          <motion.div 
-            className="mt-8"
-            variants={fadeUpVariants}
-            custom={3}
-          >
-            <Button 
-              size="lg" 
-              className="glassmorphic text-lg px-6 py-4 font-semibold transition hover:scale-[1.03] bg-primary hover:bg-primary/90"
-              onClick={() => setIsLoginModalOpen(true)}
-            >
-              Create Account
-            </Button>
-          </motion.div>
-
           {/* UI Preview Panel */}
           <motion.div 
-            className="relative mt-12 max-w-5xl mx-auto rounded-2xl shadow-2xl overflow-hidden bg-white/5 backdrop-blur-xl ring-1 ring-white/10"
+            className="relative mt-16 max-w-5xl mx-auto rounded-2xl shadow-2xl overflow-hidden bg-white/5 backdrop-blur-xl ring-1 ring-white/10"
             variants={fadeUpVariants}
-            custom={4}
+            custom={3}
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.8, duration: 1, ease: "easeOut" }}
+            transition={{ delay: 0.6, duration: 1, ease: "easeOut" }}
             whileHover={{ scale: 1.02, transition: { duration: 0.3 } }}
           >
             <img 
