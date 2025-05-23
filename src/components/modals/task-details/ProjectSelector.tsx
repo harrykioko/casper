@@ -1,8 +1,9 @@
 
-import { Button } from "@/components/ui/button";
 import { Task } from "@/components/dashboard/TaskSection";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ProjectSelectorProps {
   selectedProject?: Task["project"];
@@ -20,28 +21,58 @@ export function ProjectSelector({ selectedProject, onSelectProject }: ProjectSel
   return (
     <div className="space-y-2">
       <label className="text-xs uppercase text-white/50 tracking-wide block">Project</label>
-      <div className="flex flex-wrap gap-2">
-        {mockProjects.map((project) => (
-          <Button
-            key={project.id}
-            type="button"
-            variant="outline"
+      <div className="flex items-center gap-2">
+        <Select
+          value={selectedProject?.id}
+          onValueChange={(value) => {
+            if (value) {
+              const project = mockProjects.find((p) => p.id === value);
+              onSelectProject(project);
+            }
+          }}
+        >
+          <SelectTrigger 
             className={cn(
-              "h-8 px-3 py-1 text-sm rounded-full",
-              selectedProject?.id === project.id
-                ? "bg-gradient-to-r from-pink-500 to-purple-500 text-white border-transparent shadow-inner"
-                : "bg-white/5 hover:bg-white/10 border border-white/10"
+              "w-full bg-white/5 border border-white/10 rounded-md text-sm focus-visible:ring-1 focus-visible:ring-white/20 focus-visible:ring-offset-0 focus-visible:outline-none",
+              !selectedProject && "text-white/40"
             )}
-            onClick={() => onSelectProject(project)}
-            style={selectedProject?.id !== project.id ? {} : undefined}
           >
-            <div 
-              className="w-2 h-2 rounded-full mr-1.5 inline-block"
-              style={{backgroundColor: project.color}}
-            />
-            {project.name}
-          </Button>
-        ))}
+            <SelectValue 
+              placeholder="Select a project" 
+              className="placeholder:text-white/40"
+            >
+              {selectedProject && (
+                <div className="flex items-center">
+                  <div 
+                    className="w-2 h-2 rounded-full mr-1.5 inline-block"
+                    style={{backgroundColor: selectedProject.color}}
+                  />
+                  {selectedProject.name}
+                </div>
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent className="bg-slate-800 border border-white/10 text-white">
+            <SelectGroup>
+              {mockProjects.map((project) => (
+                <SelectItem 
+                  key={project.id} 
+                  value={project.id}
+                  className="hover:bg-white/10 focus:bg-white/10 cursor-pointer"
+                >
+                  <div className="flex items-center">
+                    <div
+                      className="w-2 h-2 rounded-full mr-1.5 inline-block"
+                      style={{backgroundColor: project.color}}
+                    />
+                    {project.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        
         {selectedProject && (
           <Button
             type="button"
