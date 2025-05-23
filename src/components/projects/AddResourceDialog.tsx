@@ -34,7 +34,11 @@ export function AddResourceDialog({ open, onOpenChange, onAddResource }: AddReso
   });
   
   const handleSubmit = (values: ResourceFormValues) => {
-    onAddResource(values);
+    // Since values are validated by Zod, we know they exist and match the required type
+    onAddResource({
+      title: values.title,
+      url: values.url
+    });
     form.reset();
     onOpenChange(false);
     toast.success("Resource added successfully");

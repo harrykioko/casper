@@ -45,7 +45,11 @@ export function ProjectPromptsList({ prompts, onAddPrompt }: ProjectPromptsListP
   
   const handleAddPrompt = (values: PromptFormValues) => {
     if (onAddPrompt) {
-      onAddPrompt(values);
+      // Since values are validated by Zod, we know they exist and match the required type
+      onAddPrompt({
+        title: values.title,
+        content: values.content
+      });
     } else {
       // For demo, show a toast
       toast.success("Prompt added successfully (demo)");
