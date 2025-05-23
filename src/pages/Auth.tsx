@@ -95,10 +95,10 @@ export default function Auth() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
-          <div className="rounded-2xl bg-white/10 dark:bg-zinc-900/30 backdrop-blur-xl shadow-2xl ring-1 ring-white/10 p-8">
+          <div className="rounded-2xl bg-white/5 dark:bg-zinc-900/20 backdrop-blur-xl shadow-2xl ring-1 ring-white/10 p-8">
             {/* Casper Logo */}
             <div className="text-center mb-8">
-              <div className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#FF6A79] to-[#415AFF] mb-2">
+              <div className="text-sm md:text-base font-semibold tracking-[0.25em] text-muted-foreground uppercase mb-2">
                 Casper
               </div>
             </div>
