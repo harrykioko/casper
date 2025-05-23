@@ -87,18 +87,18 @@ export default function Auth() {
         }}
       ></div>
 
-      {/* Casper Wordmark - Fixed at top */}
-      <motion.div
-        className="absolute top-12 left-1/2 -translate-x-1/2 text-2xl md:text-3xl font-bold tracking-[0.25em] text-muted-foreground uppercase"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: "easeOut" }}
-      >
-        CASPER
-      </motion.div>
-
       {/* Auth Form Container */}
       <div className="min-h-screen flex flex-col items-center justify-center px-4">
+        {/* Casper Wordmark - Positioned above the card */}
+        <motion.div
+          className="text-3xl md:text-4xl font-bold tracking-[0.3em] text-muted-foreground uppercase text-center mb-10"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+          CASPER
+        </motion.div>
+
         <motion.div 
           className="max-w-md w-full mx-auto"
           initial={{ opacity: 0, y: 20 }}
