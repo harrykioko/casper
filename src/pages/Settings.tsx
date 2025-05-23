@@ -1,7 +1,6 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Command, Github, Moon, Sun } from "lucide-react";
+import { Command, Github, Moon, Sun, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CommandModal } from "@/components/modals/CommandModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { useTheme } from "@/hooks/use-theme";
+import { HabitsTab } from "@/components/settings/HabitsTab";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -54,6 +54,7 @@ export default function Settings() {
             <TabsTrigger value="calendar">Calendar</TabsTrigger>
             <TabsTrigger value="github">GitHub</TabsTrigger>
             <TabsTrigger value="account">Account</TabsTrigger>
+            <TabsTrigger value="habits">Habits</TabsTrigger>
           </TabsList>
           
           <TabsContent value="appearance" className="space-y-6">
@@ -200,6 +201,10 @@ export default function Settings() {
                 Save Changes
               </Button>
             </div>
+          </TabsContent>
+          
+          <TabsContent value="habits" className="space-y-6">
+            <HabitsTab />
           </TabsContent>
         </Tabs>
       </div>
