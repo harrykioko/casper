@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { Task } from "@/components/dashboard/TaskList";
+import { v4 as uuidv4 } from "uuid";
 
 interface Project {
   id: string;
@@ -85,14 +86,51 @@ const mockLinks = [
 ];
 
 export function useProjectDetail() {
-  const [project] = useState<Project>(mockProject);
-  const [tasks] = useState<Task[]>(mockTasks);
-  const [prompts] = useState<Prompt[]>(mockPrompts);
-  const [links] = useState<Link[]>(mockLinks);
+  const [project, setProject] = useState<Project>(mockProject);
+  const [tasks, setTasks] = useState<Task[]>(mockTasks);
+  const [prompts, setPrompts] = useState<Prompt[]>(mockPrompts);
+  const [links, setLinks] = useState<Link[]>(mockLinks);
   const [isCommandModalOpen, setIsCommandModalOpen] = useState(false);
   
   const openCommandModal = () => setIsCommandModalOpen(true);
   const closeCommandModal = () => setIsCommandModalOpen(false);
+  
+  const updateProjectContext = (newContext: string) => {
+    setProject(prev => ({ ...prev, context: newContext }));
+  };
+  
+  const addTask = (content: string) => {
+    const newTask: Task = {
+      id: uuidv4(),
+      content,
+      completed: false,
+      priority: "medium",
+      scheduledFor: "Today"
+    };
+    setTasks(prev => [newTask, ...prev]);
+  };
+  
+  const addPrompt = (prompt: { title: string, content: string }) => {
+    const newPrompt: Prompt = {
+      id: uuidv4(),
+      title: prompt.title,
+      preview: prompt.content
+    };
+    setPrompts(prev => [newPrompt, ...prev]);
+  };
+  
+  const addLink = (link: { title: string, url: string }) => {
+    const newLink: Link = {
+      id: uuidv4(),
+      title: link.title,
+      url: link.url
+    };
+    setLinks(prev => [newLink, ...prev]);
+  };
+  
+  const removeLink = (id: string) => {
+    setLinks(prev => prev.filter(link => link.id !== id));
+  };
   
   return {
     project,
@@ -101,6 +139,11 @@ export function useProjectDetail() {
     links,
     isCommandModalOpen,
     openCommandModal,
-    closeCommandModal
+    closeCommandModal,
+    updateProjectContext,
+    addTask,
+    addPrompt,
+    addLink,
+    removeLink
   };
 }

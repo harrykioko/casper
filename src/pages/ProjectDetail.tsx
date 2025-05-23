@@ -7,6 +7,7 @@ import { ProjectTasksList } from "@/components/projects/ProjectTasksList";
 import { ProjectPromptsList } from "@/components/projects/ProjectPromptsList";
 import { ProjectLinksList } from "@/components/projects/ProjectLinksList";
 import { useProjectDetail } from "@/hooks/useProjectDetail";
+import { motion } from "framer-motion";
 
 export default function ProjectDetail() {
   const navigate = useNavigate();
@@ -18,7 +19,12 @@ export default function ProjectDetail() {
     links,
     isCommandModalOpen,
     openCommandModal,
-    closeCommandModal
+    closeCommandModal,
+    updateProjectContext,
+    addTask,
+    addPrompt,
+    addLink,
+    removeLink
   } = useProjectDetail();
   
   // Handle keyboard shortcut for command modal
@@ -30,7 +36,10 @@ export default function ProjectDetail() {
   };
   
   return (
-    <div 
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       className="p-8 pl-24 min-h-screen"
       tabIndex={0}
       onKeyDown={handleKeyDown}
@@ -44,18 +53,31 @@ export default function ProjectDetail() {
         />
         
         {/* Project context */}
-        <ProjectContext context={project.context} />
+        <ProjectContext 
+          context={project.context} 
+          onUpdateContext={updateProjectContext}
+        />
         
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Project Tasks */}
-          <ProjectTasksList tasks={tasks} />
+          <ProjectTasksList 
+            tasks={tasks}
+            onAddTask={addTask}
+          />
           
           <div className="space-y-6">
             {/* Project Prompts */}
-            <ProjectPromptsList prompts={prompts} />
+            <ProjectPromptsList 
+              prompts={prompts}
+              onAddPrompt={addPrompt}
+            />
             
             {/* Project Links */}
-            <ProjectLinksList links={links} />
+            <ProjectLinksList 
+              links={links}
+              onAddLink={addLink}
+              onRemoveLink={removeLink}
+            />
           </div>
         </div>
       </div>
@@ -66,6 +88,6 @@ export default function ProjectDetail() {
         onClose={closeCommandModal}
         onNavigate={navigate}
       />
-    </div>
+    </motion.div>
   );
 }
