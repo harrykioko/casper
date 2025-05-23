@@ -61,7 +61,7 @@ export default function Landing() {
 
           {/* Main Headline */}
           <motion.h1 
-            className="text-5xl md:text-6xl font-bold tracking-tight text-center"
+            className="text-3xl md:text-4xl font-bold tracking-tight text-center"
             variants={fadeUpVariants}
             custom={1}
           >
