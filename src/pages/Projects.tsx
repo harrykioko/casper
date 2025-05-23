@@ -5,6 +5,7 @@ import { FolderKanban, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CommandModal } from "@/components/modals/CommandModal";
+import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
 import { Progress } from "@/components/ui/progress";
 
 interface Project {
@@ -47,10 +48,15 @@ export default function Projects() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [isCommandModalOpen, setIsCommandModalOpen] = useState(false);
+  const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   
   // Command modal handling
   const openCommandModal = () => setIsCommandModalOpen(true);
   const closeCommandModal = () => setIsCommandModalOpen(false);
+  
+  // Create project modal handling
+  const openCreateProjectModal = () => setIsCreateProjectModalOpen(true);
+  const closeCreateProjectModal = () => setIsCreateProjectModalOpen(false);
   
   // Handle keyboard shortcut for command modal
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -58,6 +64,13 @@ export default function Projects() {
       e.preventDefault();
       openCommandModal();
     }
+  };
+
+  // Handle project creation
+  const handleCreateProject = (data: any) => {
+    console.log('Creating project:', data);
+    // Here you would typically call an API or add to state
+    // For now, we'll just log the data
   };
 
   const getAccentColorClass = (projectName: string) => {
@@ -79,7 +92,11 @@ export default function Projects() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Projects</h1>
           <div className="flex gap-3">
-            <Button variant="outline" className="gap-2">
+            <Button 
+              variant="outline" 
+              className="gap-2"
+              onClick={openCreateProjectModal}
+            >
               <Plus className="h-4 w-4" />
               <span>New Project</span>
             </Button>
@@ -133,7 +150,7 @@ export default function Projects() {
           {/* New Project Card */}
           <div 
             className="flex items-center justify-center rounded-2xl border border-dashed border-muted/40 text-muted-foreground hover:bg-white/50 dark:hover:bg-zinc-800/50 hover:shadow-lg transition cursor-pointer hover:scale-[1.01]"
-            onClick={() => {/* Add new project functionality here */}}
+            onClick={openCreateProjectModal}
           >
             <div className="flex flex-col items-center gap-2">
               <Plus className="h-6 w-6" />
@@ -148,6 +165,14 @@ export default function Projects() {
         isOpen={isCommandModalOpen} 
         onClose={closeCommandModal}
         onNavigate={navigate}
+        onAddProject={openCreateProjectModal}
+      />
+
+      {/* Create Project Modal */}
+      <CreateProjectModal
+        open={isCreateProjectModalOpen}
+        onOpenChange={setIsCreateProjectModalOpen}
+        onCreateProject={handleCreateProject}
       />
     </div>
   );

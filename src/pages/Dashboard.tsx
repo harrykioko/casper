@@ -11,6 +11,7 @@ import { mockEvents } from "@/data/mockData";
 import { useState } from "react";
 import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
 import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
+import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ export default function Dashboard() {
   const { isCommandModalOpen, openCommandModal, closeCommandModal } = useCommandModal();
   const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
   const [addTaskDialogOpen, setAddTaskDialogOpen] = useState(false);
+  const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
   
   // Set up keyboard shortcuts
   useDashboardKeyboardShortcuts({ openCommandModal });
@@ -28,6 +30,13 @@ export default function Dashboard() {
   // Handle navigation to prompts page for new prompt
   const handleAddPrompt = () => {
     navigate('/prompts', { state: { openNewPrompt: true } });
+  };
+
+  // Handle project creation
+  const handleCreateProject = (data: any) => {
+    console.log('Creating project from dashboard:', data);
+    // Here you would typically call an API or add to state
+    navigate('/projects');
   };
   
   return (
@@ -60,6 +69,7 @@ export default function Dashboard() {
         onNavigate={navigate}
         onAddLink={() => setAddLinkDialogOpen(true)}
         onAddPrompt={handleAddPrompt}
+        onAddProject={() => setCreateProjectModalOpen(true)}
       />
 
       {/* Add Link Dialog */}
@@ -74,6 +84,13 @@ export default function Dashboard() {
         open={addTaskDialogOpen}
         onOpenChange={setAddTaskDialogOpen}
         onAddTask={handleAddTask}
+      />
+
+      {/* Create Project Modal */}
+      <CreateProjectModal
+        open={createProjectModalOpen}
+        onOpenChange={setCreateProjectModalOpen}
+        onCreateProject={handleCreateProject}
       />
     </div>
   );

@@ -11,6 +11,7 @@ interface CommandModalProps {
   onNavigate?: (path: string) => void;
   onAddLink?: () => void;
   onAddPrompt?: () => void;
+  onAddProject?: () => void;
 }
 
 export function CommandModal({ 
@@ -19,7 +20,8 @@ export function CommandModal({
   onAddTask, 
   onNavigate, 
   onAddLink,
-  onAddPrompt 
+  onAddPrompt,
+  onAddProject
 }: CommandModalProps) {
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +70,9 @@ export function CommandModal({
       onClose();
     } else if (value === "add-prompt") {
       onAddPrompt?.();
+      onClose();
+    } else if (value === "add-project") {
+      onAddProject?.();
       onClose();
     } else if (value === "quick-task") {
       onAddTask?.();
@@ -141,6 +146,10 @@ export function CommandModal({
                   <CommandItem value="quick-task" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
                     <Plus className="mr-2 h-4 w-4" />
                     <span>New Task</span>
+                  </CommandItem>
+                  <CommandItem value="add-project" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
+                    <FolderKanban className="mr-2 h-4 w-4" />
+                    <span>New Project</span>
                   </CommandItem>
                   <CommandItem value="add-prompt" onSelect={handleSelect} className="hover:bg-gray-100 dark:hover:bg-gray-700/50">
                     <MessageSquareText className="mr-2 h-4 w-4" />
