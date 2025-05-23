@@ -1,4 +1,3 @@
-
 import { Check, ExternalLink, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -40,7 +39,7 @@ export function ReadingList({ items, onMarkRead, onDelete }: ReadingListProps) {
         </div>
       ) : (
         <ScrollArea className="flex-1">
-          <div className="space-y-3 pr-4">
+          <div className="space-y-5 pr-4">
             {items.map((item) => (
               <motion.div 
                 key={item.id}
