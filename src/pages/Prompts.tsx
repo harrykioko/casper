@@ -1,14 +1,13 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { MessageSquareText, Plus, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { CommandModal } from "@/components/modals/CommandModal";
 import { CreatePromptModal } from "@/components/modals/CreatePromptModal";
 import { PromptDetailModal } from "@/components/modals/PromptDetailModal";
+import { PromptHeader } from "@/components/prompts/PromptHeader";
+import { PromptFilters } from "@/components/prompts/PromptFilters";
+import { PromptGrid } from "@/components/prompts/PromptGrid";
+import { PromptEmptyState } from "@/components/prompts/PromptEmptyState";
 
 interface Prompt {
   id: string;
@@ -77,7 +76,6 @@ export default function Prompts() {
   // Handle new prompt action from Command+K
   useEffect(() => {
     if (location.state?.openNewPrompt) {
-      // Reset the state to prevent reopening on refresh
       navigate(location.pathname, { replace: true });
       setIsCreateModalOpen(true);
     }
@@ -155,112 +153,40 @@ export default function Prompts() {
       onKeyDown={handleKeyDown}
     >
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Prompt Library</h1>
-          <div className="flex gap-3">
-            <Button 
-              variant="outline" 
-              className="gap-2"
-              onClick={handleNewPrompt}
-            >
-              <Plus className="h-4 w-4" />
-              <span>New Prompt</span>
-            </Button>
-            <Button 
-              variant="outline"
-              className="glassmorphic"
-              onClick={openCommandModal}
-            >
-              <span className="sr-only">Command</span>
-              <kbd className="text-xs bg-muted px-2 py-0.5 rounded">⌘K</kbd>
-            </Button>
-          </div>
-        </div>
+        <PromptHeader 
+          onNewPrompt={handleNewPrompt}
+          onOpenCommand={openCommandModal}
+        />
         
-        <div className="mb-6 flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search prompts..."
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          
-          <div className="flex flex-wrap gap-2 items-center">
-            {allTags.map(tag => (
-              <Badge
-                key={tag}
-                variant={selectedTags.includes(tag) ? "default" : "outline"}
-                className="cursor-pointer"
-                onClick={() => toggleTag(tag)}
-              >
-                {tag}
-              </Badge>
-            ))}
-          </div>
-        </div>
+        <PromptFilters
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          allTags={allTags}
+          selectedTags={selectedTags}
+          onToggleTag={toggleTag}
+        />
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPrompts.map((prompt) => (
-            <Card
-              key={prompt.id}
-              className="hover:glassmorphic transition-all duration-150 ease-in-out cursor-pointer overflow-hidden hover:shadow-lg hover:scale-[1.01] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-cyan-500"
-              onClick={() => handleViewPrompt(prompt)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleViewPrompt(prompt);
-                }
-              }}
-            >
-              <div className="p-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <MessageSquareText className="h-4 w-4 text-muted-foreground transition-colors group-hover:text-primary" />
-                  <h3 className="font-medium">{prompt.title}</h3>
-                </div>
-                <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
-                  {prompt.description}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {prompt.tags.map(tag => (
-                    <Badge key={tag} variant="outline" className="text-xs">
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <PromptGrid 
+          prompts={filteredPrompts}
+          onViewPrompt={handleViewPrompt}
+        />
         
-        {filteredPrompts.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            <MessageSquareText className="h-12 w-12 mx-auto mb-3 opacity-20" />
-            <p className="text-lg font-medium">No prompts found</p>
-            <p className="text-sm">Try adjusting your search or filters</p>
-          </div>
-        )}
+        {filteredPrompts.length === 0 && <PromptEmptyState />}
       </div>
       
-      {/* Command Modal */}
+      {/* Modals */}
       <CommandModal 
         isOpen={isCommandModalOpen} 
         onClose={closeCommandModal}
         onNavigate={navigate}
       />
 
-      {/* Create Prompt Modal */}
       <CreatePromptModal
         open={isCreateModalOpen}
         onOpenChange={setIsCreateModalOpen}
         onCreatePrompt={handleCreatePrompt}
       />
 
-      {/* Prompt Detail Modal */}
       <PromptDetailModal
         open={isDetailModalOpen}
         onOpenChange={setIsDetailModalOpen}
