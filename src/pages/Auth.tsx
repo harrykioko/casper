@@ -99,7 +99,7 @@ export default function Auth() {
           <div className="rounded-2xl bg-white/3 dark:bg-zinc-900/15 backdrop-blur-xl shadow-2xl ring-1 ring-white/10 p-8">
             {/* Casper Logo */}
             <div className="text-center mb-8">
-              <div className="text-lg md:text-xl font-semibold tracking-[0.25em] text-muted-foreground uppercase mb-2">
+              <div className="text-2xl md:text-3xl font-semibold tracking-[0.25em] text-muted-foreground uppercase mb-2">
                 Casper
               </div>
             </div>
@@ -171,7 +171,7 @@ export default function Auth() {
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full mt-6 glassmorphic px-4 py-3 text-lg font-semibold hover:scale-[1.02] transition text-foreground"
+                    className="w-full mt-6 glassmorphic px-4 py-3 text-base font-semibold hover:scale-[1.02] hover:bg-slate-600/40 transition text-foreground"
                   >
                     {isLoading ? (
                       <div className="flex items-center justify-center gap-2">
