@@ -1,4 +1,5 @@
 
+
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -170,7 +171,7 @@ export default function Auth() {
                   <Button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full mt-6 glassmorphic px-4 py-3 text-lg font-semibold hover:scale-[1.02] transition bg-gradient-to-r from-[#FF6A79] to-[#415AFF] text-white border-0"
+                    className="w-full mt-6 glassmorphic px-4 py-3 text-lg font-semibold hover:scale-[1.02] transition text-foreground"
                   >
                     {isLoading ? (
                       <div className="flex items-center justify-center gap-2">
@@ -190,7 +191,7 @@ export default function Auth() {
                     <button
                       type="button"
                       onClick={toggleMode}
-                      className="text-[#FF6A79] hover:text-[#415AFF] font-medium transition-colors"
+                      className="text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {isLogin ? 'Create one' : 'Log in'}
                     </button>
@@ -204,3 +205,4 @@ export default function Auth() {
     </div>
   );
 }
+
