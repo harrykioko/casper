@@ -1,3 +1,4 @@
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
@@ -114,23 +115,6 @@
     background-position: center;
     background-repeat: no-repeat;
     background-attachment: fixed;
-  }
-  
-  /* Landing page backgrounds with higher specificity */
-  body.landing-page {
-    background-image: url('/lovable-uploads/f89c30f9-7ca5-4ede-9aab-6e11d70a3262.png') !important;
-    background-size: cover !important;
-    background-position: center !important;
-    background-repeat: no-repeat !important;
-    background-attachment: fixed !important;
-  }
-  
-  html.dark body.landing-page {
-    background-image: url('/lovable-uploads/30373aa5-7291-461b-be8f-2c638b379cc0.png') !important;
-    background-size: cover !important;
-    background-position: center !important;
-    background-repeat: no-repeat !important;
-    background-attachment: fixed !important;
   }
 
   /* Glassmorphism */
