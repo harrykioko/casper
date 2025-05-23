@@ -36,11 +36,11 @@ export function CalendarSidebar({ events }: CalendarSidebarProps) {
   });
 
   return (
-    <div className="w-80 border-l border-white/10 p-6 overflow-y-auto h-screen sticky top-0 glassmorphic">
+    <div className="w-80 border-l border-zinc-200 dark:border-white/10 p-6 overflow-y-auto h-screen sticky top-0 glassmorphic">
       <div>
         <div className="flex justify-between items-center mb-4">
           <h2 className="section-title flex items-center gap-2">
-            <CalendarIcon className="h-4 w-4 text-zinc-400 dark:text-white/60" /> 
+            <CalendarIcon className="h-4 w-4 text-zinc-600 dark:text-white/60" /> 
             Today
           </h2>
         </div>
@@ -53,7 +53,7 @@ export function CalendarSidebar({ events }: CalendarSidebarProps) {
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-6 w-6 hover:shadow-sm ring-1 ring-white/10 rounded-full bg-white/5">
+                <Button variant="ghost" size="icon" className="h-6 w-6 hover:shadow-sm ring-1 ring-zinc-300 dark:ring-white/10 rounded-full bg-white/5">
                   <CalendarIcon className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>

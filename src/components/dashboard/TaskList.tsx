@@ -57,7 +57,7 @@ export function TaskList({ tasks, onTaskComplete, onTaskDelete, onTaskClick }: T
 
   if (tasks.length === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
+      <div className="text-center py-12 text-zinc-500 dark:text-muted-foreground">
         <p>No tasks yet. Try adding some!</p>
       </div>
     );
@@ -104,14 +104,15 @@ export function TaskList({ tasks, onTaskComplete, onTaskDelete, onTaskClick }: T
           <div className="flex-1">
             <div className="flex items-center gap-2">
               <p className={cn(
-                task.completed && "line-through text-muted-foreground"
+                "text-zinc-800 dark:text-white",
+                task.completed && "line-through text-zinc-500 dark:text-muted-foreground"
               )}>
                 {task.content}
               </p>
               {task.project && (
                 <Badge 
                   variant="outline"
-                  className="text-xs bg-white/10 text-sm px-2 rounded-full backdrop-blur-sm transition-transform hover:shadow hover:scale-[1.02]"
+                  className="text-xs border border-zinc-300 bg-zinc-100 dark:bg-white/10 text-zinc-700 dark:text-white text-sm px-2 rounded-full backdrop-blur-sm transition-transform hover:shadow hover:scale-[1.02]"
                   style={{
                     borderColor: task.project.color,
                     color: task.project.color,
@@ -122,7 +123,7 @@ export function TaskList({ tasks, onTaskComplete, onTaskDelete, onTaskClick }: T
               )}
             </div>
             {task.scheduledFor && (
-              <div className="flex items-center text-xs text-muted-foreground mt-1">
+              <div className="flex items-center text-xs text-zinc-500 dark:text-muted-foreground mt-1">
                 <Clock className="h-3 w-3 mr-1" />
                 {task.scheduledFor}
               </div>

@@ -23,7 +23,7 @@ export function TaskInput({ onAddTask }: { onAddTask: (task: string) => void }) 
       onSubmit={handleSubmit} 
       className={cn(
         "w-full flex items-center gap-2 p-3 rounded-xl transition-all duration-300 glassmorphic",
-        isFocused ? "ring-1 ring-white/20" : ""
+        isFocused ? "ring-1 ring-zinc-300 dark:ring-white/20" : ""
       )}
     >
       <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
@@ -43,7 +43,7 @@ export function TaskInput({ onAddTask }: { onAddTask: (task: string) => void }) 
       <Input
         type="text"
         placeholder="Add a new task..."
-        className="border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none text-zinc-800 dark:text-white/90 text-base"
+        className="border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none text-zinc-800 dark:text-white/90 text-base placeholder:text-zinc-400 dark:placeholder:text-white/50"
         value={task}
         onChange={(e) => setTask(e.target.value)}
         onFocus={() => setIsFocused(true)}

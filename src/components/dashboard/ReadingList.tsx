@@ -1,3 +1,4 @@
+
 import { Check, ExternalLink, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -65,7 +66,7 @@ export function ReadingList({ items, onMarkRead, onDelete }: ReadingListProps) {
                     <div className="flex items-start justify-between gap-2">
                       <h4 
                         className={cn(
-                          "card-title text-sm line-clamp-1 text-zinc-800 dark:text-white/90",
+                          "card-title text-sm line-clamp-1 text-zinc-800 dark:text-white/90 font-medium",
                           item.isRead && "line-through"
                         )}
                       >
@@ -120,12 +121,12 @@ export function ReadingList({ items, onMarkRead, onDelete }: ReadingListProps) {
                     </div>
                     
                     {item.description && (
-                      <p className="text-xs text-zinc-400 dark:text-white/50 line-clamp-2 mt-1">
+                      <p className="text-xs text-zinc-600 dark:text-white/50 line-clamp-2 mt-1">
                         {item.description}
                       </p>
                     )}
                     
-                    <p className="mt-1 text-xs text-zinc-400 truncate">
+                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400 truncate">
                       {extractDomain(item.url)}
                     </p>
                   </div>

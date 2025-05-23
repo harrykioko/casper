@@ -66,16 +66,16 @@ export function TodayCalendar({ events }: TodayCalendarProps) {
               <div className="flex-1 p-3">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-3.5 w-3.5 text-white/80" />
+                    <Calendar className="h-3.5 w-3.5 text-zinc-700 dark:text-white/80" />
                     <h4 className="font-medium text-sm text-zinc-800 dark:text-white/90">{event.title}</h4>
                   </div>
-                  <span className="text-xs bg-white/10 dark:bg-black/20 px-2 py-0.5 rounded text-white/80">
+                  <span className="text-xs bg-zinc-100 dark:bg-black/20 px-2 py-0.5 rounded text-zinc-600 dark:text-white/80">
                     {formatTime(event.startTime)}
                     {event.endTime && ` - ${formatTime(event.endTime)}`}
                   </span>
                 </div>
                 {event.location && (
-                  <p className="text-sm text-white/80 leading-tight mt-1 flex items-center">
+                  <p className="text-sm text-zinc-600 dark:text-white/80 leading-tight mt-1 flex items-center">
                     <MapPin className="h-3 w-3 mr-1" />
                     {event.location}
                   </p>

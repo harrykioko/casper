@@ -30,7 +30,7 @@ export function ReadingListSection({
               <Button 
                 size="sm" 
                 variant="ghost" 
-                className="text-xs font-medium h-7 px-3 hover:text-zinc-700 dark:hover:text-white hover:shadow-sm ring-1 ring-white/10"
+                className="text-xs font-medium h-7 px-3 hover:text-zinc-700 dark:hover:text-white hover:shadow-sm ring-1 ring-zinc-300 dark:ring-white/10"
                 onClick={() => setAddLinkDialogOpen(true)}
               >
                 + Add Link

@@ -39,7 +39,7 @@ export function Nonnegotiables({ items }: NonnegotiablesProps) {
 
   return (
     <div className="bg-white/5 backdrop-blur-md rounded-lg p-4 shadow-sm ring-1 ring-white/10 space-y-3">
-      <h2 className="text-xs uppercase tracking-wide text-white/60 pb-2 border-b border-white/10">
+      <h2 className="text-xs uppercase tracking-wide text-zinc-700 dark:text-white/60 pb-2 border-b border-zinc-200 dark:border-white/10">
         Nonnegotiables
       </h2>
       
@@ -66,7 +66,7 @@ export function Nonnegotiables({ items }: NonnegotiablesProps) {
                     id={`nonnegotiable-${item.id}`}
                     checked={checkedItems[item.id] || false}
                     onChange={() => handleToggleItem(item.id)}
-                    className="peer appearance-none w-4 h-4 rounded-full border border-white/20 bg-white/5 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-primary checked:border-none"
+                    className="peer appearance-none w-4 h-4 rounded-full border border-zinc-400 dark:border-white/20 bg-white/5 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background focus:ring-primary checked:border-none"
                   />
                   <div className="absolute inset-0 rounded-full bg-gradient-to-br from-pink-500 to-purple-500 opacity-0 peer-checked:opacity-100 transition-opacity" />
                   {checkedItems[item.id] && (
@@ -94,8 +94,8 @@ export function Nonnegotiables({ items }: NonnegotiablesProps) {
                 <Label
                   htmlFor={`nonnegotiable-${item.id}`}
                   className={cn(
-                    "text-sm text-white cursor-pointer",
-                    checkedItems[item.id] && "line-through text-white/60"
+                    "text-sm text-zinc-800 dark:text-white cursor-pointer",
+                    checkedItems[item.id] && "line-through text-zinc-500 dark:text-white/60"
                   )}
                 >
                   {item.label}
@@ -103,7 +103,7 @@ export function Nonnegotiables({ items }: NonnegotiablesProps) {
               </div>
 
               {item.streak !== undefined && (
-                <span className="text-xs text-white/40 ml-2">
+                <span className="text-xs text-zinc-500 dark:text-white/40 ml-2">
                   · {item.streak}-day streak
                 </span>
               )}
