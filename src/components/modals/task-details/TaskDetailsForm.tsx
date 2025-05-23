@@ -27,7 +27,7 @@ export function TaskDetailsForm({
   setSelectedProject
 }: TaskDetailsFormProps) {
   return (
-    <div className="space-y-4 py-2">
+    <div className="space-y-5">
       {/* Task Content */}
       <TaskContentInput content={content} onContentChange={setContent} />
 

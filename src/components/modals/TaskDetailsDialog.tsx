@@ -1,6 +1,6 @@
 
 import { useEffect } from "react";
-import { Trash, Edit } from "lucide-react";
+import { Edit, Trash } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Task } from "@/components/dashboard/TaskSection";
@@ -79,10 +79,12 @@ export function TaskDetailsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md glassmorphic bg-white/5 backdrop-blur-md rounded-xl p-6 shadow-xl ring-1 ring-white/10 animate-fade-in">
+      <DialogContent 
+        className="max-w-md mx-auto w-full bg-white/5 backdrop-blur-md rounded-xl p-6 shadow-xl ring-1 ring-white/10 transition-all duration-200 ease-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+      >
         <DialogHeader className="border-b border-white/10 mb-4 pb-3">
           <DialogTitle className="text-lg font-semibold tracking-tight flex items-center gap-2">
-            <Edit className="h-4 w-4" /> Edit Task
+            <Edit className="w-4 h-4 text-white/60" /> Edit Task
           </DialogTitle>
         </DialogHeader>
 
@@ -99,11 +101,11 @@ export function TaskDetailsDialog({
           />
         )}
 
-        <DialogFooter className="sm:justify-between gap-2 mt-4 pt-2">
+        <DialogFooter className="flex justify-between items-center mt-6 pt-3 border-t border-white/10">
           <Button
             variant="ghost"
             onClick={handleDelete}
-            className="text-red-500 hover:text-red-600 hover:underline text-sm hover:bg-transparent"
+            className="text-red-500 hover:text-red-600 hover:underline text-sm hover:bg-transparent p-0 h-auto"
           >
             <Trash className="mr-2 h-4 w-4" />
             Delete
@@ -113,14 +115,13 @@ export function TaskDetailsDialog({
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="text-white/70 hover:text-white text-sm hover:bg-white/5"
+              className="text-white/60 hover:text-white text-sm"
             >
               Cancel
             </Button>
             <Button 
-              variant="outline"
-              className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-medium border-white/10"
               onClick={handleSave}
+              className="bg-white/10 hover:bg-white/20 px-4 py-2 rounded-lg text-sm font-medium border-white/10"
             >
               Save Changes
             </Button>

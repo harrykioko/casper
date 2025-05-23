@@ -19,7 +19,7 @@ const mockProjects = [
 export function ProjectSelector({ selectedProject, onSelectProject }: ProjectSelectorProps) {
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium block">Project</label>
+      <label className="text-xs uppercase text-white/50 tracking-wide block">Project</label>
       <div className="flex flex-wrap gap-2">
         {mockProjects.map((project) => (
           <Button
@@ -27,10 +27,10 @@ export function ProjectSelector({ selectedProject, onSelectProject }: ProjectSel
             type="button"
             variant="outline"
             className={cn(
-              "h-8 px-3 text-sm rounded-full",
+              "h-8 px-3 py-1 text-sm rounded-full",
               selectedProject?.id === project.id
-                ? "bg-gradient-to-r from-pink-500 to-purple-500 text-white border-transparent"
-                : "bg-white/5 hover:bg-white/15 border border-white/10"
+                ? "bg-gradient-to-r from-pink-500 to-purple-500 text-white border-transparent shadow-inner"
+                : "bg-white/5 hover:bg-white/10 border border-white/10"
             )}
             onClick={() => onSelectProject(project)}
             style={selectedProject?.id !== project.id ? {} : undefined}
@@ -47,7 +47,8 @@ export function ProjectSelector({ selectedProject, onSelectProject }: ProjectSel
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 w-8 bg-white/5 hover:bg-white/10 rounded-full"
+            className="h-8 w-8 bg-white/5 hover:bg-white/10 hover:text-red-400 rounded-full"
+            title="Clear project"
             onClick={() => onSelectProject(undefined)}
           >
             <X className="h-3.5 w-3.5" />
