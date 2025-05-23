@@ -15,12 +15,6 @@ export function ProjectTasksList({ tasks }: ProjectTasksListProps) {
     if (scheduledFor === 'Yesterday') return 'bg-zinc-400/10 text-zinc-500 border-zinc-200/50';
     return 'bg-teal-500/10 text-teal-500 border-teal-200/50'; // Future
   };
-
-  const getPriorityBorderColor = (priority: string) => {
-    if (priority === 'high') return 'border-red-500';
-    if (priority === 'medium') return 'border-yellow-500';
-    return 'border-green-500'; // low
-  };
   
   return (
     <Card className="lg:col-span-2 relative rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur-sm ring-1 ring-black/5 dark:ring-white/10 hover:shadow-md/10 transition group">
@@ -44,7 +38,7 @@ export function ProjectTasksList({ tasks }: ProjectTasksListProps) {
             {tasks.map(task => (
               <li 
                 key={task.id}
-                className={`flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors border-l-4 pl-3 ${getPriorityBorderColor(task.priority)}`}
+                className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors"
               >
                 <span 
                   className={`flex-1 ${task.completed ? "line-through text-muted-foreground" : ""}`}

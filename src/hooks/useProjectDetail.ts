@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { Task } from "@/components/dashboard/TaskList";
 
 interface Project {
   id: string;
@@ -7,14 +8,6 @@ interface Project {
   description: string;
   color: string;
   context: string;
-}
-
-interface Task {
-  id: string;
-  content: string;
-  completed: boolean;
-  priority: string;
-  scheduledFor: string;
 }
 
 interface Prompt {
