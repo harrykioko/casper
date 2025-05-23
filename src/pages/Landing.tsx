@@ -52,7 +52,7 @@ export default function Landing() {
         >
           {/* Casper Wordmark */}
           <motion.div 
-            className="text-4xl md:text-6xl font-semibold tracking-[0.25em] text-muted-foreground uppercase mb-6"
+            className="text-sm md:text-base font-semibold tracking-[0.25em] text-muted-foreground uppercase mb-4"
             variants={fadeUpVariants}
             custom={0}
           >
@@ -61,7 +61,7 @@ export default function Landing() {
 
           {/* Main Headline */}
           <motion.h1 
-            className="text-3xl md:text-4xl font-bold tracking-tight text-center"
+            className="text-5xl md:text-6xl font-bold tracking-tight text-center"
             variants={fadeUpVariants}
             custom={1}
           >
@@ -70,7 +70,7 @@ export default function Landing() {
 
           {/* Subheadline */}
           <motion.p 
-            className="text-base md:text-lg text-muted-foreground mt-4 text-center"
+            className="text-xl md:text-2xl text-muted-foreground mt-4 text-center"
             variants={fadeUpVariants}
             custom={2}
           >
