@@ -14,7 +14,9 @@ interface Project {
 interface Prompt {
   id: string;
   title: string;
-  preview: string;
+  description: string;
+  content: string;
+  tags: string[];
 }
 
 interface Link {
@@ -57,17 +59,21 @@ const mockTasks: Task[] = [
   }
 ];
 
-// Mock prompts
-const mockPrompts = [
+// Mock prompts with new structure
+const mockPrompts: Prompt[] = [
   {
     id: "pr1",
     title: "Casper UI Component",
-    preview: "Create a new shadcn component for Casper with glassmorphic styling..."
+    description: "Create a new shadcn component for Casper with glassmorphic styling",
+    content: "Create a new shadcn component for Casper with glassmorphic styling. The component should use backdrop-blur effects and translucent backgrounds...",
+    tags: ["ui", "react", "shadcn"]
   },
   {
     id: "pr2",
     title: "Supabase Schema Design",
-    preview: "Design a schema for Casper with tables for users, tasks, projects..."
+    description: "Design a schema for Casper with tables for users, tasks, projects",
+    content: "Design a schema for Casper with tables for users, tasks, projects, and prompts. Include proper relationships and RLS policies...",
+    tags: ["database", "supabase", "schema"]
   }
 ];
 
@@ -91,9 +97,13 @@ export function useProjectDetail() {
   const [prompts, setPrompts] = useState<Prompt[]>(mockPrompts);
   const [links, setLinks] = useState<Link[]>(mockLinks);
   const [isCommandModalOpen, setIsCommandModalOpen] = useState(false);
+  const [isCreatePromptModalOpen, setIsCreatePromptModalOpen] = useState(false);
   
   const openCommandModal = () => setIsCommandModalOpen(true);
   const closeCommandModal = () => setIsCommandModalOpen(false);
+  
+  const openCreatePromptModal = () => setIsCreatePromptModalOpen(true);
+  const closeCreatePromptModal = () => setIsCreatePromptModalOpen(false);
   
   const updateProjectContext = (newContext: string) => {
     setProject(prev => ({ ...prev, context: newContext }));
@@ -110,11 +120,10 @@ export function useProjectDetail() {
     setTasks(prev => [newTask, ...prev]);
   };
   
-  const addPrompt = (prompt: { title: string, content: string }) => {
+  const addPrompt = (prompt: Omit<Prompt, 'id'>) => {
     const newPrompt: Prompt = {
       id: uuidv4(),
-      title: prompt.title,
-      preview: prompt.content
+      ...prompt
     };
     setPrompts(prev => [newPrompt, ...prev]);
   };
@@ -138,8 +147,11 @@ export function useProjectDetail() {
     prompts,
     links,
     isCommandModalOpen,
+    isCreatePromptModalOpen,
     openCommandModal,
     closeCommandModal,
+    openCreatePromptModal,
+    closeCreatePromptModal,
     updateProjectContext,
     addTask,
     addPrompt,

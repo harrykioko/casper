@@ -1,6 +1,7 @@
 
 import { useParams, useNavigate } from "react-router-dom";
 import { CommandModal } from "@/components/modals/CommandModal";
+import { CreatePromptModal } from "@/components/modals/CreatePromptModal";
 import { ProjectHeader } from "@/components/projects/ProjectHeader";
 import { ProjectContext } from "@/components/projects/ProjectContext";
 import { ProjectTasksList } from "@/components/projects/ProjectTasksList";
@@ -18,8 +19,11 @@ export default function ProjectDetail() {
     prompts,
     links,
     isCommandModalOpen,
+    isCreatePromptModalOpen,
     openCommandModal,
     closeCommandModal,
+    openCreatePromptModal,
+    closeCreatePromptModal,
     updateProjectContext,
     addTask,
     addPrompt,
@@ -69,7 +73,7 @@ export default function ProjectDetail() {
             {/* Project Prompts */}
             <ProjectPromptsList 
               prompts={prompts}
-              onAddPrompt={addPrompt}
+              onAddPrompt={openCreatePromptModal}
             />
             
             {/* Project Links */}
@@ -87,6 +91,13 @@ export default function ProjectDetail() {
         isOpen={isCommandModalOpen} 
         onClose={closeCommandModal}
         onNavigate={navigate}
+      />
+      
+      {/* Create Prompt Modal */}
+      <CreatePromptModal
+        open={isCreatePromptModalOpen}
+        onOpenChange={closeCreatePromptModal}
+        onCreatePrompt={addPrompt}
       />
     </motion.div>
   );
