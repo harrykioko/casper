@@ -49,19 +49,23 @@ const formSchema = z.object({
   dueDate: z.date().optional(),
   resources: z.array(
     z.object({
-      title: z.string().refine((val, ctx) => {
-        const url = ctx.parent.url;
-        if (url && url.trim() !== "" && (!val || val.trim() === "")) {
-          return false;
-        }
-        return true;
-      }, "Resource title is required when URL is provided"),
+      title: z.string(),
       url: z.string().refine((val) => {
         if (!val || val.trim() === "") return true;
         return val.startsWith("https://");
       }, "URL must start with https://"),
     })
-  ).default([]),
+  ).default([]).superRefine((resources, ctx) => {
+    resources.forEach((resource, index) => {
+      if (resource.url && resource.url.trim() !== "" && (!resource.title || resource.title.trim() === "")) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Resource title is required when URL is provided",
+          path: [index, "title"],
+        });
+      }
+    });
+  }),
 });
 
 type FormData = z.infer<typeof formSchema>;
