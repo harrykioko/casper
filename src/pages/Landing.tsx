@@ -24,47 +24,59 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen w-full overflow-hidden relative">
-      {/* Background with subtle blur overlay */}
-      <div className="absolute inset-0 z-[-1] bg-background"></div>
-      <div className="absolute inset-0 z-[-1] bg-gradient-to-br from-background via-background/95 to-background/90"></div>
+      {/* Dark radial background with gradient overlay */}
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a0f] to-[#121212]"></div>
+      </div>
       
+      {/* Top Navigation */}
+      <nav className="absolute top-0 right-0 p-6 z-10">
+        <Button
+          variant="ghost"
+          className="text-sm text-muted-foreground hover:text-foreground transition px-4 py-2"
+          onClick={() => setIsLoginModalOpen(true)}
+        >
+          Log In
+        </Button>
+      </nav>
+
       {/* Hero Section - Full Viewport */}
       <section className="min-h-screen flex flex-col items-center justify-center px-4 md:px-8 relative">
         <motion.div 
-          className="text-center max-w-6xl mx-auto"
+          className="text-center max-w-4xl mx-auto"
           initial="hidden"
           animate="visible"
         >
-          {/* Casper Logo/Wordmark */}
+          {/* Casper Wordmark */}
           <motion.div 
-            className="text-2xl md:text-3xl font-bold tracking-widest text-primary uppercase mb-6"
+            className="text-sm md:text-base font-semibold tracking-[0.25em] text-muted-foreground uppercase mb-4"
             variants={fadeUpVariants}
             custom={0}
           >
-            CASPER
+            Casper
           </motion.div>
 
           {/* Main Headline */}
           <motion.h1 
-            className="text-5xl md:text-6xl font-bold tracking-tighter text-center mb-4"
+            className="text-5xl md:text-6xl font-bold tracking-tight text-center"
             variants={fadeUpVariants}
             custom={1}
           >
-            Your Personal Command Center
+            Command your productivity.
           </motion.h1>
 
-          {/* Subtitle */}
+          {/* Subheadline */}
           <motion.p 
-            className="text-xl md:text-2xl text-muted-foreground mt-4 mb-8"
+            className="text-xl md:text-2xl text-muted-foreground mt-4 text-center"
             variants={fadeUpVariants}
             custom={2}
           >
-            Tasks, prompts, priorities — captured, organized, executed.
+            One place for your tasks, prompts, and priorities. Built for flow.
           </motion.p>
 
-          {/* CTA Buttons */}
+          {/* CTA Button */}
           <motion.div 
-            className="flex gap-4 justify-center mt-8 mb-12"
+            className="mt-8"
             variants={fadeUpVariants}
             custom={3}
           >
@@ -75,33 +87,23 @@ export default function Landing() {
             >
               Create Account
             </Button>
-            <Button 
-              variant="outline"
-              size="lg" 
-              className="glassmorphic text-lg px-6 py-4 font-semibold transition hover:scale-[1.03] bg-background/50 hover:bg-background/70"
-              onClick={() => setIsLoginModalOpen(true)}
-            >
-              Log In
-            </Button>
           </motion.div>
 
-          {/* Dashboard Preview Image */}
+          {/* UI Preview Panel */}
           <motion.div 
-            className="max-w-4xl mt-12 mx-auto"
+            className="relative mt-12 max-w-5xl mx-auto rounded-2xl shadow-2xl overflow-hidden bg-white/5 backdrop-blur-xl ring-1 ring-white/10"
             variants={fadeUpVariants}
             custom={4}
             initial={{ opacity: 0, y: 50 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.8, duration: 1, ease: "easeOut" }}
+            whileHover={{ scale: 1.02, transition: { duration: 0.3 } }}
           >
-            <div className="relative">
-              <img 
-                src="/lovable-uploads/b10e4c17-6c58-4c6d-8399-51098459811e.png"
-                alt="Casper Dashboard Preview"
-                className="w-full rounded-xl shadow-2xl ring-1 ring-white/10 dark:ring-white/5 backdrop-blur-md"
-              />
-              <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-background/20 to-transparent pointer-events-none"></div>
-            </div>
+            <img 
+              src="/lovable-uploads/b10e4c17-6c58-4c6d-8399-51098459811e.png"
+              alt="Casper Dashboard Preview"
+              className="rounded-2xl w-full"
+            />
           </motion.div>
         </motion.div>
       </section>
