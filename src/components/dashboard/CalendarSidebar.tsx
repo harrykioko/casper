@@ -3,7 +3,9 @@ import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TodayCalendar } from "./TodayCalendar";
 import { UpcomingEvents } from "./UpcomingEvents";
+import { Nonnegotiables } from "./Nonnegotiables";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { mockNonnegotiables } from "@/data/mockNonnegotiables";
 
 interface CalendarEvent {
   id: string;
@@ -62,6 +64,11 @@ export function CalendarSidebar({ events }: CalendarSidebarProps) {
           </TooltipProvider>
         </div>
         <UpcomingEvents events={upcomingEvents} />
+      </div>
+      
+      {/* Nonnegotiables Section */}
+      <div className="mt-8">
+        <Nonnegotiables items={mockNonnegotiables} />
       </div>
     </div>
   );
