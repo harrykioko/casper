@@ -1,14 +1,58 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Moon, Sun } from 'lucide-react';
+import { ChevronRight, Command, Calendar, ClipboardCheck, Sparkles, Moon, Sun } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { LoginModal } from '@/components/landing/LoginModal';
+import { FeatureCard } from '@/components/landing/FeatureCard';
+import { PreviewCard } from '@/components/landing/PreviewCard';
 
 export default function Landing() {
   const { theme, setTheme } = useTheme();
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+  const features = [
+    {
+      icon: Command,
+      title: "Capture",
+      description: "Instant task entry with keyboard shortcuts and command palette."
+    },
+    {
+      icon: ClipboardCheck,
+      title: "Organize",
+      description: "Link tasks to projects, save prompts, and manage your reading list."
+    },
+    {
+      icon: Calendar,
+      title: "Execute",
+      description: "Calendar integration and prioritized task views to stay on track."
+    }
+  ];
+
+  const previewItems = [
+    {
+      title: "Task Board",
+      description: "Visualize your work with customizable views",
+      image: "/placeholder.svg"
+    },
+    {
+      title: "Prompt Library",
+      description: "Store and retrieve your best prompts instantly",
+      image: "/placeholder.svg"
+    },
+    {
+      title: "Project Overview",
+      description: "Connect tasks, prompts and resources",
+      image: "/placeholder.svg"
+    },
+    {
+      title: "Command Menu",
+      description: "Navigate and create with just your keyboard",
+      image: "/placeholder.svg"
+    }
+  ];
 
   const fadeUpVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -23,93 +67,164 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen w-full overflow-hidden relative">
-      {/* Theme Toggle - Fixed in top right */}
-      <div className="fixed top-6 right-6 z-50">
-        <Button 
-          variant="ghost" 
-          size="icon"
-          className="glassmorphic"
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          aria-label="Toggle theme"
-        >
-          {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-        </Button>
-      </div>
-
-      {/* Hero Section - Full viewport */}
+    <div className="min-h-screen w-full overflow-x-hidden">
+      {/* Hero Section */}
       <section className="min-h-screen flex flex-col items-center justify-center px-4 md:px-8 relative">
         <motion.div 
-          className="text-center max-w-5xl mx-auto"
+          className="text-center max-w-3xl mx-auto"
           initial="hidden"
           animate="visible"
           variants={fadeUpVariants}
           custom={0}
         >
-          {/* Casper Logo/Wordmark */}
-          <motion.div 
-            className="text-2xl md:text-3xl font-bold tracking-widest text-primary uppercase mb-6"
+          <motion.h1 
+            className="text-4xl md:text-6xl font-bold tracking-tighter mb-6"
             variants={fadeUpVariants}
             custom={1}
           >
-            Casper
-          </motion.div>
-
-          {/* Main Headline */}
-          <motion.h1 
-            className="text-5xl md:text-6xl font-bold tracking-tighter text-center"
+            Your Personal Command Center
+          </motion.h1>
+          <motion.p 
+            className="text-xl md:text-2xl text-muted-foreground mb-8"
             variants={fadeUpVariants}
             custom={2}
           >
-            Your Personal Command Center
-          </motion.h1>
-
-          {/* Subtitle */}
-          <motion.p 
-            className="text-xl md:text-2xl text-muted-foreground mt-4"
-            variants={fadeUpVariants}
-            custom={3}
-          >
             Tasks, prompts, priorities — captured, organized, executed.
           </motion.p>
-
-          {/* CTA Buttons */}
-          <motion.div 
-            className="flex gap-4 justify-center mt-8"
-            variants={fadeUpVariants}
-            custom={4}
-          >
+          <motion.div variants={fadeUpVariants} custom={3}>
             <Button 
-              className="glassmorphic text-lg px-6 py-4 font-semibold transition hover:scale-[1.03] bg-primary/90 hover:bg-primary text-primary-foreground"
+              size="lg" 
+              className="text-lg px-8 py-6 hover:scale-[1.02] transition-all"
               onClick={() => setIsLoginModalOpen(true)}
             >
-              Create Account
+              Get Started <ChevronRight className="ml-2" />
             </Button>
-            <Button 
-              variant="outline"
-              className="glassmorphic text-lg px-6 py-4 font-semibold transition hover:scale-[1.03] bg-background/50 hover:bg-background/70"
-              onClick={() => setIsLoginModalOpen(true)}
-            >
-              Log In
-            </Button>
-          </motion.div>
-
-          {/* Dashboard Preview Image */}
-          <motion.div 
-            className="max-w-4xl mt-12 mx-auto"
-            variants={fadeUpVariants}
-            custom={5}
-          >
-            <div className="rounded-xl shadow-2xl ring-1 ring-white/10 dark:ring-white/5 backdrop-blur-md overflow-hidden">
-              <img 
-                src="/lovable-uploads/d31f963e-ec8c-497f-a00f-505ab514001b.png" 
-                alt="Casper Dashboard Preview" 
-                className="w-full h-auto object-cover"
-              />
-            </div>
           </motion.div>
         </motion.div>
+        
+        {/* Command Line Preview */}
+        <motion.div 
+          className="w-full max-w-md mx-auto mt-12"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.7 }}
+        >
+          <Card className="glassmorphic overflow-hidden">
+            <CardContent className="p-4 font-mono text-sm">
+              <div className="flex items-center text-muted-foreground mb-2">
+                <span className="mr-2">$</span>
+                <span className="text-foreground">add 'Finish project proposal'</span>
+                <span className="ml-2 animate-pulse">⏎</span>
+              </div>
+              <div className="text-green-500 dark:text-green-400">
+                ✓ Task added to 'Work' project
+              </div>
+              <div className="flex items-center text-muted-foreground mt-2">
+                <span className="mr-2">$</span>
+                <span className="animate-pulse">|</span>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </section>
+
+      {/* Why Casper? Section */}
+      <section className="py-24 px-4 md:px-8">
+        <div className="max-w-6xl mx-auto">
+          <motion.h2 
+            className="text-3xl md:text-4xl font-bold tracking-tight text-center mb-16"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            Why Casper?
+          </motion.h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {features.map((feature, i) => (
+              <FeatureCard 
+                key={feature.title}
+                icon={feature.icon}
+                title={feature.title}
+                description={feature.description}
+                index={i}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Product Preview Carousel */}
+      <section className="py-24 px-4 md:px-8 bg-secondary/30 dark:bg-secondary/10 backdrop-blur-sm">
+        <div className="max-w-6xl mx-auto">
+          <motion.h2 
+            className="text-3xl md:text-4xl font-bold tracking-tight text-center mb-16"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+          >
+            Built for productivity
+          </motion.h2>
+          
+          <div className="flex overflow-x-auto pb-8 gap-6 snap-x">
+            {previewItems.map((item, i) => (
+              <PreviewCard 
+                key={item.title}
+                title={item.title}
+                description={item.description}
+                image={item.image}
+                index={i}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="py-32 px-4 md:px-8 flex flex-col items-center justify-center">
+        <motion.div 
+          className="text-center max-w-3xl"
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+        >
+          <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-8">
+            Start your command center today.
+          </h2>
+          <Button 
+            size="lg" 
+            className="text-lg px-8 py-6 group relative hover:scale-[1.02] transition-all"
+            onClick={() => setIsLoginModalOpen(true)}
+          >
+            Create Account
+            <span className="absolute -bottom-1 left-0 w-full h-[2px] bg-gradient-to-r from-primary via-blue to-coral scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></span>
+          </Button>
+        </motion.div>
+      </section>
+
+      {/* Footer */}
+      <footer className="py-12 px-4 md:px-8 border-t border-border/30">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between">
+          <div className="flex items-center gap-2 mb-4 md:mb-0">
+            <Sparkles className="h-5 w-5 text-primary" />
+            <span className="text-sm text-muted-foreground">
+              Casper is a fast, focused productivity tool. Built for clarity.
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </Button>
+            <span className="text-xs text-muted-foreground">v0.1 © 2025</span>
+          </div>
+        </div>
+      </footer>
 
       <LoginModal open={isLoginModalOpen} onOpenChange={setIsLoginModalOpen} />
     </div>
