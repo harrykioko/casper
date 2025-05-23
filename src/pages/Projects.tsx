@@ -1,10 +1,11 @@
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { FolderKanban, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CommandModal } from "@/components/modals/CommandModal";
+import { Progress } from "@/components/ui/progress";
 
 interface Project {
   id: string;
@@ -12,6 +13,7 @@ interface Project {
   description: string;
   color: string;
   taskCount: number;
+  completedTasks?: number;
 }
 
 const mockProjects: Project[] = [
@@ -20,21 +22,24 @@ const mockProjects: Project[] = [
     name: "Casper",
     description: "Personal task & project management command center",
     color: "#FF1464", 
-    taskCount: 12
+    taskCount: 12,
+    completedTasks: 8
   },
   {
     id: "p2",
     name: "Research",
     description: "Notes and articles for learning new technologies",
     color: "#2B2DFF",
-    taskCount: 5
+    taskCount: 5,
+    completedTasks: 2
   },
   {
     id: "p3",
     name: "Personal",
     description: "Errands and personal to-dos",
     color: "#00CFDD",
-    taskCount: 8
+    taskCount: 8,
+    completedTasks: 5
   }
 ];
 
@@ -52,6 +57,15 @@ export default function Projects() {
     if ((e.metaKey || e.ctrlKey) && e.key === "k") {
       e.preventDefault();
       openCommandModal();
+    }
+  };
+
+  const getAccentColorClass = (projectName: string) => {
+    switch(projectName) {
+      case "Casper": return "bg-pink-500";
+      case "Research": return "bg-blue-500";
+      case "Personal": return "bg-cyan-400";
+      default: return "bg-primary";
     }
   };
   
@@ -80,35 +94,52 @@ export default function Projects() {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid auto-rows-[10rem] grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-6">
           {projects.map((project) => (
-            <Card
+            <Link
               key={project.id}
-              className="hover:glassmorphic transition-all duration-200 cursor-pointer"
-              onClick={() => navigate(`/projects/${project.id}`)}
+              to={`/projects/${project.id}`}
+              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-cyan-500"
             >
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2">
-                  <div 
-                    className="h-5 w-5 rounded-md" 
-                    style={{ backgroundColor: project.color }}
+              <Card
+                className="relative rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur-sm ring-1 ring-black/5 dark:ring-white/10 transition-shadow duration-200 hover:shadow-lg/20 hover:scale-[1.01] h-full"
+                style={{ '--accentColor': project.color } as React.CSSProperties}
+              >
+                <div className="absolute left-0 top-3 bottom-3 w-1 rounded-l-2xl bg-[var(--accentColor)]"></div>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                    {project.name}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {project.description}
+                  </p>
+                  <Progress 
+                    value={(project.completedTasks || 0) / project.taskCount * 100} 
+                    className="h-1.5 rounded-full bg-muted dark:bg-muted/30" 
                   />
-                  {project.name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-3">
-                  {project.description}
-                </p>
-                <div className="flex items-center text-sm">
-                  <FolderKanban className="h-4 w-4 mr-1.5 text-muted-foreground" />
-                  <span>
-                    {project.taskCount} {project.taskCount === 1 ? 'task' : 'tasks'}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="flex items-center text-sm mt-3 text-muted-foreground">
+                    <FolderKanban className="h-4 w-4 mr-1.5" />
+                    <span>
+                      {project.completedTasks || 0}/{project.taskCount} {project.taskCount === 1 ? 'task' : 'tasks'}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
+          
+          {/* New Project Card */}
+          <div 
+            className="flex items-center justify-center rounded-2xl border border-dashed border-muted/40 text-muted-foreground hover:bg-white/50 dark:hover:bg-zinc-800/50 hover:shadow-lg transition cursor-pointer hover:scale-[1.01]"
+            onClick={() => {/* Add new project functionality here */}}
+          >
+            <div className="flex flex-col items-center gap-2">
+              <Plus className="h-6 w-6" />
+              <span className="text-lg font-semibold">New Project</span>
+            </div>
+          </div>
         </div>
       </div>
       
