@@ -5,15 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-export interface ReadingItem {
-  id: string;
-  url: string;
-  title: string;
-  description?: string;
-  favicon?: string;
-  isRead: boolean;
-}
+import { ReadingItem } from "@/hooks/useReadingItems";
 
 interface ReadingListProps {
   items: ReadingItem[];

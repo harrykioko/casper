@@ -94,7 +94,7 @@ export default function Dashboard() {
     const item = readingItems.find(item => item.id === id);
     if (item) {
       try {
-        await updateReadingItem(id, { is_read: !item.is_read });
+        await updateReadingItem(id, { is_read: !item.isRead });
       } catch (error) {
         console.error('Failed to update reading item:', error);
       }

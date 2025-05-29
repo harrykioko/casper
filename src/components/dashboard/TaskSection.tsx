@@ -7,20 +7,7 @@ import { ListFilter, Columns } from "lucide-react";
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
-
-export type Task = {
-  id: string;
-  content: string;
-  completed: boolean;
-  status?: "todo" | "inprogress" | "done";
-  project?: {
-    id: string;
-    name: string;
-    color: string;
-  };
-  priority?: "high" | "medium" | "low";
-  scheduledFor?: string;
-};
+import { Task } from "@/hooks/useTasks";
 
 type ViewMode = "list" | "kanban";
 

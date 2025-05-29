@@ -30,7 +30,7 @@ export default function ReadingList() {
     const item = readingItems.find(item => item.id === id);
     if (item) {
       try {
-        await updateReadingItem(id, { is_read: !item.is_read });
+        await updateReadingItem(id, { is_read: !item.isRead });
       } catch (error) {
         console.error('Failed to update reading item:', error);
       }
@@ -152,7 +152,7 @@ export default function ReadingList() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <h3 
-                        className={`font-medium line-clamp-2 ${item.is_read ? "text-muted-foreground" : ""}`}
+                        className={`font-medium line-clamp-2 ${item.isRead ? "text-muted-foreground" : ""}`}
                       >
                         {item.title}
                       </h3>
@@ -197,7 +197,7 @@ export default function ReadingList() {
                         className="h-auto p-0 text-sm"
                         onClick={() => handleMarkRead(item.id)}
                       >
-                        {item.is_read ? 'Mark as unread' : 'Mark as read'}
+                        {item.isRead ? 'Mark as unread' : 'Mark as read'}
                       </Button>
                     </div>
                   </div>

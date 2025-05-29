@@ -3,8 +3,38 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
 
-type ReadingItem = Database['public']['Tables']['reading_items']['Row'];
+type ReadingItemRow = Database['public']['Tables']['reading_items']['Row'];
 type ReadingItemInsert = Database['public']['Tables']['reading_items']['Insert'];
+
+// Frontend ReadingItem type
+export interface ReadingItem {
+  id: string;
+  url: string;
+  title: string;
+  description?: string;
+  favicon?: string;
+  isRead: boolean;
+  created_at?: string;
+  updated_at?: string;
+  created_by?: string;
+  project_id?: string;
+}
+
+// Transform database row to frontend ReadingItem type
+const transformReadingItem = (row: ReadingItemRow): ReadingItem => {
+  return {
+    id: row.id,
+    url: row.url,
+    title: row.title,
+    description: row.description || undefined,
+    favicon: row.favicon || undefined,
+    isRead: row.is_read || false,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    created_by: row.created_by || undefined,
+    project_id: row.project_id || undefined
+  };
+};
 
 export function useReadingItems() {
   const [readingItems, setReadingItems] = useState<ReadingItem[]>([]);
@@ -22,7 +52,8 @@ export function useReadingItems() {
         if (error) {
           setError(error.message);
         } else {
-          setReadingItems(data ?? []);
+          const transformedItems = (data || []).map(transformReadingItem);
+          setReadingItems(transformedItems);
         }
       } catch (err) {
         setError('Failed to fetch reading items');
@@ -49,11 +80,12 @@ export function useReadingItems() {
 
     if (error) throw error;
     
-    setReadingItems(prev => [data, ...prev]);
-    return data;
+    const transformedItem = transformReadingItem(data);
+    setReadingItems(prev => [transformedItem, ...prev]);
+    return transformedItem;
   };
 
-  const updateReadingItem = async (id: string, updates: Partial<ReadingItem>) => {
+  const updateReadingItem = async (id: string, updates: Partial<ReadingItemRow>) => {
     const { data, error } = await supabase
       .from('reading_items')
       .update(updates)
@@ -63,8 +95,9 @@ export function useReadingItems() {
 
     if (error) throw error;
 
-    setReadingItems(prev => prev.map(item => item.id === id ? data : item));
-    return data;
+    const transformedItem = transformReadingItem(data);
+    setReadingItems(prev => prev.map(item => item.id === id ? transformedItem : item));
+    return transformedItem;
   };
 
   const deleteReadingItem = async (id: string) => {

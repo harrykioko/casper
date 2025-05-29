@@ -1,9 +1,10 @@
 
 import { useState } from "react";
-import { ReadingItem, ReadingList } from "./ReadingList";
+import { ReadingList } from "./ReadingList";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
+import { ReadingItem } from "@/hooks/useReadingItems";
 
 interface ReadingListSectionProps {
   readingItems: ReadingItem[];

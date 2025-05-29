@@ -5,20 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-
-export interface Task {
-  id: string;
-  content: string;
-  completed: boolean;
-  project?: {
-    id: string;
-    name: string;
-    color: string;
-  };
-  priority?: "low" | "medium" | "high";
-  scheduledFor?: string;
-  status?: "todo" | "inprogress" | "done";
-}
+import { Task } from "@/hooks/useTasks";
 
 interface TaskListProps {
   tasks: Task[];
