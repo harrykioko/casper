@@ -1,3 +1,4 @@
+
 import { Textarea } from "@/components/ui/textarea";
 import { Task } from "@/hooks/useTasks";
 import { TaskContentInput } from "./TaskContentInput";
@@ -32,7 +33,7 @@ export function TaskDetailsForm({
       <TaskContentInput content={content} onContentChange={setContent} />
 
       {/* Project Selection */}
-      <ProjectSelector selectedProject={selectedProject} onSelectProject={setSelectedProject} />
+      <ProjectSelector selectedProject={selectedProject} setSelectedProject={setSelectedProject} />
 
       {/* Due Date Selection */}
       <DateSelector scheduledFor={scheduledFor} onSelectDate={setScheduledFor} />
