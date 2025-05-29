@@ -1,6 +1,5 @@
-
 import { useState, useEffect } from "react";
-import { Task } from "@/components/dashboard/TaskSection";
+import { Task } from "@/hooks/useTasks";
 
 interface UseTaskDetailsProps {
   task: Task | null;

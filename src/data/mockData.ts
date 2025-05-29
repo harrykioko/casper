@@ -1,6 +1,5 @@
-
-import { Task } from "@/components/dashboard/TaskSection";
-import { ReadingItem } from "@/components/dashboard/ReadingList";
+import { Task } from "@/hooks/useTasks";
+import { ReadingItem } from "@/hooks/useReadingItems";
 
 // Mock tasks data for the initial view
 export const mockTasks: Task[] = [

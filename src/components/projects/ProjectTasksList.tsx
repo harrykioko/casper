@@ -4,7 +4,7 @@ import { CheckCircle, Plus } from "lucide-react";
 import { CardTitle, Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Task } from "@/components/dashboard/TaskList";
+import { Task } from "@/hooks/useTasks";
 import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
 
 interface ProjectTasksListProps {

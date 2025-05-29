@@ -1,3 +1,4 @@
+
 // This file is now deprecated - use useReadingItems.ts instead
 // Keeping for backwards compatibility, will be removed soon
 
@@ -9,7 +10,7 @@ export function useReadingItemsManager() {
   const handleMarkRead = (id: string) => {
     const item = readingItems.find(item => item.id === id);
     if (item) {
-      updateReadingItem(id, { is_read: !item.is_read });
+      updateReadingItem(id, { is_read: !item.isRead });
     }
   };
   

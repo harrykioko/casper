@@ -1,7 +1,7 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Task } from "./TaskSection";
+import { Task } from "@/hooks/useTasks";
 import { GripVertical, MoveHorizontal } from "lucide-react";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import { toast } from "@/hooks/use-toast";

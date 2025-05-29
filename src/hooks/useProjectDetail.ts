@@ -1,6 +1,6 @@
 
 import { useState } from "react";
-import { Task } from "@/components/dashboard/TaskList";
+import { Task } from "@/hooks/useTasks";
 import { v4 as uuidv4 } from "uuid";
 
 interface Project {

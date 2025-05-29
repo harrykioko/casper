@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { Edit, Trash } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Task } from "@/components/dashboard/TaskSection";
+import { Task } from "@/hooks/useTasks";
 import { TaskDetailsForm } from "./task-details/TaskDetailsForm";
 import { useTaskDetails } from "@/hooks/useTaskDetails";
 import { toast } from "@/hooks/use-toast";

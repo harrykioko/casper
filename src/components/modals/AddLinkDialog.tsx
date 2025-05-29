@@ -4,7 +4,7 @@ import { LinkIcon, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ReadingItem } from "@/components/dashboard/ReadingList";
+import { ReadingItem } from "@/hooks/useReadingItems";
 import { toast } from "sonner";
 
 interface AddLinkDialogProps {

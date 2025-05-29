@@ -1,9 +1,9 @@
-
-import { Task } from "@/components/dashboard/TaskSection";
+import { Textarea } from "@/components/ui/textarea";
+import { Task } from "@/hooks/useTasks";
 import { TaskContentInput } from "./TaskContentInput";
-import { ProjectSelector } from "./ProjectSelector";
-import { DateSelector } from "./DateSelector";
 import { StatusSelector } from "./StatusSelector";
+import { DateSelector } from "./DateSelector";
+import { ProjectSelector } from "./ProjectSelector";
 
 interface TaskDetailsFormProps {
   content: string;
