@@ -7,46 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CommandModal } from "@/components/modals/CommandModal";
 import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
 import { Progress } from "@/components/ui/progress";
-
-interface Project {
-  id: string;
-  name: string;
-  description: string;
-  color: string;
-  taskCount: number;
-  completedTasks?: number;
-}
-
-const mockProjects: Project[] = [
-  {
-    id: "p1",
-    name: "Casper",
-    description: "Personal task & project management command center",
-    color: "#FF1464", 
-    taskCount: 12,
-    completedTasks: 8
-  },
-  {
-    id: "p2",
-    name: "Research",
-    description: "Notes and articles for learning new technologies",
-    color: "#2B2DFF",
-    taskCount: 5,
-    completedTasks: 2
-  },
-  {
-    id: "p3",
-    name: "Personal",
-    description: "Errands and personal to-dos",
-    color: "#00CFDD",
-    taskCount: 8,
-    completedTasks: 5
-  }
-];
+import { Skeleton } from "@/components/ui/skeleton";
+import { useProjects } from "@/hooks/useProjects";
 
 export default function Projects() {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[]>(mockProjects);
+  const { projects, loading, createProject } = useProjects();
   const [isCommandModalOpen, setIsCommandModalOpen] = useState(false);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   
@@ -67,20 +33,35 @@ export default function Projects() {
   };
 
   // Handle project creation
-  const handleCreateProject = (data: any) => {
-    console.log('Creating project:', data);
-    // Here you would typically call an API or add to state
-    // For now, we'll just log the data
-  };
-
-  const getAccentColorClass = (projectName: string) => {
-    switch(projectName) {
-      case "Casper": return "bg-pink-500";
-      case "Research": return "bg-blue-500";
-      case "Personal": return "bg-cyan-400";
-      default: return "bg-primary";
+  const handleCreateProject = async (data: any) => {
+    try {
+      await createProject(data);
+      closeCreateProjectModal();
+    } catch (error) {
+      console.error('Failed to create project:', error);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="p-8 pl-24 min-h-screen">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <Skeleton className="h-9 w-32" />
+            <div className="flex gap-3">
+              <Skeleton className="h-10 w-32" />
+              <Skeleton className="h-10 w-16" />
+            </div>
+          </div>
+          <div className="grid auto-rows-[10rem] grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-6">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-40 rounded-2xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div 
@@ -120,7 +101,7 @@ export default function Projects() {
             >
               <Card
                 className="relative rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur-sm ring-1 ring-black/5 dark:ring-white/10 transition-shadow duration-200 hover:shadow-lg/20 hover:scale-[1.01] h-full"
-                style={{ '--accentColor': project.color } as React.CSSProperties}
+                style={{ '--accentColor': project.color || '#FF1464' } as React.CSSProperties}
               >
                 <div className="absolute left-0 top-3 bottom-3 w-1 rounded-l-2xl bg-[var(--accentColor)]"></div>
                 <CardHeader className="pb-2">
@@ -130,17 +111,15 @@ export default function Projects() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-muted-foreground mb-3">
-                    {project.description}
+                    {project.description || 'No description'}
                   </p>
                   <Progress 
-                    value={(project.completedTasks || 0) / project.taskCount * 100} 
+                    value={0} 
                     className="h-1.5 rounded-full bg-muted dark:bg-muted/30" 
                   />
                   <div className="flex items-center text-sm mt-3 text-muted-foreground">
                     <FolderKanban className="h-4 w-4 mr-1.5" />
-                    <span>
-                      {project.completedTasks || 0}/{project.taskCount} {project.taskCount === 1 ? 'task' : 'tasks'}
-                    </span>
+                    <span>0 tasks</span>
                   </div>
                 </CardContent>
               </Card>
@@ -158,6 +137,14 @@ export default function Projects() {
             </div>
           </div>
         </div>
+
+        {projects.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <FolderKanban className="h-12 w-12 mx-auto mb-3 opacity-20" />
+            <p className="text-lg font-medium">No projects yet</p>
+            <p className="text-sm">Create your first project to get started</p>
+          </div>
+        )}
       </div>
       
       {/* Command Modal */}

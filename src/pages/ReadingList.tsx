@@ -5,58 +5,14 @@ import { BookOpen, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CommandModal } from "@/components/modals/CommandModal";
-import { ReadingItem } from "@/components/dashboard/ReadingList";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
-import { v4 as uuidv4 } from "uuid";
-
-// Mock reading items
-const mockReadingItems: ReadingItem[] = [
-  {
-    id: "r1",
-    url: "https://ui.shadcn.com/",
-    title: "shadcn/ui: Re-usable components built with Radix UI and Tailwind CSS",
-    description: "Beautifully designed components that you can copy and paste into your apps.",
-    favicon: "https://ui.shadcn.com/favicon.ico",
-    isRead: false
-  },
-  {
-    id: "r2",
-    url: "https://tailwindcss.com/docs/customizing-colors",
-    title: "Customizing Colors - Tailwind CSS",
-    description: "Learn how to customize the default color palette for your project.",
-    favicon: "https://tailwindcss.com/favicons/favicon.ico",
-    isRead: false
-  },
-  {
-    id: "r3",
-    url: "https://react-typescript-cheatsheet.netlify.app/",
-    title: "React TypeScript Cheatsheets",
-    description: "Cheatsheets for experienced React developers getting started with TypeScript",
-    favicon: "https://react-typescript-cheatsheet.netlify.app/favicon-96x96.png",
-    isRead: true
-  },
-  {
-    id: "r4",
-    url: "https://www.framer.com/motion/",
-    title: "Framer Motion: Production-Ready Animation",
-    description: "A production-ready motion library for React from Framer. Animate with ease.",
-    favicon: "https://www.framer.com/favicon.ico",
-    isRead: false
-  },
-  {
-    id: "r5",
-    url: "https://www.supabase.io/docs",
-    title: "Supabase Documentation",
-    description: "Build in a weekend, scale to millions. Supabase is an open source Firebase alternative.",
-    favicon: "https://www.supabase.io/favicon.ico",
-    isRead: false
-  }
-];
+import { Skeleton } from "@/components/ui/skeleton";
+import { useReadingItems } from "@/hooks/useReadingItems";
 
 export default function ReadingList() {
   const navigate = useNavigate();
-  const [readingItems, setReadingItems] = useState<ReadingItem[]>(mockReadingItems);
+  const { readingItems, loading, createReadingItem, updateReadingItem, deleteReadingItem } = useReadingItems();
   const [searchQuery, setSearchQuery] = useState("");
   const [isCommandModalOpen, setIsCommandModalOpen] = useState(false);
   const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
@@ -70,26 +26,34 @@ export default function ReadingList() {
   );
   
   // Handle marking item as read/unread
-  const handleMarkRead = (id: string) => {
-    setReadingItems(items => 
-      items.map(item => 
-        item.id === id ? { ...item, isRead: !item.isRead } : item
-      )
-    );
+  const handleMarkRead = async (id: string) => {
+    const item = readingItems.find(item => item.id === id);
+    if (item) {
+      try {
+        await updateReadingItem(id, { is_read: !item.is_read });
+      } catch (error) {
+        console.error('Failed to update reading item:', error);
+      }
+    }
   };
   
   // Handle deleting item
-  const handleDelete = (id: string) => {
-    setReadingItems(items => items.filter(item => item.id !== id));
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteReadingItem(id);
+    } catch (error) {
+      console.error('Failed to delete reading item:', error);
+    }
   };
 
   // Handle adding a new link
-  const handleAddLink = (linkData: Omit<ReadingItem, 'id'>) => {
-    const newItem: ReadingItem = {
-      ...linkData,
-      id: uuidv4()
-    };
-    setReadingItems(items => [newItem, ...items]);
+  const handleAddLink = async (linkData: any) => {
+    try {
+      await createReadingItem(linkData);
+      setAddLinkDialogOpen(false);
+    } catch (error) {
+      console.error('Failed to create reading item:', error);
+    }
   };
   
   // Command modal handling
@@ -103,6 +67,28 @@ export default function ReadingList() {
       openCommandModal();
     }
   };
+
+  if (loading) {
+    return (
+      <div className="p-8 pl-24 min-h-screen">
+        <div className="max-w-3xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <Skeleton className="h-9 w-40" />
+            <div className="flex gap-3">
+              <Skeleton className="h-10 w-24" />
+              <Skeleton className="h-10 w-16" />
+            </div>
+          </div>
+          <Skeleton className="h-10 w-full mb-6" />
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-24 w-full" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div 
@@ -166,7 +152,7 @@ export default function ReadingList() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <h3 
-                        className={`font-medium line-clamp-2 ${item.isRead ? "text-muted-foreground" : ""}`}
+                        className={`font-medium line-clamp-2 ${item.is_read ? "text-muted-foreground" : ""}`}
                       >
                         {item.title}
                       </h3>
@@ -211,7 +197,7 @@ export default function ReadingList() {
                         className="h-auto p-0 text-sm"
                         onClick={() => handleMarkRead(item.id)}
                       >
-                        {item.isRead ? 'Mark as unread' : 'Mark as read'}
+                        {item.is_read ? 'Mark as unread' : 'Mark as read'}
                       </Button>
                     </div>
                   </div>

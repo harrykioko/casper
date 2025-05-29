@@ -1,30 +1,24 @@
+// This file is now deprecated - use useReadingItems.ts instead
+// Keeping for backwards compatibility, will be removed soon
 
-import { useState } from "react";
-import { ReadingItem } from "@/components/dashboard/ReadingList";
-import { mockReadingItems } from "@/data/mockData";
-import { v4 as uuidv4 } from "uuid";
+import { useReadingItems } from './useReadingItems';
 
 export function useReadingItemsManager() {
-  const [readingItems, setReadingItems] = useState<ReadingItem[]>(mockReadingItems);
+  const { readingItems, createReadingItem, updateReadingItem, deleteReadingItem } = useReadingItems();
   
   const handleMarkRead = (id: string) => {
-    setReadingItems(items => 
-      items.map(item => 
-        item.id === id ? { ...item, isRead: !item.isRead } : item
-      )
-    );
+    const item = readingItems.find(item => item.id === id);
+    if (item) {
+      updateReadingItem(id, { is_read: !item.is_read });
+    }
   };
   
   const handleDeleteReadingItem = (id: string) => {
-    setReadingItems(items => items.filter(item => item.id !== id));
+    deleteReadingItem(id);
   };
 
-  const handleAddReadingItem = (itemData: Omit<ReadingItem, 'id'>) => {
-    const newItem: ReadingItem = {
-      ...itemData,
-      id: uuidv4()
-    };
-    setReadingItems(items => [newItem, ...items]);
+  const handleAddReadingItem = (itemData: any) => {
+    createReadingItem(itemData);
   };
 
   return {
