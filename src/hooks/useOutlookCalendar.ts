@@ -87,12 +87,28 @@ export function useOutlookCalendar() {
 
     setLoading(true);
     try {
-      // Make GET request without body to get authorization URL
-      const { data, error } = await supabase.functions.invoke('microsoft-auth');
-
-      if (error) {
-        throw error;
+      // Get the JWT token for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error('No authentication token available');
       }
+
+      // Make a direct GET request to the edge function
+      const response = await fetch(`https://onzzazxyfjdgvxhoxstr.supabase.co/functions/v1/microsoft-auth`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get authorization URL');
+      }
+
+      const data = await response.json();
 
       if (data.authUrl) {
         // Redirect to Microsoft OAuth
