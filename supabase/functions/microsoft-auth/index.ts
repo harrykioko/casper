@@ -35,6 +35,11 @@ serve(async (req) => {
       const clientId = Deno.env.get('MICROSOFT_CLIENT_ID');
       const redirectUri = Deno.env.get('MICROSOFT_REDIRECT_URI');
       
+      console.log('Microsoft OAuth Config Check:');
+      console.log('- Client ID exists:', !!clientId);
+      console.log('- Client ID format:', clientId ? `${clientId.substring(0, 8)}...` : 'missing');
+      console.log('- Redirect URI:', redirectUri);
+      
       if (!clientId || !redirectUri) {
         throw new Error('Microsoft OAuth not configured');
       }
@@ -46,6 +51,7 @@ serve(async (req) => {
       authUrl.searchParams.set('scope', 'https://graph.microsoft.com/calendars.read https://graph.microsoft.com/user.read offline_access');
       authUrl.searchParams.set('state', user.id); // Use user ID as state for security
 
+      console.log('Generated auth URL successfully');
       return new Response(JSON.stringify({ authUrl: authUrl.toString() }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -55,8 +61,15 @@ serve(async (req) => {
       // Handle OAuth callback
       const { code, state, action } = await req.json();
       
+      console.log('OAuth callback received:');
+      console.log('- Action:', action);
+      console.log('- State matches user ID:', state === user.id);
+      console.log('- Code received:', !!code);
+      console.log('- Code length:', code ? code.length : 0);
+      
       if (action === 'callback') {
         if (state !== user.id) {
+          console.error('State validation failed:', { expected: user.id, received: state });
           throw new Error('Invalid state parameter');
         }
 
@@ -64,43 +77,96 @@ serve(async (req) => {
         const clientSecret = Deno.env.get('MICROSOFT_CLIENT_SECRET');
         const redirectUri = Deno.env.get('MICROSOFT_REDIRECT_URI');
 
+        console.log('Token exchange attempt:');
+        console.log('- Client ID:', clientId ? `${clientId.substring(0, 8)}...` : 'missing');
+        console.log('- Client Secret exists:', !!clientSecret);
+        console.log('- Client Secret length:', clientSecret ? clientSecret.length : 0);
+        console.log('- Redirect URI:', redirectUri);
+
+        if (!clientId || !clientSecret || !redirectUri) {
+          console.error('Missing required environment variables');
+          throw new Error('Missing Microsoft OAuth configuration');
+        }
+
         // Exchange code for tokens
+        const tokenRequestBody = new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code: code,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code',
+        });
+
+        console.log('Making token exchange request to Microsoft...');
+        console.log('Request body params:', Object.fromEntries(tokenRequestBody.entries()));
+
         const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: new URLSearchParams({
-            client_id: clientId!,
-            client_secret: clientSecret!,
-            code: code,
-            redirect_uri: redirectUri!,
-            grant_type: 'authorization_code',
-          }),
+          body: tokenRequestBody,
         });
 
+        console.log('Token response status:', tokenResponse.status);
+        console.log('Token response headers:', Object.fromEntries(tokenResponse.headers.entries()));
+
+        const tokenResponseText = await tokenResponse.text();
+        console.log('Token response body:', tokenResponseText);
+
         if (!tokenResponse.ok) {
-          throw new Error('Failed to exchange code for token');
+          console.error('Token exchange failed with status:', tokenResponse.status);
+          try {
+            const errorData = JSON.parse(tokenResponseText);
+            console.error('Microsoft error details:', errorData);
+            throw new Error(`Microsoft token exchange failed: ${errorData.error} - ${errorData.error_description || 'Unknown error'}`);
+          } catch (parseError) {
+            console.error('Failed to parse error response:', parseError);
+            throw new Error(`Failed to exchange code for token. Status: ${tokenResponse.status}, Response: ${tokenResponseText}`);
+          }
         }
 
-        const tokenData = await tokenResponse.json();
+        let tokenData;
+        try {
+          tokenData = JSON.parse(tokenResponseText);
+          console.log('Token data received:', {
+            access_token: !!tokenData.access_token,
+            refresh_token: !!tokenData.refresh_token,
+            expires_in: tokenData.expires_in,
+            token_type: tokenData.token_type
+          });
+        } catch (parseError) {
+          console.error('Failed to parse token response:', parseError);
+          throw new Error('Invalid token response from Microsoft');
+        }
         
         // Get user info from Microsoft Graph
+        console.log('Fetching user info from Microsoft Graph...');
         const userResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
           headers: {
             'Authorization': `Bearer ${tokenData.access_token}`,
           },
         });
 
+        console.log('User info response status:', userResponse.status);
+
         if (!userResponse.ok) {
-          throw new Error('Failed to get user info');
+          const userErrorText = await userResponse.text();
+          console.error('Failed to get user info:', userErrorText);
+          throw new Error('Failed to get user info from Microsoft Graph');
         }
 
         const userData = await userResponse.json();
+        console.log('User data received:', {
+          id: userData.id,
+          email: userData.mail || userData.userPrincipalName,
+          displayName: userData.displayName
+        });
 
         // Store connection in database
         const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000));
         
+        console.log('Storing connection in database...');
         const { error } = await supabaseClient
           .from('outlook_connections')
           .upsert({
@@ -117,9 +183,11 @@ serve(async (req) => {
           });
 
         if (error) {
+          console.error('Database error:', error);
           throw new Error('Failed to store connection');
         }
 
+        console.log('OAuth flow completed successfully');
         return new Response(JSON.stringify({ success: true, user: userData }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -129,7 +197,7 @@ serve(async (req) => {
     return new Response('Not found', { status: 404, headers: corsHeaders });
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Edge function error:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
