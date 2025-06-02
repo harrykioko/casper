@@ -42,6 +42,23 @@ const transformTask = (row: TaskRow & { project?: any }): Task => {
   };
 };
 
+// Transform frontend Task data to database format
+const transformTaskForDatabase = (taskData: any): any => {
+  const dbData: any = { ...taskData };
+  
+  // Convert camelCase to snake_case
+  if (taskData.scheduledFor !== undefined) {
+    dbData.scheduled_for = taskData.scheduledFor;
+    delete dbData.scheduledFor;
+  }
+  if (taskData.projectId !== undefined) {
+    dbData.project_id = taskData.projectId;
+    delete dbData.projectId;
+  }
+  
+  return dbData;
+};
+
 export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,10 +95,13 @@ export function useTasks() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
+    // Transform camelCase to snake_case
+    const dbTaskData = transformTaskForDatabase(taskData);
+
     const { data, error } = await supabase
       .from('tasks')
       .insert({
-        ...taskData,
+        ...dbTaskData,
         created_by: user.id
       })
       .select(`
@@ -98,9 +118,12 @@ export function useTasks() {
   };
 
   const updateTask = async (id: string, updates: Partial<TaskRow>) => {
+    // Transform camelCase to snake_case for updates
+    const dbUpdates = transformTaskForDatabase(updates);
+
     const { data, error } = await supabase
       .from('tasks')
-      .update(updates)
+      .update(dbUpdates)
       .eq('id', id)
       .select(`
         *,

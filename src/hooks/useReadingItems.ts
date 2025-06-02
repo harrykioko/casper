@@ -36,6 +36,23 @@ const transformReadingItem = (row: ReadingItemRow): ReadingItem => {
   };
 };
 
+// Transform frontend ReadingItem data to database format
+const transformReadingItemForDatabase = (itemData: any): any => {
+  const dbData: any = { ...itemData };
+  
+  // Convert camelCase to snake_case
+  if (itemData.isRead !== undefined) {
+    dbData.is_read = itemData.isRead;
+    delete dbData.isRead;
+  }
+  if (itemData.projectId !== undefined) {
+    dbData.project_id = itemData.projectId;
+    delete dbData.projectId;
+  }
+  
+  return dbData;
+};
+
 export function useReadingItems() {
   const [readingItems, setReadingItems] = useState<ReadingItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,10 +86,13 @@ export function useReadingItems() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
+    // Transform camelCase to snake_case
+    const dbItemData = transformReadingItemForDatabase(itemData);
+
     const { data, error } = await supabase
       .from('reading_items')
       .insert({
-        ...itemData,
+        ...dbItemData,
         created_by: user.id
       })
       .select()
@@ -86,9 +106,12 @@ export function useReadingItems() {
   };
 
   const updateReadingItem = async (id: string, updates: Partial<ReadingItemRow>) => {
+    // Transform camelCase to snake_case for updates
+    const dbUpdates = transformReadingItemForDatabase(updates);
+
     const { data, error } = await supabase
       .from('reading_items')
-      .update(updates)
+      .update(dbUpdates)
       .eq('id', id)
       .select()
       .single();
