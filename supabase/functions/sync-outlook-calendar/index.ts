@@ -91,7 +91,7 @@ serve(async (req) => {
 
     const graphUrl = new URL('https://graph.microsoft.com/v1.0/me/calendar/events');
     graphUrl.searchParams.set('$filter', `start/dateTime ge '${startTime.toISOString()}' and end/dateTime le '${endTime.toISOString()}'`);
-    graphUrl.searchParams.set('$select', 'id,subject,start,end,location,bodyPreview,isAllDay,categories');
+    graphUrl.searchParams.set('$select', 'id,subject,start,end,location,body,bodyPreview,isAllDay,categories,attendees');
     graphUrl.searchParams.set('$orderby', 'start/dateTime');
 
     const eventsResponse = await fetch(graphUrl.toString(), {
@@ -108,17 +108,27 @@ serve(async (req) => {
     const eventsData = await eventsResponse.json();
     
     // Transform and store events
-    const transformedEvents = eventsData.value.map((event: any) => ({
-      user_id: user.id,
-      microsoft_event_id: event.id,
-      title: event.subject || 'Untitled Event',
-      start_time: event.start.dateTime,
-      end_time: event.end.dateTime,
-      location: event.location?.displayName || null,
-      category: event.categories?.[0] || 'personal',
-      description: event.bodyPreview || null,
-      is_all_day: event.isAllDay || false,
-    }));
+    const transformedEvents = eventsData.value.map((event: any) => {
+      // Transform attendees from Microsoft Graph format to our format
+      const attendees = event.attendees?.map((attendee: any) => ({
+        name: attendee.emailAddress?.name || 'Unknown',
+        email: attendee.emailAddress?.address || '',
+        avatar: null, // Microsoft Graph doesn't provide avatar URLs directly
+      })) || [];
+
+      return {
+        user_id: user.id,
+        microsoft_event_id: event.id,
+        title: event.subject || 'Untitled Event',
+        start_time: event.start.dateTime,
+        end_time: event.end.dateTime,
+        location: event.location?.displayName || null,
+        category: event.categories?.[0] || 'personal',
+        description: event.body?.content || event.bodyPreview || null,
+        is_all_day: event.isAllDay || false,
+        attendees: attendees,
+      };
+    });
 
     // Clear existing events for this user and insert new ones
     await supabaseClient

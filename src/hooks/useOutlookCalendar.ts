@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +19,12 @@ interface CalendarEvent {
   endTime?: string;
   location?: string;
   category?: string;
+  description?: string;
+  attendees?: Array<{
+    name: string;
+    email?: string;
+    avatar?: string;
+  }>;
 }
 
 export function useOutlookCalendar() {
@@ -74,6 +79,8 @@ export function useOutlookCalendar() {
         endTime: event.end_time || undefined,
         location: event.location || undefined,
         category: event.category || 'personal',
+        description: event.description || undefined,
+        attendees: event.attendees || undefined,
       }));
 
       setEvents(transformedEvents);
