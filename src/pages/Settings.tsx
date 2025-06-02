@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Command } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CommandModal } from "@/components/modals/CommandModal";
+import { EnhancedCommandModal } from "@/components/modals/EnhancedCommandModal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Import tab components
@@ -34,20 +34,8 @@ export default function Settings() {
   const openCommandModal = () => setIsCommandModalOpen(true);
   const closeCommandModal = () => setIsCommandModalOpen(false);
   
-  // Handle keyboard shortcut for command modal
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-      e.preventDefault();
-      openCommandModal();
-    }
-  };
-  
   return (
-    <div 
-      className="p-8 pl-24 min-h-screen"
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-    >
+    <div className="p-8 pl-24 min-h-screen">
       <div className="max-w-3xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Settings</h1>
@@ -92,8 +80,8 @@ export default function Settings() {
         </Tabs>
       </div>
       
-      {/* Command Modal */}
-      <CommandModal 
+      {/* Enhanced Command Modal */}
+      <EnhancedCommandModal 
         isOpen={isCommandModalOpen} 
         onClose={closeCommandModal}
         onNavigate={navigate}
