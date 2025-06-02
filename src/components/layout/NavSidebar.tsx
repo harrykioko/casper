@@ -9,17 +9,20 @@ import {
   Sun,
   Moon,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  LogOut
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/use-theme";
 import { useSidebarState } from "@/contexts/SidebarStateContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function NavSidebar() {
   const location = useLocation();
   const { theme, setTheme } = useTheme();
   const { expanded, toggleSidebar } = useSidebarState();
+  const { signOut } = useAuth();
 
   const navItems = [
     { 
@@ -47,6 +50,14 @@ export function NavSidebar() {
       active: location.pathname.startsWith("/reading-list") 
     }
   ];
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   return (
     <div 
@@ -154,6 +165,31 @@ export function NavSidebar() {
           {!expanded && (
             <TooltipContent side="right" className="glassmorphic">
               {theme === "dark" ? "Light Mode" : "Dark Mode"}
+            </TooltipContent>
+          )}
+        </Tooltip>
+
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleSignOut}
+              aria-label="Sign out"
+              className={cn(
+                "text-zinc-700 dark:text-white/70 hover:text-red-500 dark:hover:text-red-400",
+                expanded ? "w-[90%] justify-start px-4" : ""
+              )}
+            >
+              <LogOut className="h-5 w-5 flex-shrink-0" />
+              {expanded && (
+                <span className="ml-3 text-sm">Sign Out</span>
+              )}
+            </Button>
+          </TooltipTrigger>
+          {!expanded && (
+            <TooltipContent side="right" className="glassmorphic">
+              Sign Out
             </TooltipContent>
           )}
         </Tooltip>
