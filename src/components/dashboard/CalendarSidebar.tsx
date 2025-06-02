@@ -5,6 +5,7 @@ import { EventGroup } from "./EventGroup";
 import { Nonnegotiables, Nonnegotiable } from "./Nonnegotiables";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 
 interface CalendarEvent {
   id: string;
@@ -56,9 +57,10 @@ export function CalendarSidebar({ events, nonnegotiables }: CalendarSidebarProps
   });
 
   return (
-    <div className="w-80 border-l border-zinc-200 dark:border-white/10 h-screen sticky top-0 glassmorphic">
-      <div className="p-6 pb-0">
-        <div className="flex justify-between items-center mb-6">
+    <div className="w-80 border-l border-zinc-200 dark:border-white/10 h-screen sticky top-0 glassmorphic flex flex-col">
+      {/* Header */}
+      <div className="p-6 pb-4 flex-shrink-0">
+        <div className="flex justify-between items-center">
           <h2 className="section-title flex items-center gap-2">
             <CalendarIcon className="h-4 w-4 text-zinc-600 dark:text-white/60" /> 
             Calendar
@@ -78,56 +80,66 @@ export function CalendarSidebar({ events, nonnegotiables }: CalendarSidebarProps
         </div>
       </div>
 
-      <ScrollArea className="flex-1 px-6">
-        <div className="space-y-6 pb-6">
-          {/* Today Events - only show if there are events */}
-          {todayEvents.length > 0 && (
-            <EventGroup 
-              title="📅 Today" 
-              events={todayEvents} 
-              isToday={true}
-            />
-          )}
-          
-          {/* Tomorrow Events */}
-          {tomorrowEvents.length > 0 && (
-            <EventGroup 
-              title="🔜 Tomorrow" 
-              events={tomorrowEvents} 
-            />
-          )}
-          
-          {/* Later This Week Events */}
-          {laterThisWeekEvents.length > 0 && (
-            <EventGroup 
-              title="📆 This Week" 
-              events={laterThisWeekEvents} 
-              showDate={true}
-            />
-          )}
-          
-          {/* Later Events */}
-          {laterEvents.length > 0 && (
-            <EventGroup 
-              title="🗓️ Later" 
-              events={laterEvents} 
-              showDate={true}
-            />
-          )}
+      {/* Events Section - Upper 60% */}
+      <div className="flex-[3] min-h-0 px-6">
+        <ScrollArea className="h-full">
+          <div className="space-y-6 pb-4">
+            {/* Today Events - only show if there are events */}
+            {todayEvents.length > 0 && (
+              <EventGroup 
+                title="📅 Today" 
+                events={todayEvents} 
+                isToday={true}
+              />
+            )}
+            
+            {/* Tomorrow Events */}
+            {tomorrowEvents.length > 0 && (
+              <EventGroup 
+                title="🔜 Tomorrow" 
+                events={tomorrowEvents} 
+              />
+            )}
+            
+            {/* Later This Week Events */}
+            {laterThisWeekEvents.length > 0 && (
+              <EventGroup 
+                title="📆 This Week" 
+                events={laterThisWeekEvents} 
+                showDate={true}
+              />
+            )}
+            
+            {/* Later Events */}
+            {laterEvents.length > 0 && (
+              <EventGroup 
+                title="🗓️ Later" 
+                events={laterEvents} 
+                showDate={true}
+              />
+            )}
 
-          {/* Show message if no events at all */}
-          {events.length === 0 && (
-            <div className="text-center py-8 text-zinc-500 dark:text-white/60 text-sm">
-              No upcoming events
-            </div>
-          )}
-          
-          {/* Nonnegotiables Section */}
-          <div className="mt-8">
-            <Nonnegotiables items={nonnegotiables} />
+            {/* Show message if no events at all */}
+            {events.length === 0 && (
+              <div className="text-center py-8 text-zinc-500 dark:text-white/60 text-sm">
+                No upcoming events
+              </div>
+            )}
           </div>
-        </div>
-      </ScrollArea>
+        </ScrollArea>
+      </div>
+
+      {/* Separator */}
+      <div className="px-6">
+        <Separator className="bg-zinc-200 dark:bg-white/10" />
+      </div>
+
+      {/* Nonnegotiables Section - Lower 40% */}
+      <div className="flex-[2] min-h-0 p-6 pt-4">
+        <ScrollArea className="h-full">
+          <Nonnegotiables items={nonnegotiables} />
+        </ScrollArea>
+      </div>
     </div>
   );
 }
