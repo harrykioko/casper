@@ -35,20 +35,24 @@ function CommandItemComponent({
   
   return (
     <div
-      className={`px-3 py-2 rounded-lg hover:bg-muted cursor-pointer flex gap-3 items-center transition-colors ${
-        isSelected ? 'bg-primary/10 ring-1 ring-primary/30' : ''
+      className={`px-3 py-2 rounded-lg cursor-pointer flex gap-3 items-center transition-all duration-200 ${
+        isSelected 
+          ? 'bg-muted/60 ring-1 ring-primary/40' 
+          : 'bg-muted/40 hover:bg-muted/60'
       }`}
       onClick={() => onExecute(item)}
     >
-      <Icon className="h-4 w-4 text-muted-foreground" />
+      <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-sm">{item.title}</div>
+        <div className="text-sm font-medium text-foreground">{item.title}</div>
         {item.description && (
-          <div className="text-xs text-muted-foreground/70">{item.description}</div>
+          <div className="text-xs text-muted-foreground truncate">{item.description}</div>
         )}
       </div>
       {item.shortcut && (
-        <kbd className="text-xs bg-muted px-2 py-1 rounded">{item.shortcut}</kbd>
+        <kbd className="text-xs font-semibold bg-muted px-2 py-1 rounded-md text-muted-foreground border flex-shrink-0">
+          {item.shortcut}
+        </kbd>
       )}
     </div>
   );
@@ -66,11 +70,11 @@ function CommandGroupComponent({
   onExecute: (item: CommandItem) => void; 
 }) {
   return (
-    <div className="mb-4 last:mb-0">
-      <div className="text-xs uppercase tracking-widest text-muted-foreground/70 px-3 py-2 font-medium">
+    <div className="space-y-2">
+      <div className="uppercase text-xs text-muted-foreground/60 tracking-wider pt-3 pb-1 border-b border-muted/30 first:pt-0">
         {group.title}
       </div>
-      <div className="space-y-1">
+      <div className="space-y-2">
         {group.items.map((item) => {
           const itemIndex = allItems.findIndex(i => i.id === item.id);
           return (
@@ -131,7 +135,7 @@ function DesktopModal({
         transition={{ duration: 0.2 }}
       >
         <motion.div
-          className="max-w-xl w-full rounded-2xl bg-muted/30 backdrop-blur-xl shadow-xl border p-4"
+          className="max-w-xl w-full rounded-2xl backdrop-blur-lg bg-muted/20 border border-muted/30 shadow-xl overflow-hidden"
           onClick={(e) => e.stopPropagation()}
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -139,21 +143,23 @@ function DesktopModal({
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         >
           {/* Search Input */}
-          <div className="flex items-center gap-3 p-3 border-b border-border/50">
-            <Search className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-3 p-4 border-b border-muted/30">
+            <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <input
               ref={inputRef}
               type="text"
               placeholder="Type a command or search…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+              className="flex-1 text-sm bg-muted/30 placeholder-muted-foreground text-foreground px-4 py-2 rounded-xl border border-muted/30 backdrop-blur outline-none focus:ring-1 focus:ring-primary/40 transition-all"
             />
-            <kbd className="text-xs bg-muted px-2 py-1 rounded">ESC</kbd>
+            <kbd className="text-xs font-semibold bg-muted px-2 py-1 rounded-md text-muted-foreground border flex-shrink-0">
+              ESC
+            </kbd>
           </div>
 
           {/* Results */}
-          <div className="max-h-[400px] overflow-y-auto py-2">
+          <div className="max-h-[400px] overflow-y-auto p-4 space-y-3 scrollbar-none">
             {filteredGroups.length > 0 ? (
               filteredGroups.map((group) => (
                 <CommandGroupComponent
@@ -205,23 +211,23 @@ function MobileDrawer({
 
   return (
     <Drawer open={isOpen} onOpenChange={onClose}>
-      <DrawerContent className="max-h-[80vh]">
+      <DrawerContent className="max-h-[80vh] rounded-t-2xl backdrop-blur-lg bg-muted/20 border border-muted/30">
         <DrawerHeader>
           <DrawerTitle className="sr-only">Command Palette</DrawerTitle>
-          <div className="flex items-center gap-3 p-3 border-b border-border/50">
-            <Search className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center gap-3 p-4 border-b border-muted/30">
+            <Search className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             <input
               ref={inputRef}
               type="text"
               placeholder="Type a command or search…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+              className="flex-1 text-sm bg-muted/30 placeholder-muted-foreground text-foreground px-4 py-2 rounded-xl border border-muted/30 backdrop-blur outline-none focus:ring-1 focus:ring-primary/40 transition-all"
             />
           </div>
         </DrawerHeader>
         
-        <div className="overflow-y-auto px-4 pb-4">
+        <div className="overflow-y-auto p-4 space-y-3 scrollbar-none">
           {filteredGroups.length > 0 ? (
             filteredGroups.map((group) => (
               <CommandGroupComponent
