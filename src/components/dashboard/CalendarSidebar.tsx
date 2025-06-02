@@ -3,9 +3,8 @@ import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TodayCalendar } from "./TodayCalendar";
 import { UpcomingEvents } from "./UpcomingEvents";
-import { Nonnegotiables } from "./Nonnegotiables";
+import { Nonnegotiables, Nonnegotiable } from "./Nonnegotiables";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { mockNonnegotiables } from "@/data/mockNonnegotiables";
 
 interface CalendarEvent {
   id: string;
@@ -18,9 +17,10 @@ interface CalendarEvent {
 
 interface CalendarSidebarProps {
   events: CalendarEvent[];
+  nonnegotiables: Nonnegotiable[];
 }
 
-export function CalendarSidebar({ events }: CalendarSidebarProps) {
+export function CalendarSidebar({ events, nonnegotiables }: CalendarSidebarProps) {
   // Filter today's events
   const todayEvents = events.filter(event => {
     const today = new Date("2025-05-22");
@@ -68,7 +68,7 @@ export function CalendarSidebar({ events }: CalendarSidebarProps) {
       
       {/* Nonnegotiables Section */}
       <div className="mt-8">
-        <Nonnegotiables items={mockNonnegotiables} />
+        <Nonnegotiables items={nonnegotiables} />
       </div>
     </div>
   );

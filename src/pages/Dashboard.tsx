@@ -5,6 +5,7 @@ import { CalendarSidebar } from "@/components/dashboard/CalendarSidebar";
 import { DashboardMainContent } from "@/components/dashboard/DashboardMainContent";
 import { useTasks } from "@/hooks/useTasks";
 import { useReadingItems } from "@/hooks/useReadingItems";
+import { useNonnegotiables } from "@/hooks/useNonnegotiables";
 import { useCommandModal } from "@/hooks/useCommandModal";
 import { useDashboardKeyboardShortcuts } from "@/hooks/useDashboardKeyboardShortcuts";
 import { mockEvents } from "@/data/mockData";
@@ -20,6 +21,7 @@ export default function Dashboard() {
   // Use live data hooks instead of mock data
   const { tasks, loading: tasksLoading, createTask, updateTask, deleteTask } = useTasks();
   const { readingItems, loading: readingLoading, createReadingItem, updateReadingItem, deleteReadingItem } = useReadingItems();
+  const { nonnegotiables, loading: nonnegotiablesLoading } = useNonnegotiables();
   const { isCommandModalOpen, openCommandModal, closeCommandModal } = useCommandModal();
   const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
   const [addTaskDialogOpen, setAddTaskDialogOpen] = useState(false);
@@ -118,7 +120,7 @@ export default function Dashboard() {
   };
 
   // Show loading skeleton while data is loading
-  if (tasksLoading || readingLoading) {
+  if (tasksLoading || readingLoading || nonnegotiablesLoading) {
     return (
       <div className="min-h-screen" tabIndex={0}>
         <div className="flex">
@@ -129,11 +131,18 @@ export default function Dashboard() {
               <Skeleton className="h-32 w-full" />
             </div>
           </div>
-          <CalendarSidebar events={mockEvents} />
+          <CalendarSidebar events={mockEvents} nonnegotiables={[]} />
         </div>
       </div>
     );
   }
+
+  // Transform nonnegotiables data to match the expected format
+  const transformedNonnegotiables = nonnegotiables.map(item => ({
+    id: item.id,
+    label: item.title, // Transform title to label
+    streak: undefined // We don't have streak data in the database yet
+  }));
   
   return (
     <div className="min-h-screen" tabIndex={0}>
@@ -154,7 +163,7 @@ export default function Dashboard() {
         />
         
         {/* Right Sidebar - Calendar and Upcoming */}
-        <CalendarSidebar events={mockEvents} />
+        <CalendarSidebar events={mockEvents} nonnegotiables={transformedNonnegotiables} />
       </div>
       
       {/* Command Modal */}
