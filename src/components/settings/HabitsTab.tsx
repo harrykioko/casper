@@ -5,32 +5,32 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { v4 as uuidv4 } from "uuid";
-
-interface Habit {
-  id: string;
-  label: string;
-  streak?: number;
-}
+import { useNonnegotiables } from "@/hooks/useNonnegotiables";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function HabitsTab() {
-  const [habits, setHabits] = useState<Habit[]>([
-    { id: "1", label: "Write in journal", streak: 7 },
-    { id: "2", label: "Move for 30 minutes", streak: 3 },
-    { id: "3", label: "Drink 2L of water", streak: 5 },
-    { id: "4", label: "Review schedule for tomorrow" }
-  ]);
+  const { user } = useAuth();
+  const { nonnegotiables, loading, createNonnegotiable, deleteNonnegotiable } = useNonnegotiables();
   const [newHabitText, setNewHabitText] = useState("");
 
-  const handleAddHabit = () => {
+  const handleAddHabit = async () => {
+    if (!user) {
+      toast.error("You must be logged in to add habits");
+      return;
+    }
+
     if (newHabitText.trim()) {
-      const newHabit: Habit = {
-        id: uuidv4(),
-        label: newHabitText.trim()
-      };
-      setHabits([...habits, newHabit]);
-      setNewHabitText("");
-      toast.success("Habit added");
+      try {
+        await createNonnegotiable({
+          title: newHabitText.trim(),
+          is_active: true
+        });
+        setNewHabitText("");
+        toast.success("Habit added");
+      } catch (error) {
+        console.error('Error adding habit:', error);
+        toast.error("Failed to add habit");
+      }
     }
   };
 
@@ -40,10 +40,33 @@ export function HabitsTab() {
     }
   };
 
-  const handleDeleteHabit = (id: string) => {
-    setHabits(habits.filter(habit => habit.id !== id));
-    toast.success("Habit removed");
+  const handleDeleteHabit = async (id: string) => {
+    try {
+      await deleteNonnegotiable(id);
+      toast.success("Habit removed");
+    } catch (error) {
+      console.error('Error deleting habit:', error);
+      toast.error("Failed to remove habit");
+    }
   };
+
+  if (!user) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-pink-500" />
+            Daily Habits
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-6 text-zinc-500 dark:text-zinc-400">
+            Please log in to manage your habits
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -69,16 +92,22 @@ export function HabitsTab() {
               onChange={(e) => setNewHabitText(e.target.value)}
               onKeyDown={handleKeyDown}
               className="border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 placeholder-zinc-400 dark:placeholder-zinc-500"
+              disabled={loading}
             />
             <Button 
               onClick={handleAddHabit}
               className="bg-zinc-800 hover:bg-zinc-900 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-white"
+              disabled={loading || !newHabitText.trim()}
             >
               Add
             </Button>
           </div>
 
-          {habits.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-6 text-zinc-500 dark:text-zinc-400">
+              Loading habits...
+            </div>
+          ) : nonnegotiables.length === 0 ? (
             <div className="text-center py-6 text-zinc-500 dark:text-zinc-400">
               No habits added yet
             </div>
@@ -86,21 +115,17 @@ export function HabitsTab() {
             <div className="space-y-3">
               <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Current Habits</h3>
               <ul className="flex flex-wrap gap-2">
-                {habits.map((habit) => (
+                {nonnegotiables.map((habit) => (
                   <li 
                     key={habit.id}
                     className="flex items-center gap-1 px-3 py-1 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-full"
                   >
-                    <span className="text-sm">{habit.label}</span>
-                    {habit.streak !== undefined && (
-                      <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-1">
-                        · {habit.streak}-day streak
-                      </span>
-                    )}
+                    <span className="text-sm">{habit.title}</span>
                     <button 
                       onClick={() => handleDeleteHabit(habit.id)}
                       className="ml-1 text-zinc-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400"
                       title="Delete habit"
+                      disabled={loading}
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -112,7 +137,7 @@ export function HabitsTab() {
         </div>
 
         <div className="text-xs text-zinc-500 dark:text-zinc-400 pt-2 border-t border-zinc-200 dark:border-zinc-700">
-          <p>Streaks are automatically tracked when you complete habits consistently.</p>
+          <p>Habits are automatically synced across your dashboard and settings.</p>
         </div>
       </CardContent>
     </Card>
