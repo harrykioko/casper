@@ -1,6 +1,7 @@
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Task } from "@/hooks/useTasks";
+import { useProjects } from "@/hooks/useProjects";
 
 interface ProjectSelectorProps {
   selectedProject: Task["project"] | undefined;
@@ -8,11 +9,7 @@ interface ProjectSelectorProps {
 }
 
 export function ProjectSelector({ selectedProject, setSelectedProject }: ProjectSelectorProps) {
-  const projects = [
-    { id: "p1", name: "Casper", color: "#FF1464" },
-    { id: "p2", name: "Research", color: "#2B2DFF" },
-    { id: "p3", name: "Personal", color: "#10B981" },
-  ];
+  const { projects } = useProjects();
 
   return (
     <div>
@@ -23,7 +20,13 @@ export function ProjectSelector({ selectedProject, setSelectedProject }: Project
             setSelectedProject(undefined);
           } else {
             const project = projects.find((p) => p.id === value);
-            setSelectedProject(project);
+            if (project) {
+              setSelectedProject({
+                id: project.id,
+                name: project.name,
+                color: project.color || "#FF1464"
+              });
+            }
           }
         }}
       >

@@ -9,6 +9,51 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      calendar_events: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          end_time: string | null
+          id: string
+          is_all_day: boolean | null
+          location: string | null
+          microsoft_event_id: string
+          start_time: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          end_time?: string | null
+          id?: string
+          is_all_day?: boolean | null
+          location?: string | null
+          microsoft_event_id: string
+          start_time: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          end_time?: string | null
+          id?: string
+          is_all_day?: boolean | null
+          location?: string | null
+          microsoft_event_id?: string
+          start_time?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       nonnegotiables: {
         Row: {
           created_at: string
@@ -65,6 +110,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      outlook_connections: {
+        Row: {
+          access_token: string
+          created_at: string
+          display_name: string | null
+          email: string
+          id: string
+          is_active: boolean
+          microsoft_user_id: string
+          refresh_token: string
+          token_expires_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          display_name?: string | null
+          email: string
+          id?: string
+          is_active?: boolean
+          microsoft_user_id: string
+          refresh_token: string
+          token_expires_at: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          display_name?: string | null
+          email?: string
+          id?: string
+          is_active?: boolean
+          microsoft_user_id?: string
+          refresh_token?: string
+          token_expires_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       projects: {
         Row: {

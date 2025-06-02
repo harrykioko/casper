@@ -6,9 +6,9 @@ import { DashboardMainContent } from "@/components/dashboard/DashboardMainConten
 import { useTasks } from "@/hooks/useTasks";
 import { useReadingItems } from "@/hooks/useReadingItems";
 import { useNonnegotiables } from "@/hooks/useNonnegotiables";
+import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
 import { useCommandModal } from "@/hooks/useCommandModal";
 import { useDashboardKeyboardShortcuts } from "@/hooks/useDashboardKeyboardShortcuts";
-import { mockEvents } from "@/data/mockData";
 import { useState } from "react";
 import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
 import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
@@ -22,6 +22,7 @@ export default function Dashboard() {
   const { tasks, loading: tasksLoading, createTask, updateTask, deleteTask } = useTasks();
   const { readingItems, loading: readingLoading, createReadingItem, updateReadingItem, deleteReadingItem } = useReadingItems();
   const { nonnegotiables, loading: nonnegotiablesLoading } = useNonnegotiables();
+  const { events: calendarEvents } = useOutlookCalendar();
   const { isCommandModalOpen, openCommandModal, closeCommandModal } = useCommandModal();
   const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
   const [addTaskDialogOpen, setAddTaskDialogOpen] = useState(false);
@@ -131,7 +132,7 @@ export default function Dashboard() {
               <Skeleton className="h-32 w-full" />
             </div>
           </div>
-          <CalendarSidebar events={mockEvents} nonnegotiables={[]} />
+          <CalendarSidebar events={[]} nonnegotiables={[]} />
         </div>
       </div>
     );
@@ -163,7 +164,7 @@ export default function Dashboard() {
         />
         
         {/* Right Sidebar - Calendar and Upcoming */}
-        <CalendarSidebar events={mockEvents} nonnegotiables={transformedNonnegotiables} />
+        <CalendarSidebar events={calendarEvents} nonnegotiables={transformedNonnegotiables} />
       </div>
       
       {/* Command Modal */}
