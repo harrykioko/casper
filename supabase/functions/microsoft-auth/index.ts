@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -6,6 +5,9 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// In-memory store to track used codes (in production, use Redis or database)
+const usedCodes = new Set<string>();
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -44,14 +46,18 @@ serve(async (req) => {
         throw new Error('Microsoft OAuth not configured');
       }
 
+      // Generate a unique state value with timestamp to prevent reuse
+      const state = `${user.id}_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+
       const authUrl = new URL('https://login.microsoftonline.com/common/oauth2/v2.0/authorize');
       authUrl.searchParams.set('client_id', clientId);
       authUrl.searchParams.set('response_type', 'code');
       authUrl.searchParams.set('redirect_uri', redirectUri);
       authUrl.searchParams.set('scope', 'https://graph.microsoft.com/calendars.read https://graph.microsoft.com/user.read offline_access');
-      authUrl.searchParams.set('state', user.id); // Use user ID as state for security
+      authUrl.searchParams.set('state', state);
+      authUrl.searchParams.set('response_mode', 'query');
 
-      console.log('Generated auth URL successfully');
+      console.log('Generated auth URL with unique state:', state);
       return new Response(JSON.stringify({ authUrl: authUrl.toString() }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -63,15 +69,27 @@ serve(async (req) => {
       
       console.log('OAuth callback received:');
       console.log('- Action:', action);
-      console.log('- State matches user ID:', state === user.id);
       console.log('- Code received:', !!code);
       console.log('- Code length:', code ? code.length : 0);
+      console.log('- State received:', state);
       
       if (action === 'callback') {
-        if (state !== user.id) {
-          console.error('State validation failed:', { expected: user.id, received: state });
-          throw new Error('Invalid state parameter');
+        // Validate state format and extract user ID
+        const statePattern = new RegExp(`^${user.id}_\\d+_[a-z0-9]+$`);
+        if (!state || !statePattern.test(state)) {
+          console.error('State validation failed:', { expected_pattern: `${user.id}_*`, received: state });
+          throw new Error('Invalid or expired state parameter');
         }
+
+        // Check if code has already been used
+        if (usedCodes.has(code)) {
+          console.error('Code already used:', code.substring(0, 20) + '...');
+          throw new Error('Authorization code has already been used');
+        }
+
+        // Mark code as used immediately
+        usedCodes.add(code);
+        console.log('Marked code as used, total used codes:', usedCodes.size);
 
         const clientId = Deno.env.get('MICROSOFT_CLIENT_ID');
         const clientSecret = Deno.env.get('MICROSOFT_CLIENT_SECRET');
@@ -98,7 +116,6 @@ serve(async (req) => {
         });
 
         console.log('Making token exchange request to Microsoft...');
-        console.log('Request body params:', Object.fromEntries(tokenRequestBody.entries()));
 
         const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
           method: 'POST',
@@ -109,13 +126,14 @@ serve(async (req) => {
         });
 
         console.log('Token response status:', tokenResponse.status);
-        console.log('Token response headers:', Object.fromEntries(tokenResponse.headers.entries()));
 
         const tokenResponseText = await tokenResponse.text();
         console.log('Token response body:', tokenResponseText);
 
         if (!tokenResponse.ok) {
           console.error('Token exchange failed with status:', tokenResponse.status);
+          // Remove code from used set if token exchange fails
+          usedCodes.delete(code);
           try {
             const errorData = JSON.parse(tokenResponseText);
             console.error('Microsoft error details:', errorData);
@@ -137,6 +155,8 @@ serve(async (req) => {
           });
         } catch (parseError) {
           console.error('Failed to parse token response:', parseError);
+          // Remove code from used set if parsing fails
+          usedCodes.delete(code);
           throw new Error('Invalid token response from Microsoft');
         }
         
@@ -153,6 +173,8 @@ serve(async (req) => {
         if (!userResponse.ok) {
           const userErrorText = await userResponse.text();
           console.error('Failed to get user info:', userErrorText);
+          // Remove code from used set if user info fails
+          usedCodes.delete(code);
           throw new Error('Failed to get user info from Microsoft Graph');
         }
 
@@ -184,10 +206,21 @@ serve(async (req) => {
 
         if (error) {
           console.error('Database error:', error);
+          // Remove code from used set if database storage fails
+          usedCodes.delete(code);
           throw new Error('Failed to store connection');
         }
 
         console.log('OAuth flow completed successfully');
+        
+        // Clean up old used codes periodically (keep last 1000)
+        if (usedCodes.size > 1000) {
+          const codesArray = Array.from(usedCodes);
+          usedCodes.clear();
+          // Keep the most recent codes (this is a simple cleanup)
+          codesArray.slice(-500).forEach(code => usedCodes.add(code));
+        }
+
         return new Response(JSON.stringify({ success: true, user: userData }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

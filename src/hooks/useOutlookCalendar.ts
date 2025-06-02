@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -155,7 +156,14 @@ export function useOutlookCalendar() {
 
       if (error) {
         console.error('Edge function error:', error);
-        throw error;
+        // Handle specific error messages
+        if (error.message?.includes('already redeemed')) {
+          throw new Error('This authorization code has already been used. Please try connecting again.');
+        } else if (error.message?.includes('Invalid or expired state')) {
+          throw new Error('The connection session has expired. Please try connecting again.');
+        } else {
+          throw error;
+        }
       }
 
       console.log('OAuth callback successful:', data);
@@ -164,7 +172,7 @@ export function useOutlookCalendar() {
       await syncCalendar();
     } catch (error) {
       console.error('Error handling OAuth callback:', error);
-      throw new Error('Failed to complete Outlook connection');
+      throw new Error(error.message || 'Failed to complete Outlook connection');
     } finally {
       setLoading(false);
     }

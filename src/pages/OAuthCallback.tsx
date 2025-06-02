@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,12 +14,19 @@ export default function OAuthCallback() {
   const { user, loading: authLoading } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const processedRef = useRef(false);
 
   useEffect(() => {
     console.log('OAuth callback page loaded');
     console.log('Current user:', user);
     console.log('Auth loading:', authLoading);
     console.log('Search params:', Object.fromEntries(searchParams.entries()));
+
+    // Prevent multiple processing
+    if (processedRef.current) {
+      console.log('OAuth callback already processed, skipping');
+      return;
+    }
 
     // Wait for auth to load
     if (authLoading) {
@@ -54,12 +61,20 @@ export default function OAuthCallback() {
       return;
     }
 
+    // Mark as processed to prevent duplicate calls
+    processedRef.current = true;
+
     // Handle the OAuth callback
     console.log('Processing OAuth callback...');
     handleOAuthCallback(code, state)
       .then(() => {
         console.log('OAuth callback successful');
         setStatus('success');
+        
+        // Clear the URL parameters to prevent reprocessing on refresh
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
+        
         // Redirect to settings after a short delay
         setTimeout(() => {
           navigate('/settings?tab=calendar');
@@ -69,10 +84,16 @@ export default function OAuthCallback() {
         console.error('OAuth callback failed:', error);
         setStatus('error');
         setErrorMessage(error.message || 'Failed to complete OAuth flow');
+        
+        // Clear the URL parameters even on error
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, '', newUrl);
       });
   }, [searchParams, handleOAuthCallback, navigate, user, authLoading]);
 
   const handleRetry = () => {
+    // Reset the processed flag to allow retry
+    processedRef.current = false;
     navigate('/settings?tab=calendar');
   };
 
