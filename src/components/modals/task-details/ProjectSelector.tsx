@@ -1,3 +1,4 @@
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Task } from "@/hooks/useTasks";
 
@@ -15,12 +16,19 @@ export function ProjectSelector({ selectedProject, setSelectedProject }: Project
 
   return (
     <div>
-      <Select onValueChange={(value) => {
-        const project = projects.find((p) => p.id === value);
-        setSelectedProject(project);
-      }}>
+      <Select 
+        value={selectedProject?.id || "none"} 
+        onValueChange={(value) => {
+          if (value === "none") {
+            setSelectedProject(undefined);
+          } else {
+            const project = projects.find((p) => p.id === value);
+            setSelectedProject(project);
+          }
+        }}
+      >
         <SelectTrigger className="w-full">
-          <SelectValue placeholder="Select project" defaultValue={selectedProject?.id} />
+          <SelectValue placeholder="Select project" />
         </SelectTrigger>
         <SelectContent>
           {projects.map((project) => (
@@ -28,7 +36,7 @@ export function ProjectSelector({ selectedProject, setSelectedProject }: Project
               {project.name}
             </SelectItem>
           ))}
-          <SelectItem value="">No project</SelectItem>
+          <SelectItem value="none">No project</SelectItem>
         </SelectContent>
       </Select>
     </div>
