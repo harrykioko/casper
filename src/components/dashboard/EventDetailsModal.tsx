@@ -1,6 +1,6 @@
 
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Clock, MapPin, Video, Users, ExternalLink } from "lucide-react";
+import { X, Clock, MapPin, Video, Users, Calendar, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -110,92 +110,70 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       .slice(0, 2);
   };
 
-  const displayedAttendees = event.attendees?.slice(0, 3) || [];
-  const remainingCount = (event.attendees?.length || 0) - 3;
+  const displayedAttendees = event.attendees?.slice(0, 5) || [];
+  const remainingCount = (event.attendees?.length || 0) - 5;
 
   return (
     <AnimatePresence>
       {isOpen && (
         <Dialog open={isOpen} onOpenChange={onClose}>
-          <DialogOverlay className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm" />
+          <DialogOverlay className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm" />
           <DialogContent 
-            className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-full max-w-[90vw] sm:max-w-md md:max-w-lg lg:max-w-xl max-h-[90vh] p-0 border-none bg-transparent shadow-none"
+            className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-full max-w-[90vw] sm:max-w-lg max-h-[85vh] p-0 border-none bg-transparent shadow-none"
             aria-labelledby="event-title"
             aria-describedby="event-description"
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="relative rounded-2xl bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg border border-gray-200/50 dark:border-gray-800/50 shadow-2xl overflow-hidden"
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+              className="relative rounded-2xl bg-muted/30 backdrop-blur-xl border border-muted/40 shadow-lg overflow-hidden"
             >
               {/* Header */}
-              <div className="p-6 pb-4 border-b border-gray-200/50 dark:border-gray-800/50">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <h2 
-                      id="event-title"
-                      className="text-xl font-bold text-gray-900 dark:text-gray-100 truncate mb-2"
-                    >
-                      {event.title}
-                    </h2>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                      {formatDate(event.startTime)}
-                    </p>
-                    
-                    {/* Time Badge */}
-                    <Badge 
-                      variant="secondary" 
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 text-primary border-primary/20"
-                    >
-                      <Clock className="h-3 w-3" />
-                      {getTimeRange()}
-                    </Badge>
-                  </div>
+              <div className="p-6 pb-4">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <h1 
+                    id="event-title"
+                    className="text-xl font-bold text-foreground leading-tight flex-1"
+                  >
+                    {event.title}
+                  </h1>
                   
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={onClose}
-                    className="h-8 w-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    className="h-8 w-8 rounded-full hover:bg-muted/50 transition-colors flex-shrink-0"
                     aria-label="Close modal"
                   >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
+
+                {/* Date */}
+                <div className="flex items-center gap-2 text-muted-foreground mb-3">
+                  <Calendar className="h-4 w-4" />
+                  <span className="text-sm font-medium">{formatDate(event.startTime)}</span>
+                </div>
+
+                {/* Time Badge */}
+                <Badge 
+                  variant="secondary" 
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 text-foreground border-0"
+                >
+                  <Clock className="h-3 w-3" />
+                  {getTimeRange()}
+                </Badge>
               </div>
 
               {/* Content */}
-              <div className="p-6 pt-4 max-h-[60vh] overflow-y-auto space-y-4">
-                {/* Location */}
-                {event.location && (
-                  <div className="flex items-start gap-3">
-                    <MapPin className="h-4 w-4 text-gray-500 dark:text-gray-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      {isLocationUrl ? (
-                        <a 
-                          href={event.location}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:text-primary/80 transition-colors text-sm break-all"
-                        >
-                          {hasVideoLink ? 'Join Video Call' : 'View Location'}
-                        </a>
-                      ) : (
-                        <p className="text-sm text-gray-700 dark:text-gray-300 break-words">
-                          {event.location}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Video Call CTA */}
+              <div className="px-6 pb-6 max-h-[50vh] overflow-y-auto space-y-5">
+                {/* Join Call CTA */}
                 {hasVideoLink && (
                   <Button
                     asChild
-                    className="w-full bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 text-white border-0"
+                    className="w-full bg-primary/80 hover:bg-primary text-primary-foreground border-0 rounded-xl h-11"
                   >
                     <a 
                       href={event.location}
@@ -210,18 +188,28 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                   </Button>
                 )}
 
-                {/* Description */}
-                {event.description && (
+                {/* Location */}
+                {event.location && !hasVideoLink && (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="h-4 w-4 rounded-full bg-gray-200 dark:bg-gray-700 flex-shrink-0" />
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Description</span>
-                    </div>
-                    <div 
-                      id="event-description"
-                      className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed pl-6 whitespace-pre-wrap"
-                    >
-                      {event.description}
+                    <p className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Location</p>
+                    <div className="flex items-start gap-3">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        {isLocationUrl ? (
+                          <a 
+                            href={event.location}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary/80 transition-colors text-sm break-all"
+                          >
+                            View Location
+                          </a>
+                        ) : (
+                          <p className="text-sm text-foreground break-words">
+                            {event.location}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -229,31 +217,41 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                 {/* Attendees */}
                 {event.attendees && event.attendees.length > 0 && (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Users className="h-4 w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Attendees ({event.attendees.length})
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 pl-6 flex-wrap">
+                    <p className="text-xs uppercase tracking-wide font-medium text-muted-foreground">
+                      Attendees ({event.attendees.length})
+                    </p>
+                    <div className="flex items-center gap-3 flex-wrap">
                       {displayedAttendees.map((attendee, index) => (
                         <div key={index} className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6">
+                          <Avatar className="h-7 w-7">
                             <AvatarImage src={attendee.avatar} alt={attendee.name} />
-                            <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                            <AvatarFallback className="text-xs bg-muted text-muted-foreground">
                               {getInitials(attendee.name)}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="text-xs text-gray-600 dark:text-gray-400 truncate max-w-20">
+                          <span className="text-sm text-foreground truncate max-w-24">
                             {attendee.name}
                           </span>
                         </div>
                       ))}
                       {remainingCount > 0 && (
-                        <Badge variant="secondary" className="text-xs px-2 py-0.5">
+                        <Badge variant="secondary" className="text-xs px-2 py-1 bg-muted/50 text-muted-foreground">
                           +{remainingCount} more
                         </Badge>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Description */}
+                {event.description && (
+                  <div className="space-y-3">
+                    <p className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Description</p>
+                    <div 
+                      id="event-description"
+                      className="text-sm text-foreground leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto"
+                    >
+                      {event.description}
                     </div>
                   </div>
                 )}
