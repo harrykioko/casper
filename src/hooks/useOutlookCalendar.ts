@@ -27,6 +27,19 @@ interface CalendarEvent {
   }>;
 }
 
+// Type guard function to safely parse attendees from Json
+function parseAttendees(attendeesJson: any): Array<{ name: string; email?: string; avatar?: string; }> {
+  if (!attendeesJson || !Array.isArray(attendeesJson)) {
+    return [];
+  }
+  
+  return attendeesJson.map((attendee: any) => ({
+    name: attendee?.name || 'Unknown',
+    email: attendee?.email || undefined,
+    avatar: attendee?.avatar || undefined,
+  }));
+}
+
 export function useOutlookCalendar() {
   const { user } = useAuth();
   const [connection, setConnection] = useState<OutlookConnection | null>(null);
@@ -80,7 +93,7 @@ export function useOutlookCalendar() {
         location: event.location || undefined,
         category: event.category || 'personal',
         description: event.description || undefined,
-        attendees: event.attendees || undefined,
+        attendees: parseAttendees(event.attendees),
       }));
 
       setEvents(transformedEvents);
