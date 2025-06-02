@@ -37,8 +37,8 @@ function CommandItemComponent({
     <div
       className={`px-3 py-2 rounded-lg cursor-pointer flex gap-3 items-center transition-all duration-200 ${
         isSelected 
-          ? 'bg-muted/60 ring-1 ring-primary/40' 
-          : 'bg-muted/40 hover:bg-muted/60'
+          ? 'bg-muted/50 ring-1 ring-muted/50' 
+          : 'bg-muted/30 hover:bg-muted/50'
       }`}
       onClick={() => onExecute(item)}
     >
@@ -50,7 +50,7 @@ function CommandItemComponent({
         )}
       </div>
       {item.shortcut && (
-        <kbd className="text-xs font-semibold bg-muted px-2 py-1 rounded-md text-muted-foreground border flex-shrink-0">
+        <kbd className="text-xs font-medium bg-muted/60 text-muted-foreground border px-2 py-1 rounded-md ml-auto flex-shrink-0">
           {item.shortcut}
         </kbd>
       )}
@@ -62,16 +62,18 @@ function CommandGroupComponent({
   group, 
   allItems, 
   selectedIndex, 
-  onExecute 
+  onExecute,
+  isFirst = false
 }: { 
   group: CommandGroup; 
   allItems: CommandItem[]; 
   selectedIndex: number; 
   onExecute: (item: CommandItem) => void; 
+  isFirst?: boolean;
 }) {
   return (
     <div className="space-y-2">
-      <div className="uppercase text-xs text-muted-foreground/60 tracking-wider pt-3 pb-1 border-b border-muted/30 first:pt-0">
+      <div className={`text-xs uppercase tracking-wide font-medium text-muted-foreground/80 pt-3 pb-1 ${!isFirst ? 'border-t border-muted/20' : 'first:pt-0'}`}>
         {group.title}
       </div>
       <div className="space-y-2">
@@ -135,7 +137,7 @@ function DesktopModal({
         transition={{ duration: 0.2 }}
       >
         <motion.div
-          className="max-w-xl w-full rounded-2xl backdrop-blur-lg bg-muted/20 border border-muted/30 shadow-xl overflow-hidden"
+          className="max-w-lg w-full rounded-2xl backdrop-blur-xl bg-muted/20 border border-muted/30 shadow-xl overflow-hidden"
           onClick={(e) => e.stopPropagation()}
           initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -151,9 +153,9 @@ function DesktopModal({
               placeholder="Type a command or search…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 text-sm bg-muted/30 placeholder-muted-foreground text-foreground px-4 py-2 rounded-xl border border-muted/30 backdrop-blur outline-none focus:ring-1 focus:ring-primary/40 transition-all"
+              className="flex-1 text-sm bg-muted/30 placeholder-muted-foreground/70 text-foreground px-4 py-2 rounded-xl border border-muted/30 backdrop-blur outline-none focus:ring-1 focus:ring-primary/30 transition-all"
             />
-            <kbd className="text-xs font-semibold bg-muted px-2 py-1 rounded-md text-muted-foreground border flex-shrink-0">
+            <kbd className="text-xs font-medium bg-muted/60 px-2 py-1 rounded-md text-muted-foreground border flex-shrink-0">
               ESC
             </kbd>
           </div>
@@ -161,13 +163,14 @@ function DesktopModal({
           {/* Results */}
           <div className="max-h-[400px] overflow-y-auto p-4 space-y-3 scrollbar-none">
             {filteredGroups.length > 0 ? (
-              filteredGroups.map((group) => (
+              filteredGroups.map((group, index) => (
                 <CommandGroupComponent
                   key={group.id}
                   group={group}
                   allItems={allItems}
                   selectedIndex={selectedIndex}
                   onExecute={executeCommand}
+                  isFirst={index === 0}
                 />
               ))
             ) : (
@@ -211,7 +214,7 @@ function MobileDrawer({
 
   return (
     <Drawer open={isOpen} onOpenChange={onClose}>
-      <DrawerContent className="max-h-[80vh] rounded-t-2xl backdrop-blur-lg bg-muted/20 border border-muted/30">
+      <DrawerContent className="max-h-[80vh] rounded-t-2xl backdrop-blur-xl bg-muted/20 border border-muted/30">
         <DrawerHeader>
           <DrawerTitle className="sr-only">Command Palette</DrawerTitle>
           <div className="flex items-center gap-3 p-4 border-b border-muted/30">
@@ -222,20 +225,21 @@ function MobileDrawer({
               placeholder="Type a command or search…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="flex-1 text-sm bg-muted/30 placeholder-muted-foreground text-foreground px-4 py-2 rounded-xl border border-muted/30 backdrop-blur outline-none focus:ring-1 focus:ring-primary/40 transition-all"
+              className="flex-1 text-sm bg-muted/30 placeholder-muted-foreground/70 text-foreground px-4 py-2 rounded-xl border border-muted/30 backdrop-blur outline-none focus:ring-1 focus:ring-primary/30 transition-all"
             />
           </div>
         </DrawerHeader>
         
         <div className="overflow-y-auto p-4 space-y-3 scrollbar-none">
           {filteredGroups.length > 0 ? (
-            filteredGroups.map((group) => (
+            filteredGroups.map((group, index) => (
               <CommandGroupComponent
                 key={group.id}
                 group={group}
                 allItems={allItems}
                 selectedIndex={selectedIndex}
                 onExecute={executeCommand}
+                isFirst={index === 0}
               />
             ))
           ) : (
