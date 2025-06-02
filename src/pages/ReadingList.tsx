@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Plus, Search } from "lucide-react";
+import { BookOpen, Plus, Search, ExternalLink, Trash, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CommandModal } from "@/components/modals/CommandModal";
@@ -9,6 +9,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useReadingItems } from "@/hooks/useReadingItems";
+import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 
 export default function ReadingList() {
   const navigate = useNavigate();
@@ -22,7 +24,8 @@ export default function ReadingList() {
     !searchQuery || 
     item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    item.url.toLowerCase().includes(searchQuery.toLowerCase())
+    item.url.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item.hostname && item.hostname.toLowerCase().includes(searchQuery.toLowerCase()))
   );
   
   // Handle marking item as read/unread
@@ -71,7 +74,7 @@ export default function ReadingList() {
   if (loading) {
     return (
       <div className="p-8 pl-24 min-h-screen">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-4xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <Skeleton className="h-9 w-40" />
             <div className="flex gap-3">
@@ -80,9 +83,9 @@ export default function ReadingList() {
             </div>
           </div>
           <Skeleton className="h-10 w-full mb-6" />
-          <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-24 w-full" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-32 w-full" />
             ))}
           </div>
         </div>
@@ -96,7 +99,7 @@ export default function ReadingList() {
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Reading List</h1>
           <div className="flex gap-3">
@@ -130,89 +133,109 @@ export default function ReadingList() {
         </div>
         
         <ScrollArea className="h-[calc(100vh-12rem)]">
-          <div className="space-y-4 pr-4">
-            {filteredItems.map((item) => (
-              <div 
-                key={item.id}
-                className="group p-4 rounded-lg hover:glassmorphic transition-all duration-200"
-              >
-                <div className="flex gap-4">
-                  {item.favicon ? (
-                    <img 
-                      src={item.favicon} 
-                      alt=""
-                      className="w-10 h-10 rounded-sm object-cover flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="w-10 h-10 rounded-sm bg-accent flex items-center justify-center flex-shrink-0">
-                      <BookOpen className="h-5 w-5 opacity-70" />
-                    </div>
+          {filteredItems.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-20" />
+              <p className="text-lg font-medium">No items found</p>
+              <p className="text-sm">Try adjusting your search or save some links</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pr-4">
+              {filteredItems.map((item) => (
+                <motion.div
+                  key={item.id}
+                  className={cn(
+                    "group relative rounded-xl backdrop-blur-sm transition-all duration-200 cursor-pointer",
+                    "bg-white/60 dark:bg-zinc-900/40 border border-white/20 dark:border-white/10",
+                    "shadow-sm hover:shadow-lg hover:scale-[1.02]",
+                    item.isRead ? "opacity-60" : ""
                   )}
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 
-                        className={`font-medium line-clamp-2 ${item.isRead ? "text-muted-foreground" : ""}`}
-                      >
-                        {item.title}
-                      </h3>
+                  whileHover={{ scale: 1.02 }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={() => window.open(item.url, '_blank', 'noopener,noreferrer')}
+                >
+                  <div className="p-4">
+                    {/* Image */}
+                    {item.image && (
+                      <div className="mb-3">
+                        <img 
+                          src={item.image} 
+                          alt=""
+                          className="w-full h-32 rounded-lg object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                      </div>
+                    )}
+                    
+                    {/* Header with favicon and actions */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {item.favicon && (
+                          <img 
+                            src={item.favicon} 
+                            alt=""
+                            className="w-4 h-4 rounded flex-shrink-0"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        )}
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                          {item.hostname || new URL(item.url).hostname}
+                        </p>
+                      </div>
                       
-                      <div className="flex gap-1 flex-shrink-0">
+                      {/* Action Buttons */}
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="ghost"
-                          className="opacity-0 group-hover:opacity-100"
-                          onClick={() => handleDelete(item.id)}
+                          className={`h-6 w-6 rounded-full ${item.isRead ? 'text-green-500' : 'text-zinc-500 hover:text-green-500'}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMarkRead(item.id);
+                          }}
                         >
-                          Delete
+                          <Check className="h-3 w-3" />
                         </Button>
                         
                         <Button
-                          size="sm"
-                          variant="outline"
-                          asChild
-                          className="opacity-0 group-hover:opacity-100"
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 rounded-full text-zinc-500 hover:text-rose-500"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(item.id);
+                          }}
                         >
-                          <a href={item.url} target="_blank" rel="noopener noreferrer">
-                            Open
-                          </a>
+                          <Trash className="h-3 w-3" />
                         </Button>
                       </div>
                     </div>
                     
+                    {/* Title */}
+                    <h3 className={cn(
+                      "font-medium text-sm line-clamp-2 text-zinc-800 dark:text-white/90 mb-2",
+                      item.isRead && "line-through"
+                    )}>
+                      {item.title}
+                    </h3>
+                    
+                    {/* Description */}
                     {item.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
+                      <p className="text-xs text-zinc-600 dark:text-white/60 line-clamp-3">
                         {item.description}
                       </p>
                     )}
-                    
-                    <div className="mt-2 flex items-center justify-between">
-                      <p className="text-xs text-muted-foreground truncate">
-                        {item.url}
-                      </p>
-                      
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="h-auto p-0 text-sm"
-                        onClick={() => handleMarkRead(item.id)}
-                      >
-                        {item.isRead ? 'Mark as unread' : 'Mark as read'}
-                      </Button>
-                    </div>
                   </div>
-                </div>
-              </div>
-            ))}
-            
-            {filteredItems.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p className="text-lg font-medium">No items found</p>
-                <p className="text-sm">Try adjusting your search or save some links</p>
-              </div>
-            )}
-          </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </ScrollArea>
       </div>
       

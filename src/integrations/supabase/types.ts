@@ -164,7 +164,9 @@ export type Database = {
           created_by: string | null
           description: string | null
           favicon: string | null
+          hostname: string | null
           id: string
+          image: string | null
           is_read: boolean | null
           project_id: string | null
           title: string
@@ -176,7 +178,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           favicon?: string | null
+          hostname?: string | null
           id?: string
+          image?: string | null
           is_read?: boolean | null
           project_id?: string | null
           title: string
@@ -188,7 +192,9 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           favicon?: string | null
+          hostname?: string | null
           id?: string
+          image?: string | null
           is_read?: boolean | null
           project_id?: string | null
           title?: string

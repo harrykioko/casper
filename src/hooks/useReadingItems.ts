@@ -13,6 +13,8 @@ export interface ReadingItem {
   title: string;
   description?: string;
   favicon?: string;
+  image?: string;
+  hostname?: string;
   isRead: boolean;
   created_at?: string;
   updated_at?: string;
@@ -28,6 +30,8 @@ const transformReadingItem = (row: ReadingItemRow): ReadingItem => {
     title: row.title,
     description: row.description || undefined,
     favicon: row.favicon || undefined,
+    image: row.image || undefined,
+    hostname: row.hostname || undefined,
     isRead: row.is_read || false,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -51,6 +55,33 @@ const transformReadingItemForDatabase = (itemData: any): any => {
   }
   
   return dbData;
+};
+
+// Function to fetch metadata from edge function
+export const fetchLinkMetadata = async (url: string) => {
+  const { data, error } = await supabase.functions.invoke('fetch-link-metadata', {
+    body: { url }
+  });
+
+  if (error) {
+    console.error('Error fetching metadata:', error);
+    // Return fallback metadata
+    try {
+      const urlObj = new URL(url);
+      return {
+        title: urlObj.hostname,
+        description: null,
+        image: null,
+        favicon: null,
+        hostname: urlObj.hostname,
+        url: url
+      };
+    } catch {
+      throw new Error('Invalid URL');
+    }
+  }
+
+  return data;
 };
 
 export function useReadingItems() {
