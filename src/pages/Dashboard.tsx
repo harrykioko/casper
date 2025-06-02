@@ -2,16 +2,15 @@
 import { useNavigate } from "react-router-dom";
 import { CalendarSidebar } from "@/components/dashboard/CalendarSidebar";
 import { DashboardMainContent } from "@/components/dashboard/DashboardMainContent";
+import { DashboardLoading } from "@/components/dashboard/DashboardLoading";
+import { DashboardDialogs } from "@/components/dashboard/DashboardDialogs";
 import { useTasks } from "@/hooks/useTasks";
 import { useReadingItems } from "@/hooks/useReadingItems";
 import { useNonnegotiables } from "@/hooks/useNonnegotiables";
 import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
 import { useCommandModal } from "@/hooks/useCommandModal";
+import { useDashboardHandlers } from "@/hooks/useDashboardHandlers";
 import { useState } from "react";
-import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
-import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
-import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
-import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -22,122 +21,34 @@ export default function Dashboard() {
   const { nonnegotiables, loading: nonnegotiablesLoading } = useNonnegotiables();
   const { events: calendarEvents } = useOutlookCalendar();
   const { isCommandModalOpen, openCommandModal, closeCommandModal } = useCommandModal();
+  
+  // Modal state
   const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
   const [addTaskDialogOpen, setAddTaskDialogOpen] = useState(false);
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
   
-  // Handle navigation to prompts page for new prompt
-  const handleAddPrompt = () => {
-    navigate('/prompts', { state: { openNewPrompt: true } });
-  };
-
-  // Handle project creation
-  const handleCreateProject = (data: any) => {
-    console.log('Creating project from dashboard:', data);
-    navigate('/projects');
-  };
-
-  // Task handlers
-  const handleAddTask = async (content: string) => {
-    try {
-      await createTask({ content });
-    } catch (error) {
-      console.error('Failed to create task:', error);
-    }
-  };
-
-  const handleCompleteTask = async (id: string) => {
-    const task = tasks.find(t => t.id === id);
-    if (task) {
-      try {
-        await updateTask(id, { 
-          completed: !task.completed,
-          status: !task.completed ? 'done' : 'todo'
-        });
-      } catch (error) {
-        console.error('Failed to update task:', error);
-      }
-    }
-  };
-
-  const handleDeleteTask = async (id: string) => {
-    try {
-      await deleteTask(id);
-    } catch (error) {
-      console.error('Failed to delete task:', error);
-    }
-  };
-
-  const handleUpdateTaskStatus = async (id: string, status: "todo" | "inprogress" | "done") => {
-    try {
-      await updateTask(id, { 
-        status,
-        completed: status === 'done'
-      });
-    } catch (error) {
-      console.error('Failed to update task status:', error);
-    }
-  };
-
-  const handleUpdateTask = async (updatedTask: any) => {
-    try {
-      await updateTask(updatedTask.id, updatedTask);
-    } catch (error) {
-      console.error('Failed to update task:', error);
-    }
-  };
-
-  // Reading list handlers
-  const handleMarkRead = async (id: string) => {
-    const item = readingItems.find(item => item.id === id);
-    if (item) {
-      try {
-        await updateReadingItem(id, { is_read: !item.isRead });
-      } catch (error) {
-        console.error('Failed to update reading item:', error);
-      }
-    }
-  };
-
-  const handleDeleteReadingItem = async (id: string) => {
-    try {
-      await deleteReadingItem(id);
-    } catch (error) {
-      console.error('Failed to delete reading item:', error);
-    }
-  };
-
-  const handleAddReadingItem = async (itemData: any) => {
-    try {
-      await createReadingItem(itemData);
-    } catch (error) {
-      console.error('Failed to create reading item:', error);
-    }
-  };
+  // Get all handlers
+  const handlers = useDashboardHandlers({
+    tasks,
+    createTask,
+    updateTask,
+    deleteTask,
+    readingItems,
+    createReadingItem,
+    updateReadingItem,
+    deleteReadingItem,
+  });
 
   // Show loading skeleton while data is loading
   if (tasksLoading || readingLoading || nonnegotiablesLoading) {
-    return (
-      <div className="min-h-screen" tabIndex={0}>
-        <div className="flex">
-          <div className="flex-1 p-8">
-            <div className="max-w-3xl mx-auto space-y-6">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-48 w-full" />
-              <Skeleton className="h-32 w-full" />
-            </div>
-          </div>
-          <CalendarSidebar events={[]} nonnegotiables={[]} />
-        </div>
-      </div>
-    );
+    return <DashboardLoading />;
   }
 
   // Transform nonnegotiables data to match the expected format
   const transformedNonnegotiables = nonnegotiables.map(item => ({
     id: item.id,
-    label: item.title, // Transform title to label
-    streak: undefined // We don't have streak data in the database yet
+    label: item.title,
+    streak: undefined
   }));
   
   return (
@@ -148,14 +59,14 @@ export default function Dashboard() {
           tasks={tasks}
           readingItems={readingItems}
           openCommandModal={openCommandModal}
-          onAddTask={handleAddTask}
-          onTaskComplete={handleCompleteTask}
-          onTaskDelete={handleDeleteTask}
-          onUpdateTaskStatus={handleUpdateTaskStatus}
-          onUpdateTask={handleUpdateTask}
-          onMarkRead={handleMarkRead}
-          onDeleteReadingItem={handleDeleteReadingItem}
-          onAddReadingItem={handleAddReadingItem}
+          onAddTask={handlers.handleAddTask}
+          onTaskComplete={handlers.handleCompleteTask}
+          onTaskDelete={handlers.handleDeleteTask}
+          onUpdateTaskStatus={handlers.handleUpdateTaskStatus}
+          onUpdateTask={handlers.handleUpdateTask}
+          onMarkRead={handlers.handleMarkRead}
+          onDeleteReadingItem={handlers.handleDeleteReadingItem}
+          onAddReadingItem={handlers.handleAddReadingItem}
           isCommandModalOpen={isCommandModalOpen}
           closeCommandModal={closeCommandModal}
           onNavigate={navigate}
@@ -165,25 +76,17 @@ export default function Dashboard() {
         <CalendarSidebar events={calendarEvents} nonnegotiables={transformedNonnegotiables} />
       </div>
 
-      {/* Add Link Dialog */}
-      <AddLinkDialog
-        open={addLinkDialogOpen}
-        onOpenChange={setAddLinkDialogOpen}
-        onAddLink={handleAddReadingItem}
-      />
-
-      {/* Add Task Dialog */}
-      <AddTaskDialog
-        open={addTaskDialogOpen}
-        onOpenChange={setAddTaskDialogOpen}
-        onAddTask={handleAddTask}
-      />
-
-      {/* Create Project Modal */}
-      <CreateProjectModal
-        open={createProjectModalOpen}
-        onOpenChange={setCreateProjectModalOpen}
-        onCreateProject={handleCreateProject}
+      {/* Dialogs */}
+      <DashboardDialogs
+        addLinkDialogOpen={addLinkDialogOpen}
+        setAddLinkDialogOpen={setAddLinkDialogOpen}
+        addTaskDialogOpen={addTaskDialogOpen}
+        setAddTaskDialogOpen={setAddTaskDialogOpen}
+        createProjectModalOpen={createProjectModalOpen}
+        setCreateProjectModalOpen={setCreateProjectModalOpen}
+        onAddReadingItem={handlers.handleAddReadingItem}
+        onAddTask={handlers.handleAddTask}
+        onCreateProject={handlers.handleCreateProject}
       />
     </div>
   );
