@@ -9,10 +9,12 @@ import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjects } from "@/hooks/useProjects";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Projects() {
   const navigate = useNavigate();
   const { projects, loading, createProject } = useProjects();
+  const { toast } = useToast();
   const [isCommandModalOpen, setIsCommandModalOpen] = useState(false);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   
@@ -35,10 +37,20 @@ export default function Projects() {
   // Handle project creation
   const handleCreateProject = async (data: any) => {
     try {
+      console.log('Creating project with data:', data);
       await createProject(data);
       closeCreateProjectModal();
+      toast({
+        title: "Success",
+        description: "Project created successfully!",
+      });
     } catch (error) {
       console.error('Failed to create project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create project. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 

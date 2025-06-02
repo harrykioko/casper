@@ -10,11 +10,13 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Form,
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 
 import { createProjectFormSchema, CreateProjectFormData } from "./create-project/schema";
 import { BasicsSection } from "./create-project/BasicsSection";
@@ -33,6 +35,7 @@ export function CreateProjectModal({
   onCreateProject,
 }: CreateProjectModalProps) {
   const [showSuccess, setShowSuccess] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<CreateProjectFormData>({
     resolver: zodResolver(createProjectFormSchema),
@@ -58,24 +61,33 @@ export function CreateProjectModal({
   }, [open, form]);
 
   const onSubmit = async (data: CreateProjectFormData) => {
-    // Filter out empty resources
-    const filteredResources = data.resources.filter(
-      (resource) => resource.title.trim() !== "" || resource.url.trim() !== ""
-    );
-    
-    const finalData = {
-      ...data,
-      resources: filteredResources,
-    };
+    try {
+      // Filter out fields that don't exist in the database table
+      // Only send supported fields: name, description, color
+      const projectData = {
+        name: data.name,
+        description: data.description,
+        color: data.color,
+        // Note: dueDate and resources are not supported in the current database schema
+      };
 
-    // Show success animation
-    setShowSuccess(true);
-    
-    // Call the callback after a brief delay
-    setTimeout(() => {
-      onCreateProject?.(finalData);
-      onOpenChange(false);
-    }, 1000);
+      // Show success animation
+      setShowSuccess(true);
+      
+      // Call the callback after a brief delay
+      setTimeout(() => {
+        onCreateProject?.(projectData as CreateProjectFormData);
+        onOpenChange(false);
+      }, 1000);
+    } catch (error) {
+      console.error('Error creating project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create project. Please try again.",
+        variant: "destructive",
+      });
+      setShowSuccess(false);
+    }
   };
 
   return (
@@ -120,6 +132,9 @@ export function CreateProjectModal({
                 <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   New Project
                 </DialogTitle>
+                <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
+                  Create a new project to organize your tasks and resources.
+                </DialogDescription>
               </DialogHeader>
 
               <Form {...form}>
