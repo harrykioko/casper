@@ -1,46 +1,11 @@
+
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import type { OutlookConnection, CalendarEvent, OutlookCalendarHook } from '@/types/outlook';
+import { fetchConnection, connectToOutlook, handleOAuthCallback as handleCallback, disconnectFromOutlook } from '@/services/outlookConnectionService';
+import { fetchEvents, syncCalendar as syncCalendarEvents } from '@/services/calendarEventsService';
 
-interface OutlookConnection {
-  id: string;
-  email: string;
-  display_name: string | null;
-  is_active: boolean;
-  token_expires_at: string;
-  created_at: string;
-}
-
-interface CalendarEvent {
-  id: string;
-  title: string;
-  startTime: string;
-  endTime?: string;
-  location?: string;
-  category?: string;
-  description?: string;
-  attendees?: Array<{
-    name: string;
-    email?: string;
-    avatar?: string;
-  }>;
-}
-
-// Type guard function to safely parse attendees from Json
-function parseAttendees(attendeesJson: any): Array<{ name: string; email?: string; avatar?: string; }> {
-  if (!attendeesJson || !Array.isArray(attendeesJson)) {
-    return [];
-  }
-  
-  return attendeesJson.map((attendee: any) => ({
-    name: attendee?.name || 'Unknown',
-    email: attendee?.email || undefined,
-    avatar: attendee?.avatar || undefined,
-  }));
-}
-
-export function useOutlookCalendar() {
+export function useOutlookCalendar(): OutlookCalendarHook {
   const { user } = useAuth();
   const [connection, setConnection] = useState<OutlookConnection | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -49,57 +14,21 @@ export function useOutlookCalendar() {
 
   useEffect(() => {
     if (user) {
-      fetchConnection();
-      fetchEvents();
+      loadConnection();
+      loadEvents();
     }
   }, [user]);
 
-  const fetchConnection = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('outlook_connections')
-        .select('id, email, display_name, is_active, token_expires_at, created_at')
-        .eq('user_id', user?.id)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      setConnection(data);
-    } catch (error) {
-      console.error('Error fetching connection:', error);
-    }
+  const loadConnection = async () => {
+    if (!user) return;
+    const connectionData = await fetchConnection(user.id);
+    setConnection(connectionData);
   };
 
-  const fetchEvents = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('calendar_events')
-        .select('*')
-        .eq('user_id', user?.id)
-        .order('start_time', { ascending: true });
-
-      if (error) {
-        throw error;
-      }
-
-      const transformedEvents: CalendarEvent[] = data.map(event => ({
-        id: event.id,
-        title: event.title,
-        startTime: event.start_time,
-        endTime: event.end_time || undefined,
-        location: event.location || undefined,
-        category: event.category || 'personal',
-        description: event.description || undefined,
-        attendees: parseAttendees(event.attendees),
-      }));
-
-      setEvents(transformedEvents);
-    } catch (error) {
-      console.error('Error fetching events:', error);
-    }
+  const loadEvents = async () => {
+    if (!user) return;
+    const eventsData = await fetchEvents(user.id);
+    setEvents(eventsData);
   };
 
   const connectOutlook = async () => {
@@ -114,56 +43,9 @@ export function useOutlookCalendar() {
     }
 
     setLoading(true);
-    console.log('Starting Outlook connection process...');
-    
     try {
-      // Get the JWT token for authentication
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        throw new Error('No authentication token available');
-      }
-
-      console.log('Making request to Microsoft auth endpoint...');
-      
-      // Make a direct GET request to the edge function
-      const response = await fetch(`https://onzzazxyfjdgvxhoxstr.supabase.co/functions/v1/microsoft-auth`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('Response status:', response.status);
-
-      if (!response.ok) {
-        let errorMessage = 'Failed to get authorization URL';
-        try {
-          const errorData = await response.json();
-          console.error('Auth endpoint error:', errorData);
-          errorMessage = errorData.error || errorMessage;
-        } catch (parseError) {
-          console.error('Failed to parse error response:', parseError);
-          const errorText = await response.text();
-          console.error('Raw error response:', errorText);
-        }
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      console.log('Auth URL received:', !!data.authUrl);
-
-      if (data.authUrl) {
-        console.log('Redirecting to Microsoft OAuth...');
-        // Redirect to Microsoft OAuth
-        window.location.href = data.authUrl;
-      } else {
-        throw new Error('No authorization URL received');
-      }
+      await connectToOutlook(user.id);
     } catch (error) {
-      console.error('Error connecting to Outlook:', error);
-      toast.error(`Failed to connect to Outlook: ${error.message}`);
       setLoading(false);
     }
     // Note: don't set loading to false here as we're redirecting
@@ -174,58 +56,11 @@ export function useOutlookCalendar() {
       throw new Error('No user available for OAuth callback');
     }
 
-    console.log('Handling OAuth callback with code and state');
     setLoading(true);
-    
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session?.access_token) {
-        throw new Error('No authentication token available');
-      }
-
-      const response = await fetch('https://onzzazxyfjdgvxhoxstr.supabase.co/functions/v1/microsoft-auth', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ code, state, action: 'callback' }),
-      });
-
-      console.log('Callback response status:', response.status);
-
-      if (!response.ok) {
-        let errorMessage = 'Failed to complete Outlook connection';
-        try {
-          const errorData = await response.json();
-          console.error('Callback error:', errorData);
-          errorMessage = errorData.error || errorMessage;
-          
-          // Handle specific error messages
-          if (errorMessage.includes('already been used') || errorMessage.includes('already redeemed')) {
-            throw new Error('This authorization has already been processed. Please try connecting again.');
-          } else if (errorMessage.includes('Invalid state')) {
-            throw new Error('The connection session has expired. Please try connecting again.');
-          } else if (errorMessage.includes('Database operation failed') || errorMessage.includes('Failed to store connection')) {
-            throw new Error('Database error occurred. Please try again in a moment.');
-          }
-        } catch (parseError) {
-          console.error('Failed to parse error response:', parseError);
-          const errorText = await response.text();
-          console.error('Raw error response:', errorText);
-        }
-        throw new Error(errorMessage);
-      }
-
-      const data = await response.json();
-      console.log('OAuth callback successful:', data);
-      toast.success('Successfully connected to Outlook!');
-      await fetchConnection();
+      await handleCallback(user.id, code, state);
+      await loadConnection();
       await syncCalendar();
-    } catch (error) {
-      console.error('Error handling OAuth callback:', error);
-      throw new Error(error.message || 'Failed to complete Outlook connection');
     } finally {
       setLoading(false);
     }
@@ -236,17 +71,8 @@ export function useOutlookCalendar() {
 
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('sync-outlook-calendar');
-
-      if (error) {
-        throw error;
-      }
-
-      toast.success(`Synced ${data.eventsCount} calendar events`);
-      await fetchEvents();
-    } catch (error) {
-      console.error('Error syncing calendar:', error);
-      toast.error('Failed to sync calendar');
+      await syncCalendarEvents();
+      await loadEvents();
     } finally {
       setSyncing(false);
     }
@@ -257,27 +83,9 @@ export function useOutlookCalendar() {
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('outlook_connections')
-        .update({ is_active: false })
-        .eq('id', connection.id);
-
-      if (error) {
-        throw error;
-      }
-
-      // Clear local events
-      await supabase
-        .from('calendar_events')
-        .delete()
-        .eq('user_id', user.id);
-
+      await disconnectFromOutlook(user.id, connection.id);
       setConnection(null);
       setEvents([]);
-      toast.success('Disconnected from Outlook');
-    } catch (error) {
-      console.error('Error disconnecting:', error);
-      toast.error('Failed to disconnect from Outlook');
     } finally {
       setLoading(false);
     }
