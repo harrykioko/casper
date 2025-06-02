@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -48,6 +49,7 @@ const AppContent = () => {
   const location = useLocation();
   const isLandingPage = location.pathname === '/';
   const isAuthPage = location.pathname === '/auth';
+  const isOAuthCallback = location.pathname === '/auth/callback/outlook';
 
   // Add class to body based on current route
   useEffect(() => {
@@ -58,13 +60,14 @@ const AppContent = () => {
     }
   }, [isLandingPage]);
 
-  if (isLandingPage || isAuthPage) {
-    // Landing and Auth pages without sidebar
+  if (isLandingPage || isAuthPage || isOAuthCallback) {
+    // Landing, Auth, and OAuth callback pages without sidebar
     return (
       <AnimatePresence mode="wait">
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/callback/outlook" element={<OAuthCallback />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>
@@ -95,7 +98,6 @@ const MainContent = () => {
           <Route path="/prompts" element={<Prompts />} />
           <Route path="/reading-list" element={<ReadingList />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/auth/callback/outlook" element={<OAuthCallback />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AnimatePresence>

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -83,9 +82,19 @@ export function useOutlookCalendar() {
   };
 
   const connectOutlook = async () => {
-    if (!user) return;
+    if (!user) {
+      console.error('No user available for Outlook connection');
+      return;
+    }
+
+    if (loading) {
+      console.log('Connection already in progress, ignoring request');
+      return;
+    }
 
     setLoading(true);
+    console.log('Starting Outlook connection process...');
+    
     try {
       // Get the JWT token for authentication
       const { data: { session } } = await supabase.auth.getSession();
@@ -94,6 +103,8 @@ export function useOutlookCalendar() {
         throw new Error('No authentication token available');
       }
 
+      console.log('Making request to Microsoft auth endpoint...');
+      
       // Make a direct GET request to the edge function
       const response = await fetch(`https://onzzazxyfjdgvxhoxstr.supabase.co/functions/v1/microsoft-auth`, {
         method: 'GET',
@@ -103,14 +114,19 @@ export function useOutlookCalendar() {
         },
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Auth endpoint error:', errorData);
         throw new Error(errorData.error || 'Failed to get authorization URL');
       }
 
       const data = await response.json();
+      console.log('Auth URL received:', !!data.authUrl);
 
       if (data.authUrl) {
+        console.log('Redirecting to Microsoft OAuth...');
         // Redirect to Microsoft OAuth
         window.location.href = data.authUrl;
       } else {
@@ -119,30 +135,36 @@ export function useOutlookCalendar() {
     } catch (error) {
       console.error('Error connecting to Outlook:', error);
       toast.error('Failed to connect to Outlook');
-    } finally {
       setLoading(false);
     }
+    // Note: don't set loading to false here as we're redirecting
   };
 
   const handleOAuthCallback = async (code: string, state: string) => {
-    if (!user) return;
+    if (!user) {
+      throw new Error('No user available for OAuth callback');
+    }
 
+    console.log('Handling OAuth callback with code and state');
     setLoading(true);
+    
     try {
       const { data, error } = await supabase.functions.invoke('microsoft-auth', {
         body: { code, state, action: 'callback' },
       });
 
       if (error) {
+        console.error('Edge function error:', error);
         throw error;
       }
 
+      console.log('OAuth callback successful:', data);
       toast.success('Successfully connected to Outlook!');
       await fetchConnection();
       await syncCalendar();
     } catch (error) {
       console.error('Error handling OAuth callback:', error);
-      toast.error('Failed to complete Outlook connection');
+      throw new Error('Failed to complete Outlook connection');
     } finally {
       setLoading(false);
     }
