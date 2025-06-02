@@ -1,7 +1,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Clock, MapPin, Video, Users, Calendar, ExternalLink } from "lucide-react";
-import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -119,10 +119,11 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
         <Dialog open={isOpen} onOpenChange={onClose}>
           <DialogOverlay className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm" />
           <DialogContent 
-            className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-full max-w-[90vw] sm:max-w-lg max-h-[85vh] p-0 border-none bg-transparent shadow-none"
+            className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] w-full max-w-[90vw] sm:max-w-lg max-h-[85vh] p-0 border-none bg-transparent shadow-none [&>button]:hidden"
             aria-labelledby="event-title"
             aria-describedby="event-description"
           >
+            <DialogTitle className="sr-only">{event.title}</DialogTitle>
             <motion.div
               initial={{ opacity: 0, scale: 0.96, y: 10 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
