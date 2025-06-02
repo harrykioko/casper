@@ -6,6 +6,31 @@ import { Database } from '@/integrations/supabase/types';
 type Prompt = Database['public']['Tables']['prompts']['Row'];
 type PromptInsert = Database['public']['Tables']['prompts']['Insert'];
 
+// Transform frontend prompt data to database format
+const transformPromptForDatabase = (promptData: any): any => {
+  const dbData: any = { ...promptData };
+  
+  // Convert camelCase to snake_case
+  if (promptData.projectId !== undefined) {
+    dbData.project_id = promptData.projectId;
+    delete dbData.projectId;
+  }
+  if (promptData.createdBy !== undefined) {
+    dbData.created_by = promptData.createdBy;
+    delete dbData.createdBy;
+  }
+  if (promptData.createdAt !== undefined) {
+    dbData.created_at = promptData.createdAt;
+    delete dbData.createdAt;
+  }
+  if (promptData.updatedAt !== undefined) {
+    dbData.updated_at = promptData.updatedAt;
+    delete dbData.updatedAt;
+  }
+  
+  return dbData;
+};
+
 export function usePrompts() {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,10 +63,13 @@ export function usePrompts() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
+    // Transform camelCase to snake_case
+    const dbPromptData = transformPromptForDatabase(promptData);
+
     const { data, error } = await supabase
       .from('prompts')
       .insert({
-        ...promptData,
+        ...dbPromptData,
         created_by: user.id
       })
       .select()
@@ -54,9 +82,12 @@ export function usePrompts() {
   };
 
   const updatePrompt = async (id: string, updates: Partial<Prompt>) => {
+    // Transform camelCase to snake_case for updates
+    const dbUpdates = transformPromptForDatabase(updates);
+
     const { data, error } = await supabase
       .from('prompts')
-      .update(updates)
+      .update(dbUpdates)
       .eq('id', id)
       .select()
       .single();

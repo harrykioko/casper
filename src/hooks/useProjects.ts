@@ -5,6 +5,31 @@ import { Database } from '@/integrations/supabase/types';
 
 type Project = Database['public']['Tables']['projects']['Row'];
 
+// Transform frontend project data to database format
+const transformProjectForDatabase = (projectData: any): any => {
+  const dbData: any = { ...projectData };
+  
+  // Convert camelCase to snake_case
+  if (projectData.projectId !== undefined) {
+    dbData.project_id = projectData.projectId;
+    delete dbData.projectId;
+  }
+  if (projectData.createdBy !== undefined) {
+    dbData.created_by = projectData.createdBy;
+    delete dbData.createdBy;
+  }
+  if (projectData.createdAt !== undefined) {
+    dbData.created_at = projectData.createdAt;
+    delete dbData.createdAt;
+  }
+  if (projectData.updatedAt !== undefined) {
+    dbData.updated_at = projectData.updatedAt;
+    delete dbData.updatedAt;
+  }
+  
+  return dbData;
+};
+
 export function useProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,10 +62,13 @@ export function useProjects() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
+    // Transform camelCase to snake_case
+    const dbProjectData = transformProjectForDatabase(projectData);
+
     const { data, error } = await supabase
       .from('projects')
       .insert({
-        ...projectData,
+        ...dbProjectData,
         created_by: user.id
       })
       .select()
@@ -53,9 +81,12 @@ export function useProjects() {
   };
 
   const updateProject = async (id: string, updates: Partial<Project>) => {
+    // Transform camelCase to snake_case for updates
+    const dbUpdates = transformProjectForDatabase(updates);
+
     const { data, error } = await supabase
       .from('projects')
-      .update(updates)
+      .update(dbUpdates)
       .eq('id', id)
       .select()
       .single();
