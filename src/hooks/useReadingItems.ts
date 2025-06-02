@@ -57,30 +57,41 @@ const transformReadingItemForDatabase = (itemData: any): any => {
   return dbData;
 };
 
-// Function to fetch metadata from edge function
+// Client-side metadata fetching using Microlink API directly
 export const fetchLinkMetadata = async (url: string) => {
+  const microlinkApi = `https://api.microlink.io/?url=${encodeURIComponent(url)}`;
+
   try {
     console.log('Fetching metadata for:', url);
     
-    const { data, error } = await supabase.functions.invoke('fetch-link-metadata', {
-      body: { url }
-    });
+    const res = await fetch(microlinkApi);
 
-    if (error) {
-      console.error('Edge function error:', error);
-      throw error;
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      throw new Error(`Expected JSON but got ${contentType}`);
     }
 
-    if (!data) {
-      throw new Error('No data returned from metadata service');
+    const data = await res.json();
+
+    if (data.status !== 'success') {
+      throw new Error(`Microlink API returned status: ${data.status}`);
     }
 
-    console.log('Metadata fetched successfully:', data);
-    return data;
-  } catch (error) {
-    console.error('Error fetching metadata:', error);
-    
-    // Return fallback metadata
+    const metadata = {
+      title: data.data.title || new URL(url).hostname,
+      description: data.data.description || null,
+      image: data.data.image?.url || null,
+      favicon: data.data.logo?.url || null,
+      hostname: new URL(url).hostname,
+      url: url
+    };
+
+    console.log('Metadata fetched successfully:', metadata);
+    return metadata;
+  } catch (err) {
+    console.error(`[fetchLinkMetadata] Failed for ${url}:`, err.message);
+
+    // Fallback if Microlink fails
     try {
       const urlObj = new URL(url);
       const fallback = {
