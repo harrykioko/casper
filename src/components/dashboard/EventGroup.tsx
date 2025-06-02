@@ -9,6 +9,12 @@ interface CalendarEvent {
   endTime?: string;
   location?: string;
   category?: string;
+  description?: string;
+  attendees?: Array<{
+    name: string;
+    email?: string;
+    avatar?: string;
+  }>;
 }
 
 interface EventGroupProps {
@@ -16,9 +22,10 @@ interface EventGroupProps {
   events: CalendarEvent[];
   isToday?: boolean;
   showDate?: boolean;
+  onEventClick?: (event: CalendarEvent) => void;
 }
 
-export function EventGroup({ title, events, isToday = false, showDate = false }: EventGroupProps) {
+export function EventGroup({ title, events, isToday = false, showDate = false, onEventClick }: EventGroupProps) {
   // Sort events by start time
   const sortedEvents = [...events].sort((a, b) => 
     new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
@@ -70,6 +77,7 @@ export function EventGroup({ title, events, isToday = false, showDate = false }:
                     key={event.id} 
                     event={event} 
                     delay={index * 0.05}
+                    onClick={onEventClick}
                   />
                 ))}
               </div>
@@ -85,6 +93,7 @@ export function EventGroup({ title, events, isToday = false, showDate = false }:
               event={event} 
               delay={index * 0.05}
               isToday={isToday}
+              onClick={onEventClick}
             />
           ))}
         </div>

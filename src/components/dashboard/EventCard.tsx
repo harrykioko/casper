@@ -9,15 +9,22 @@ interface CalendarEvent {
   endTime?: string;
   location?: string;
   category?: string;
+  description?: string;
+  attendees?: Array<{
+    name: string;
+    email?: string;
+    avatar?: string;
+  }>;
 }
 
 interface EventCardProps {
   event: CalendarEvent;
   delay?: number;
   isToday?: boolean;
+  onClick?: (event: CalendarEvent) => void;
 }
 
-export function EventCard({ event, delay = 0, isToday = false }: EventCardProps) {
+export function EventCard({ event, delay = 0, isToday = false, onClick }: EventCardProps) {
   // Format time to display in a readable format
   const formatTime = (timeString: string) => {
     const date = new Date(timeString);
@@ -63,16 +70,33 @@ export function EventCard({ event, delay = 0, isToday = false }: EventCardProps)
     event.location.startsWith('https://')
   );
 
+  const handleClick = () => {
+    if (onClick) {
+      onClick(event);
+    }
+  };
+
   return (
     <motion.div 
       className={`
         rounded-2xl shadow-sm bg-muted/50 backdrop-blur border-l-4 
         ${getCategoryColor()} 
-        hover:shadow-md transition-shadow duration-200
+        hover:shadow-md hover:bg-muted/70 transition-all duration-200 cursor-pointer
+        hover:scale-[1.02] active:scale-[0.98]
       `}
       initial={{ opacity: 0, y: 5 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, delay }}
+      onClick={handleClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleClick();
+        }
+      }}
+      aria-label={`View details for ${event.title}`}
     >
       <div className="p-3">
         {/* Time */}
