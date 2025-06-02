@@ -1,114 +1,9 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Database } from '@/integrations/supabase/types';
-
-type ReadingItemRow = Database['public']['Tables']['reading_items']['Row'];
-type ReadingItemInsert = Database['public']['Tables']['reading_items']['Insert'];
-
-// Frontend ReadingItem type
-export interface ReadingItem {
-  id: string;
-  url: string;
-  title: string;
-  description?: string;
-  favicon?: string;
-  image?: string;
-  hostname?: string;
-  isRead: boolean;
-  created_at?: string;
-  updated_at?: string;
-  created_by?: string;
-  project_id?: string;
-}
-
-// Transform database row to frontend ReadingItem type
-const transformReadingItem = (row: ReadingItemRow): ReadingItem => {
-  return {
-    id: row.id,
-    url: row.url,
-    title: row.title,
-    description: row.description || undefined,
-    favicon: row.favicon || undefined,
-    image: row.image || undefined,
-    hostname: row.hostname || undefined,
-    isRead: row.is_read || false,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    created_by: row.created_by || undefined,
-    project_id: row.project_id || undefined
-  };
-};
-
-// Transform frontend ReadingItem data to database format
-const transformReadingItemForDatabase = (itemData: any): any => {
-  const dbData: any = { ...itemData };
-  
-  // Convert camelCase to snake_case
-  if (itemData.isRead !== undefined) {
-    dbData.is_read = itemData.isRead;
-    delete dbData.isRead;
-  }
-  if (itemData.projectId !== undefined) {
-    dbData.project_id = itemData.projectId;
-    delete dbData.projectId;
-  }
-  
-  return dbData;
-};
-
-// Client-side metadata fetching using Microlink API directly
-export const fetchLinkMetadata = async (url: string) => {
-  const microlinkApi = `https://api.microlink.io/?url=${encodeURIComponent(url)}`;
-
-  try {
-    console.log('Fetching metadata for:', url);
-    
-    const res = await fetch(microlinkApi);
-
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      throw new Error(`Expected JSON but got ${contentType}`);
-    }
-
-    const data = await res.json();
-
-    if (data.status !== 'success') {
-      throw new Error(`Microlink API returned status: ${data.status}`);
-    }
-
-    const metadata = {
-      title: data.data.title || new URL(url).hostname,
-      description: data.data.description || null,
-      image: data.data.image?.url || null,
-      favicon: data.data.logo?.url || null,
-      hostname: new URL(url).hostname,
-      url: url
-    };
-
-    console.log('Metadata fetched successfully:', metadata);
-    return metadata;
-  } catch (err) {
-    console.error(`[fetchLinkMetadata] Failed for ${url}:`, err.message);
-
-    // Fallback if Microlink fails
-    try {
-      const urlObj = new URL(url);
-      const fallback = {
-        title: urlObj.hostname,
-        description: null,
-        image: null,
-        favicon: null,
-        hostname: urlObj.hostname,
-        url: url
-      };
-      console.log('Using fallback metadata:', fallback);
-      return fallback;
-    } catch {
-      throw new Error('Invalid URL');
-    }
-  }
-};
+import { ReadingItem, ReadingItemInsert, ReadingItemRow } from '@/types/readingItem';
+import { transformReadingItem, transformReadingItemForDatabase } from '@/utils/readingItemTransforms';
+import { fetchLinkMetadata } from '@/services/linkMetadataService';
 
 export function useReadingItems() {
   const [readingItems, setReadingItems] = useState<ReadingItem[]>([]);
@@ -233,3 +128,6 @@ export function useReadingItems() {
     updateExistingItemsWithMetadata
   };
 }
+
+// Re-export the fetchLinkMetadata function for backward compatibility
+export { fetchLinkMetadata } from '@/services/linkMetadataService';
