@@ -59,16 +59,31 @@ const transformReadingItemForDatabase = (itemData: any): any => {
 
 // Function to fetch metadata from edge function
 export const fetchLinkMetadata = async (url: string) => {
-  const { data, error } = await supabase.functions.invoke('fetch-link-metadata', {
-    body: { url }
-  });
+  try {
+    console.log('Fetching metadata for:', url);
+    
+    const { data, error } = await supabase.functions.invoke('fetch-link-metadata', {
+      body: { url }
+    });
 
-  if (error) {
+    if (error) {
+      console.error('Edge function error:', error);
+      throw error;
+    }
+
+    if (!data) {
+      throw new Error('No data returned from metadata service');
+    }
+
+    console.log('Metadata fetched successfully:', data);
+    return data;
+  } catch (error) {
     console.error('Error fetching metadata:', error);
+    
     // Return fallback metadata
     try {
       const urlObj = new URL(url);
-      return {
+      const fallback = {
         title: urlObj.hostname,
         description: null,
         image: null,
@@ -76,12 +91,12 @@ export const fetchLinkMetadata = async (url: string) => {
         hostname: urlObj.hostname,
         url: url
       };
+      console.log('Using fallback metadata:', fallback);
+      return fallback;
     } catch {
       throw new Error('Invalid URL');
     }
   }
-
-  return data;
 };
 
 export function useReadingItems() {
@@ -165,12 +180,45 @@ export function useReadingItems() {
     setReadingItems(prev => prev.filter(item => item.id !== id));
   };
 
+  // Function to update existing items with metadata
+  const updateExistingItemsWithMetadata = async () => {
+    const itemsNeedingMetadata = readingItems.filter(item => 
+      item.title === item.url || // Title is just the URL
+      item.title === item.hostname || // Title is just the hostname
+      !item.description // No description
+    );
+
+    console.log(`Found ${itemsNeedingMetadata.length} items that need metadata updates`);
+
+    for (const item of itemsNeedingMetadata) {
+      try {
+        console.log(`Updating metadata for item: ${item.id}`);
+        const metadata = await fetchLinkMetadata(item.url);
+        
+        // Only update if we got better metadata
+        if (metadata.title !== item.title || metadata.description || metadata.image) {
+          await updateReadingItem(item.id, {
+            title: metadata.title,
+            description: metadata.description,
+            image: metadata.image,
+            favicon: metadata.favicon,
+            hostname: metadata.hostname
+          });
+          console.log(`Updated metadata for item: ${item.id}`);
+        }
+      } catch (error) {
+        console.error(`Failed to update metadata for item ${item.id}:`, error);
+      }
+    }
+  };
+
   return { 
     readingItems, 
     loading, 
     error, 
     createReadingItem, 
     updateReadingItem, 
-    deleteReadingItem 
+    deleteReadingItem,
+    updateExistingItemsWithMetadata
   };
 }

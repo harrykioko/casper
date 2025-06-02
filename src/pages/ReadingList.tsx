@@ -1,7 +1,6 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Plus, Search, ExternalLink, Trash, Check } from "lucide-react";
+import { BookOpen, Plus, Search, ExternalLink, Trash, Check, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CommandModal } from "@/components/modals/CommandModal";
@@ -11,13 +10,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useReadingItems } from "@/hooks/useReadingItems";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 
 export default function ReadingList() {
   const navigate = useNavigate();
-  const { readingItems, loading, createReadingItem, updateReadingItem, deleteReadingItem } = useReadingItems();
+  const { readingItems, loading, createReadingItem, updateReadingItem, deleteReadingItem, updateExistingItemsWithMetadata } = useReadingItems();
   const [searchQuery, setSearchQuery] = useState("");
   const [isCommandModalOpen, setIsCommandModalOpen] = useState(false);
   const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
+  const [updatingMetadata, setUpdatingMetadata] = useState(false);
   
   // Filter reading items based on search query
   const filteredItems = readingItems.filter(item => 
@@ -56,6 +57,20 @@ export default function ReadingList() {
       setAddLinkDialogOpen(false);
     } catch (error) {
       console.error('Failed to create reading item:', error);
+    }
+  };
+
+  // Handle updating metadata for existing items
+  const handleUpdateMetadata = async () => {
+    setUpdatingMetadata(true);
+    try {
+      await updateExistingItemsWithMetadata();
+      toast.success("Updated metadata for existing items");
+    } catch (error) {
+      console.error('Failed to update metadata:', error);
+      toast.error("Failed to update metadata");
+    } finally {
+      setUpdatingMetadata(false);
     }
   };
   
@@ -103,6 +118,15 @@ export default function ReadingList() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">Reading List</h1>
           <div className="flex gap-3">
+            <Button 
+              variant="outline" 
+              className="gap-2" 
+              onClick={handleUpdateMetadata}
+              disabled={updatingMetadata}
+            >
+              <RefreshCw className={cn("h-4 w-4", updatingMetadata && "animate-spin")} />
+              <span>Update Metadata</span>
+            </Button>
             <Button 
               variant="outline" 
               className="gap-2" 
