@@ -87,17 +87,19 @@ export function useOutlookCalendar() {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('microsoft-auth', {
-        method: 'GET',
-        body: {},
-      });
+      // Make GET request without body to get authorization URL
+      const { data, error } = await supabase.functions.invoke('microsoft-auth');
 
       if (error) {
         throw error;
       }
 
-      // Redirect to Microsoft OAuth
-      window.location.href = data.authUrl;
+      if (data.authUrl) {
+        // Redirect to Microsoft OAuth
+        window.location.href = data.authUrl;
+      } else {
+        throw new Error('No authorization URL received');
+      }
     } catch (error) {
       console.error('Error connecting to Outlook:', error);
       toast.error('Failed to connect to Outlook');
@@ -112,8 +114,7 @@ export function useOutlookCalendar() {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('microsoft-auth', {
-        method: 'POST',
-        body: { code, state },
+        body: { code, state, action: 'callback' },
       });
 
       if (error) {
@@ -136,10 +137,7 @@ export function useOutlookCalendar() {
 
     setSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('sync-outlook-calendar', {
-        method: 'POST',
-        body: {},
-      });
+      const { data, error } = await supabase.functions.invoke('sync-outlook-calendar');
 
       if (error) {
         throw error;
