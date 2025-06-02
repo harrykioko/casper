@@ -1,4 +1,3 @@
-
 import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EventGroup } from "./EventGroup";
@@ -80,8 +79,8 @@ export function CalendarSidebar({ events, nonnegotiables }: CalendarSidebarProps
         </div>
       </div>
 
-      {/* Events Section - Upper 60% */}
-      <div className="flex-[3] min-h-0 px-6">
+      {/* Events Section - Upper 80% */}
+      <div className="flex-[4] min-h-0 px-6">
         <ScrollArea className="h-full">
           <div className="space-y-6 pb-4">
             {/* Today Events - only show if there are events */}
@@ -134,8 +133,8 @@ export function CalendarSidebar({ events, nonnegotiables }: CalendarSidebarProps
         <Separator className="bg-zinc-200 dark:bg-white/10" />
       </div>
 
-      {/* Nonnegotiables Section - Lower 40% */}
-      <div className="flex-[2] min-h-0 p-6 pt-4">
+      {/* Nonnegotiables Section - Lower 20% */}
+      <div className="flex-[1] min-h-0 p-6 pt-4">
         <ScrollArea className="h-full">
           <Nonnegotiables items={nonnegotiables} />
         </ScrollArea>
