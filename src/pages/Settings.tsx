@@ -1,6 +1,6 @@
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Command } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CommandModal } from "@/components/modals/CommandModal";
@@ -15,7 +15,20 @@ import { HabitsTab } from "@/components/settings/HabitsTab";
 
 export default function Settings() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isCommandModalOpen, setIsCommandModalOpen] = useState(false);
+  
+  // Get the tab from URL parameters, default to 'appearance'
+  const defaultTab = searchParams.get('tab') || 'appearance';
+  const [activeTab, setActiveTab] = useState(defaultTab);
+
+  // Update active tab when URL parameter changes
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
   
   // Command modal handling
   const openCommandModal = () => setIsCommandModalOpen(true);
@@ -48,7 +61,7 @@ export default function Settings() {
           </Button>
         </div>
         
-        <Tabs defaultValue="appearance" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="glassmorphic">
             <TabsTrigger value="appearance">Appearance</TabsTrigger>
             <TabsTrigger value="calendar">Calendar</TabsTrigger>

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -21,6 +20,7 @@ import Prompts from "./pages/Prompts";
 import ReadingList from "./pages/ReadingList";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import OAuthCallback from "./pages/OAuthCallback";
 
 const queryClient = new QueryClient();
 
@@ -95,6 +95,7 @@ const MainContent = () => {
           <Route path="/prompts" element={<Prompts />} />
           <Route path="/reading-list" element={<ReadingList />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/auth/callback/outlook" element={<OAuthCallback />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AnimatePresence>
