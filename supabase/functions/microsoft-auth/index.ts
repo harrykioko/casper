@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -237,31 +238,83 @@ serve(async (req) => {
             displayName: userData.displayName
           });
 
-          // Store connection in database
+          // Store connection in database with improved error handling
           const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000));
           
           console.log('Storing connection in database...');
-          const { error } = await supabaseClient
-            .from('outlook_connections')
-            .upsert({
-              user_id: user.id,
-              access_token: tokenData.access_token,
-              refresh_token: tokenData.refresh_token,
-              token_expires_at: expiresAt.toISOString(),
-              microsoft_user_id: userData.id,
-              email: userData.mail || userData.userPrincipalName,
-              display_name: userData.displayName,
-              is_active: true,
-            }, {
-              onConflict: 'user_id',
-            });
+          
+          try {
+            // First try to update existing connection
+            const { data: existingConnection, error: selectError } = await supabaseClient
+              .from('outlook_connections')
+              .select('id')
+              .eq('user_id', user.id)
+              .maybeSingle();
 
-          if (error) {
-            console.error('Database error:', error);
-            // Clean up on database failure
+            if (selectError) {
+              console.error('Error checking existing connection:', selectError);
+            }
+
+            let dbError;
+            if (existingConnection) {
+              // Update existing connection
+              console.log('Updating existing connection for user:', user.id);
+              const { error } = await supabaseClient
+                .from('outlook_connections')
+                .update({
+                  access_token: tokenData.access_token,
+                  refresh_token: tokenData.refresh_token,
+                  token_expires_at: expiresAt.toISOString(),
+                  microsoft_user_id: userData.id,
+                  email: userData.mail || userData.userPrincipalName,
+                  display_name: userData.displayName,
+                  is_active: true,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('user_id', user.id);
+              dbError = error;
+            } else {
+              // Insert new connection
+              console.log('Creating new connection for user:', user.id);
+              const { error } = await supabaseClient
+                .from('outlook_connections')
+                .insert({
+                  user_id: user.id,
+                  access_token: tokenData.access_token,
+                  refresh_token: tokenData.refresh_token,
+                  token_expires_at: expiresAt.toISOString(),
+                  microsoft_user_id: userData.id,
+                  email: userData.mail || userData.userPrincipalName,
+                  display_name: userData.displayName,
+                  is_active: true,
+                });
+              dbError = error;
+            }
+
+            if (dbError) {
+              console.error('Database operation error:', dbError);
+              // Clean up on database failure
+              usedStates.delete(state);
+              usedCodes.delete(code);
+              return new Response(JSON.stringify({ 
+                error: 'Failed to store connection', 
+                details: dbError.message 
+              }), {
+                status: 500,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
+
+            console.log('Database operation completed successfully');
+          } catch (dbException) {
+            console.error('Database exception:', dbException);
+            // Clean up on database exception
             usedStates.delete(state);
             usedCodes.delete(code);
-            return new Response(JSON.stringify({ error: 'Failed to store connection' }), {
+            return new Response(JSON.stringify({ 
+              error: 'Database operation failed', 
+              details: dbException.message 
+            }), {
               status: 500,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });

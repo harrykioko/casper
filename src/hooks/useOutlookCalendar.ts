@@ -187,6 +187,8 @@ export function useOutlookCalendar() {
             throw new Error('This authorization has already been processed. Please try connecting again.');
           } else if (errorMessage.includes('Invalid state')) {
             throw new Error('The connection session has expired. Please try connecting again.');
+          } else if (errorMessage.includes('Database operation failed') || errorMessage.includes('Failed to store connection')) {
+            throw new Error('Database error occurred. Please try again in a moment.');
           }
         } catch (parseError) {
           console.error('Failed to parse error response:', parseError);
