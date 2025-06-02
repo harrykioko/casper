@@ -64,7 +64,7 @@ export function CalendarTab() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-medium">Connected Account</h4>
-                <Badge variant="success">Active</Badge>
+                <Badge variant="default" className="bg-green-500 text-white">Active</Badge>
               </div>
               
               <div className="space-y-3">
