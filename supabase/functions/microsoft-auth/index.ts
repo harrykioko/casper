@@ -8,6 +8,7 @@ const corsHeaders = {
 
 // In-memory store to track used codes (in production, use Redis or database)
 const usedCodes = new Set<string>();
+const usedStates = new Set<string>();
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -22,15 +23,25 @@ serve(async (req) => {
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      throw new Error('No authorization header');
+      console.error('No authorization header provided');
+      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser(token);
     
     if (userError || !user) {
-      throw new Error('Invalid authentication');
+      console.error('Invalid authentication:', userError);
+      return new Response(JSON.stringify({ error: 'Invalid authentication' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
+
+    console.log('Request authenticated for user:', user.id);
 
     if (req.method === 'GET') {
       // Generate authorization URL
@@ -43,7 +54,11 @@ serve(async (req) => {
       console.log('- Redirect URI:', redirectUri);
       
       if (!clientId || !redirectUri) {
-        throw new Error('Microsoft OAuth not configured');
+        console.error('Missing Microsoft OAuth configuration');
+        return new Response(JSON.stringify({ error: 'Microsoft OAuth not configured' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       // Generate a unique state value with timestamp to prevent reuse
@@ -72,24 +87,43 @@ serve(async (req) => {
       console.log('- Code received:', !!code);
       console.log('- Code length:', code ? code.length : 0);
       console.log('- State received:', state);
+      console.log('- User ID:', user.id);
       
       if (action === 'callback') {
-        // Validate state format and extract user ID
-        const statePattern = new RegExp(`^${user.id}_\\d+_[a-z0-9]+$`);
-        if (!state || !statePattern.test(state)) {
-          console.error('State validation failed:', { expected_pattern: `${user.id}_*`, received: state });
-          throw new Error('Invalid or expired state parameter');
+        // Basic validation - check if state contains user ID
+        if (!state || !state.includes(user.id)) {
+          console.error('State validation failed: state does not contain user ID', { 
+            expected_user: user.id, 
+            received_state: state 
+          });
+          return new Response(JSON.stringify({ error: 'Invalid state parameter' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Check if state has already been used
+        if (usedStates.has(state)) {
+          console.error('State already used:', state);
+          return new Response(JSON.stringify({ error: 'State parameter has already been used' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
 
         // Check if code has already been used
         if (usedCodes.has(code)) {
           console.error('Code already used:', code.substring(0, 20) + '...');
-          throw new Error('Authorization code has already been used');
+          return new Response(JSON.stringify({ error: 'Authorization code has already been used' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
 
-        // Mark code as used immediately
+        // Mark state and code as used immediately
+        usedStates.add(state);
         usedCodes.add(code);
-        console.log('Marked code as used, total used codes:', usedCodes.size);
+        console.log('Marked state and code as used');
 
         const clientId = Deno.env.get('MICROSOFT_CLIENT_ID');
         const clientSecret = Deno.env.get('MICROSOFT_CLIENT_SECRET');
@@ -103,7 +137,13 @@ serve(async (req) => {
 
         if (!clientId || !clientSecret || !redirectUri) {
           console.error('Missing required environment variables');
-          throw new Error('Missing Microsoft OAuth configuration');
+          // Clean up on configuration error
+          usedStates.delete(state);
+          usedCodes.delete(code);
+          return new Response(JSON.stringify({ error: 'Missing Microsoft OAuth configuration' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
 
         // Exchange code for tokens
@@ -117,122 +157,158 @@ serve(async (req) => {
 
         console.log('Making token exchange request to Microsoft...');
 
-        const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: tokenRequestBody,
-        });
-
-        console.log('Token response status:', tokenResponse.status);
-
-        const tokenResponseText = await tokenResponse.text();
-        console.log('Token response body:', tokenResponseText);
-
-        if (!tokenResponse.ok) {
-          console.error('Token exchange failed with status:', tokenResponse.status);
-          // Remove code from used set if token exchange fails
-          usedCodes.delete(code);
-          try {
-            const errorData = JSON.parse(tokenResponseText);
-            console.error('Microsoft error details:', errorData);
-            throw new Error(`Microsoft token exchange failed: ${errorData.error} - ${errorData.error_description || 'Unknown error'}`);
-          } catch (parseError) {
-            console.error('Failed to parse error response:', parseError);
-            throw new Error(`Failed to exchange code for token. Status: ${tokenResponse.status}, Response: ${tokenResponseText}`);
-          }
-        }
-
-        let tokenData;
         try {
-          tokenData = JSON.parse(tokenResponseText);
-          console.log('Token data received:', {
-            access_token: !!tokenData.access_token,
-            refresh_token: !!tokenData.refresh_token,
-            expires_in: tokenData.expires_in,
-            token_type: tokenData.token_type
+          const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: tokenRequestBody,
           });
-        } catch (parseError) {
-          console.error('Failed to parse token response:', parseError);
-          // Remove code from used set if parsing fails
-          usedCodes.delete(code);
-          throw new Error('Invalid token response from Microsoft');
-        }
-        
-        // Get user info from Microsoft Graph
-        console.log('Fetching user info from Microsoft Graph...');
-        const userResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
-          headers: {
-            'Authorization': `Bearer ${tokenData.access_token}`,
-          },
-        });
 
-        console.log('User info response status:', userResponse.status);
+          console.log('Token response status:', tokenResponse.status);
 
-        if (!userResponse.ok) {
-          const userErrorText = await userResponse.text();
-          console.error('Failed to get user info:', userErrorText);
-          // Remove code from used set if user info fails
-          usedCodes.delete(code);
-          throw new Error('Failed to get user info from Microsoft Graph');
-        }
+          const tokenResponseText = await tokenResponse.text();
+          console.log('Token response received');
 
-        const userData = await userResponse.json();
-        console.log('User data received:', {
-          id: userData.id,
-          email: userData.mail || userData.userPrincipalName,
-          displayName: userData.displayName
-        });
+          if (!tokenResponse.ok) {
+            console.error('Token exchange failed with status:', tokenResponse.status);
+            // Clean up on token exchange failure
+            usedStates.delete(state);
+            usedCodes.delete(code);
+            
+            let errorMessage = `Failed to exchange code for token. Status: ${tokenResponse.status}`;
+            
+            try {
+              const errorData = JSON.parse(tokenResponseText);
+              console.error('Microsoft error details:', errorData);
+              errorMessage = `Microsoft token exchange failed: ${errorData.error} - ${errorData.error_description || 'Unknown error'}`;
+            } catch (parseError) {
+              console.error('Failed to parse error response:', parseError);
+            }
+            
+            return new Response(JSON.stringify({ error: errorMessage }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
 
-        // Store connection in database
-        const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000));
-        
-        console.log('Storing connection in database...');
-        const { error } = await supabaseClient
-          .from('outlook_connections')
-          .upsert({
-            user_id: user.id,
-            access_token: tokenData.access_token,
-            refresh_token: tokenData.refresh_token,
-            token_expires_at: expiresAt.toISOString(),
-            microsoft_user_id: userData.id,
+          let tokenData;
+          try {
+            tokenData = JSON.parse(tokenResponseText);
+            console.log('Token data parsed successfully');
+          } catch (parseError) {
+            console.error('Failed to parse token response:', parseError);
+            // Clean up on parsing failure
+            usedStates.delete(state);
+            usedCodes.delete(code);
+            return new Response(JSON.stringify({ error: 'Invalid token response from Microsoft' }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+          
+          // Get user info from Microsoft Graph
+          console.log('Fetching user info from Microsoft Graph...');
+          const userResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+            headers: {
+              'Authorization': `Bearer ${tokenData.access_token}`,
+            },
+          });
+
+          console.log('User info response status:', userResponse.status);
+
+          if (!userResponse.ok) {
+            const userErrorText = await userResponse.text();
+            console.error('Failed to get user info:', userErrorText);
+            // Clean up on user info failure
+            usedStates.delete(state);
+            usedCodes.delete(code);
+            return new Response(JSON.stringify({ error: 'Failed to get user info from Microsoft Graph' }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          const userData = await userResponse.json();
+          console.log('User data received:', {
+            id: userData.id,
             email: userData.mail || userData.userPrincipalName,
-            display_name: userData.displayName,
-            is_active: true,
-          }, {
-            onConflict: 'user_id',
+            displayName: userData.displayName
           });
 
-        if (error) {
-          console.error('Database error:', error);
-          // Remove code from used set if database storage fails
+          // Store connection in database
+          const expiresAt = new Date(Date.now() + (tokenData.expires_in * 1000));
+          
+          console.log('Storing connection in database...');
+          const { error } = await supabaseClient
+            .from('outlook_connections')
+            .upsert({
+              user_id: user.id,
+              access_token: tokenData.access_token,
+              refresh_token: tokenData.refresh_token,
+              token_expires_at: expiresAt.toISOString(),
+              microsoft_user_id: userData.id,
+              email: userData.mail || userData.userPrincipalName,
+              display_name: userData.displayName,
+              is_active: true,
+            }, {
+              onConflict: 'user_id',
+            });
+
+          if (error) {
+            console.error('Database error:', error);
+            // Clean up on database failure
+            usedStates.delete(state);
+            usedCodes.delete(code);
+            return new Response(JSON.stringify({ error: 'Failed to store connection' }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          console.log('OAuth flow completed successfully');
+          
+          // Clean up old used codes and states periodically (keep last 500 each)
+          if (usedCodes.size > 1000) {
+            const codesArray = Array.from(usedCodes);
+            usedCodes.clear();
+            codesArray.slice(-500).forEach(code => usedCodes.add(code));
+          }
+          
+          if (usedStates.size > 1000) {
+            const statesArray = Array.from(usedStates);
+            usedStates.clear();
+            statesArray.slice(-500).forEach(state => usedStates.add(state));
+          }
+
+          return new Response(JSON.stringify({ success: true, user: userData }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+          
+        } catch (fetchError) {
+          console.error('Network error during token exchange:', fetchError);
+          // Clean up on network error
+          usedStates.delete(state);
           usedCodes.delete(code);
-          throw new Error('Failed to store connection');
+          return new Response(JSON.stringify({ error: 'Network error during authentication' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
-
-        console.log('OAuth flow completed successfully');
-        
-        // Clean up old used codes periodically (keep last 1000)
-        if (usedCodes.size > 1000) {
-          const codesArray = Array.from(usedCodes);
-          usedCodes.clear();
-          // Keep the most recent codes (this is a simple cleanup)
-          codesArray.slice(-500).forEach(code => usedCodes.add(code));
-        }
-
-        return new Response(JSON.stringify({ success: true, user: userData }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
       }
     }
 
-    return new Response('Not found', { status: 404, headers: corsHeaders });
+    console.log('Invalid request method or action');
+    return new Response(JSON.stringify({ error: 'Invalid request' }), { 
+      status: 400, 
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    });
 
   } catch (error) {
     console.error('Edge function error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 400,
+    return new Response(JSON.stringify({ error: error.message || 'Internal server error' }), {
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
