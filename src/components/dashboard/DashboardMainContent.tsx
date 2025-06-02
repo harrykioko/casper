@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Task } from "@/hooks/useTasks";
 import { ReadingItem } from "@/types/readingItem";
@@ -48,6 +49,12 @@ export function DashboardMainContent({
   const [showAddLink, setShowAddLink] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
 
+  const handleCreatePrompt = (promptData: any) => {
+    console.log('Creating prompt:', promptData);
+    // Navigate to prompts page after creation
+    onNavigate('/prompts');
+  };
+
   return (
     <div className="flex-1 p-8">
       <div className="max-w-3xl mx-auto">
@@ -91,7 +98,8 @@ export function DashboardMainContent({
       
       <CreatePromptModal 
         open={showCreatePrompt} 
-        onOpenChange={setShowCreatePrompt} 
+        onOpenChange={setShowCreatePrompt}
+        onCreatePrompt={handleCreatePrompt}
       />
       
       <AddLinkDialog 

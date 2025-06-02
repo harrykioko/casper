@@ -1,6 +1,5 @@
 
 import { useNavigate } from "react-router-dom";
-import { CommandModal } from "@/components/modals/CommandModal";
 import { CalendarSidebar } from "@/components/dashboard/CalendarSidebar";
 import { DashboardMainContent } from "@/components/dashboard/DashboardMainContent";
 import { useTasks } from "@/hooks/useTasks";
@@ -8,7 +7,6 @@ import { useReadingItems } from "@/hooks/useReadingItems";
 import { useNonnegotiables } from "@/hooks/useNonnegotiables";
 import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
 import { useCommandModal } from "@/hooks/useCommandModal";
-import { useDashboardKeyboardShortcuts } from "@/hooks/useDashboardKeyboardShortcuts";
 import { useState } from "react";
 import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
 import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
@@ -27,9 +25,6 @@ export default function Dashboard() {
   const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
   const [addTaskDialogOpen, setAddTaskDialogOpen] = useState(false);
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState(false);
-  
-  // Set up keyboard shortcuts
-  useDashboardKeyboardShortcuts({ openCommandModal });
   
   // Handle navigation to prompts page for new prompt
   const handleAddPrompt = () => {
@@ -161,22 +156,14 @@ export default function Dashboard() {
           onMarkRead={handleMarkRead}
           onDeleteReadingItem={handleDeleteReadingItem}
           onAddReadingItem={handleAddReadingItem}
+          isCommandModalOpen={isCommandModalOpen}
+          closeCommandModal={closeCommandModal}
+          onNavigate={navigate}
         />
         
         {/* Right Sidebar - Calendar and Upcoming */}
         <CalendarSidebar events={calendarEvents} nonnegotiables={transformedNonnegotiables} />
       </div>
-      
-      {/* Command Modal */}
-      <CommandModal 
-        isOpen={isCommandModalOpen} 
-        onClose={closeCommandModal} 
-        onAddTask={() => setAddTaskDialogOpen(true)}
-        onNavigate={navigate}
-        onAddLink={() => setAddLinkDialogOpen(true)}
-        onAddPrompt={handleAddPrompt}
-        onAddProject={() => setCreateProjectModalOpen(true)}
-      />
 
       {/* Add Link Dialog */}
       <AddLinkDialog
