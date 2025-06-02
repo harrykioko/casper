@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEffect } from "react";
+import DOMPurify from 'dompurify';
 
 interface CalendarEvent {
   id: string;
@@ -112,6 +113,15 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
 
   const displayedAttendees = event.attendees?.slice(0, 5) || [];
   const remainingCount = (event.attendees?.length || 0) - 5;
+
+  // Sanitize description HTML for safe rendering
+  const sanitizeDescription = (description: string) => {
+    return DOMPurify.sanitize(description, {
+      ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li', 'a', 'span', 'div'],
+      ALLOWED_ATTR: ['href', 'target', 'rel'],
+      ALLOW_DATA_ATTR: false
+    });
+  };
 
   return (
     <AnimatePresence>
@@ -250,10 +260,11 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                     <p className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Description</p>
                     <div 
                       id="event-description"
-                      className="text-sm text-foreground leading-relaxed whitespace-pre-wrap max-h-32 overflow-y-auto"
-                    >
-                      {event.description}
-                    </div>
+                      className="prose prose-sm max-h-60 overflow-y-auto text-muted-foreground rounded-md border border-muted/30 p-3 bg-background/50"
+                      dangerouslySetInnerHTML={{ 
+                        __html: sanitizeDescription(event.description) 
+                      }}
+                    />
                   </div>
                 )}
               </div>
