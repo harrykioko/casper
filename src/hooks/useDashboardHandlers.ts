@@ -1,16 +1,16 @@
 
 import { useNavigate } from "react-router-dom";
-import { Task } from "@/hooks/useTasks";
-import { ReadingItem } from "@/types/readingItem";
+import { Task, TaskRow, TaskInsert } from "@/hooks/useTasks";
+import { ReadingItem, ReadingItemRow, ReadingItemInsert } from "@/types/readingItem";
 
 interface UseDashboardHandlersProps {
   tasks: Task[];
-  createTask: (data: any) => Promise<void>;
-  updateTask: (id: string, data: any) => Promise<void>;
+  createTask: (data: Omit<TaskInsert, "id" | "created_at" | "updated_at" | "created_by">) => Promise<Task>;
+  updateTask: (id: string, data: Partial<TaskRow>) => Promise<Task>;
   deleteTask: (id: string) => Promise<void>;
   readingItems: ReadingItem[];
-  createReadingItem: (data: any) => Promise<void>;
-  updateReadingItem: (id: string, data: any) => Promise<void>;
+  createReadingItem: (data: Omit<ReadingItemInsert, "id" | "created_at" | "updated_at" | "created_by">) => Promise<ReadingItem>;
+  updateReadingItem: (id: string, data: Partial<ReadingItemRow>) => Promise<ReadingItem>;
   deleteReadingItem: (id: string) => Promise<void>;
 }
 
