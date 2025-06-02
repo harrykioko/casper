@@ -1,7 +1,6 @@
-
 import { useState } from "react";
 import { Task } from "@/hooks/useTasks";
-import { ReadingItem } from "@/hooks/useReadingItems";
+import { ReadingItem } from "@/types/readingItem";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { TaskSection } from "@/components/dashboard/TaskSection";
 import { ReadingListSection } from "@/components/dashboard/ReadingListSection";

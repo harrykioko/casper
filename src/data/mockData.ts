@@ -1,5 +1,5 @@
 import { Task } from "@/hooks/useTasks";
-import { ReadingItem } from "@/hooks/useReadingItems";
+import { ReadingItem } from "@/types/readingItem";
 
 // Mock tasks data for the initial view
 export const mockTasks: Task[] = [

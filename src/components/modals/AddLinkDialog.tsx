@@ -4,7 +4,8 @@ import { LinkIcon, Loader2, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ReadingItem, fetchLinkMetadata } from "@/hooks/useReadingItems";
+import { ReadingItem } from "@/types/readingItem";
+import { fetchLinkMetadata } from "@/hooks/useReadingItems";
 import { toast } from "sonner";
 
 interface LinkMetadata {

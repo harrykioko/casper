@@ -1,11 +1,10 @@
-
 import { Check, ExternalLink, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ReadingItem } from "@/hooks/useReadingItems";
+import { ReadingItem } from "@/types/readingItem";
 
 interface ReadingListProps {
   items: ReadingItem[];
