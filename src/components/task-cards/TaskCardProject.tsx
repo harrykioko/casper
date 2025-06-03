@@ -20,8 +20,8 @@ export function TaskCardProject({ project, className }: TaskCardProjectProps) {
       className
     )}>
       <div 
-        className="w-1.5 h-1.5 rounded-full" 
-        style={{ backgroundColor: project.color }}
+        className="w-1.5 h-1.5 rounded-full flex-shrink-0" 
+        style={{ backgroundColor: project.color || "#FF1464" }}
       />
       {project.name}
     </span>

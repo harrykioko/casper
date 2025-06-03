@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { FolderKanban, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,15 +8,115 @@ import { CommandModal } from "@/components/modals/CommandModal";
 import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/integrations/supabase/client";
 import { useProjects } from "@/hooks/useProjects";
 import { useToast } from "@/hooks/use-toast";
+
+interface ProjectWithCounts {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  taskCount: number;
+  completedTaskCount: number;
+  promptCount: number;
+}
 
 export default function Projects() {
   const navigate = useNavigate();
   const { projects, loading, createProject } = useProjects();
   const { toast } = useToast();
+  const [projectsWithCounts, setProjectsWithCounts] = useState<ProjectWithCounts[]>([]);
+  const [countsLoading, setCountsLoading] = useState(true);
   const [isCommandModalOpen, setIsCommandModalOpen] = useState(false);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+
+  // Fetch task and prompt counts for each project
+  useEffect(() => {
+    const fetchProjectCounts = async () => {
+      if (projects.length === 0) {
+        setCountsLoading(false);
+        return;
+      }
+
+      try {
+        setCountsLoading(true);
+        
+        const projectIds = projects.map(p => p.id);
+        
+        // Fetch task counts
+        const { data: taskCounts, error: taskError } = await supabase
+          .from('tasks')
+          .select('project_id, completed')
+          .in('project_id', projectIds);
+
+        if (taskError) throw taskError;
+
+        // Fetch prompt counts
+        const { data: promptCounts, error: promptError } = await supabase
+          .from('prompts')
+          .select('project_id')
+          .in('project_id', projectIds);
+
+        if (promptError) throw promptError;
+
+        // Process counts
+        const countsMap = new Map<string, { taskCount: number; completedTaskCount: number; promptCount: number }>();
+        
+        // Initialize counts
+        projectIds.forEach(id => {
+          countsMap.set(id, { taskCount: 0, completedTaskCount: 0, promptCount: 0 });
+        });
+
+        // Count tasks
+        taskCounts?.forEach(task => {
+          if (task.project_id) {
+            const counts = countsMap.get(task.project_id);
+            if (counts) {
+              counts.taskCount++;
+              if (task.completed) {
+                counts.completedTaskCount++;
+              }
+            }
+          }
+        });
+
+        // Count prompts
+        promptCounts?.forEach(prompt => {
+          if (prompt.project_id) {
+            const counts = countsMap.get(prompt.project_id);
+            if (counts) {
+              counts.promptCount++;
+            }
+          }
+        });
+
+        // Combine with project data
+        const projectsWithCounts = projects.map(project => ({
+          id: project.id,
+          name: project.name,
+          description: project.description || "",
+          color: project.color || "#FF1464",
+          taskCount: countsMap.get(project.id)?.taskCount || 0,
+          completedTaskCount: countsMap.get(project.id)?.completedTaskCount || 0,
+          promptCount: countsMap.get(project.id)?.promptCount || 0
+        }));
+
+        setProjectsWithCounts(projectsWithCounts);
+      } catch (error) {
+        console.error('Error fetching project counts:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load project statistics",
+          variant: "destructive"
+        });
+      } finally {
+        setCountsLoading(false);
+      }
+    };
+
+    fetchProjectCounts();
+  }, [projects, toast]);
   
   // Command modal handling
   const openCommandModal = () => setIsCommandModalOpen(true);
@@ -105,38 +205,55 @@ export default function Projects() {
         </div>
         
         <div className="grid auto-rows-[10rem] grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-6">
-          {projects.map((project) => (
-            <Link
-              key={project.id}
-              to={`/projects/${project.id}`}
-              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-cyan-500"
-            >
-              <Card
-                className="relative rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur-sm ring-1 ring-black/5 dark:ring-white/10 transition-shadow duration-200 hover:shadow-lg/20 hover:scale-[1.01] h-full"
-                style={{ '--accentColor': project.color || '#FF1464' } as React.CSSProperties}
+          {projectsWithCounts.map((project) => {
+            const progressPercentage = project.taskCount > 0 
+              ? (project.completedTaskCount / project.taskCount) * 100 
+              : 0;
+            
+            return (
+              <Link
+                key={project.id}
+                to={`/projects/${project.id}`}
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-cyan-500"
               >
-                <div className="absolute left-0 top-3 bottom-3 w-1 rounded-l-2xl bg-[var(--accentColor)]"></div>
-                <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-                    {project.name}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    {project.description || 'No description'}
-                  </p>
-                  <Progress 
-                    value={0} 
-                    className="h-1.5 rounded-full bg-muted dark:bg-muted/30" 
-                  />
-                  <div className="flex items-center text-sm mt-3 text-muted-foreground">
-                    <FolderKanban className="h-4 w-4 mr-1.5" />
-                    <span>0 tasks</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                <Card
+                  className="relative rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur-sm ring-1 ring-black/5 dark:ring-white/10 transition-shadow duration-200 hover:shadow-lg/20 hover:scale-[1.01] h-full"
+                  style={{ '--accentColor': project.color } as React.CSSProperties}
+                >
+                  <div className="absolute left-0 top-3 bottom-3 w-1 rounded-l-2xl bg-[var(--accentColor)]"></div>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                      {project.name}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      {project.description || 'No description'}
+                    </p>
+                    
+                    {countsLoading ? (
+                      <Skeleton className="h-1.5 w-full mb-3" />
+                    ) : (
+                      <Progress 
+                        value={progressPercentage} 
+                        className="h-1.5 rounded-full bg-muted dark:bg-muted/30 mb-3" 
+                      />
+                    )}
+                    
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <div className="flex items-center">
+                        <FolderKanban className="h-4 w-4 mr-1.5" />
+                        <span>{countsLoading ? '...' : `${project.taskCount} tasks`}</span>
+                      </div>
+                      {project.promptCount > 0 && (
+                        <span>{project.promptCount} prompts</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
           
           {/* New Project Card */}
           <div 
@@ -150,7 +267,7 @@ export default function Projects() {
           </div>
         </div>
 
-        {projects.length === 0 && (
+        {projectsWithCounts.length === 0 && !loading && (
           <div className="text-center py-12 text-muted-foreground">
             <FolderKanban className="h-12 w-12 mx-auto mb-3 opacity-20" />
             <p className="text-lg font-medium">No projects yet</p>
