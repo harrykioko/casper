@@ -2,6 +2,9 @@
 import { useState } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useTasksManager } from "@/hooks/useTasksManager";
+import { useCategories } from "@/hooks/useCategories";
+import { useProjects } from "@/hooks/useProjects";
+import { useTaskFiltering } from "@/hooks/useTaskFiltering";
 import { Task } from "@/hooks/useTasks";
 import { QuickTaskInput } from "@/components/tasks/QuickTaskInput";
 import { ViewModeToggle } from "@/components/tasks/ViewModeToggle";
@@ -14,6 +17,9 @@ export default function Tasks() {
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [projectFilter, setProjectFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("date");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
 
@@ -26,9 +32,23 @@ export default function Tasks() {
     handleUpdateTask
   } = useTasksManager();
 
+  const { categories } = useCategories();
+  const { projects } = useProjects();
+
   // Filter tasks into quick tasks and regular tasks
   const quickTasks = tasks.filter(task => task.is_quick_task);
   const regularTasks = tasks.filter(task => !task.is_quick_task);
+
+  // Apply filtering to regular tasks
+  const filteredRegularTasks = useTaskFiltering(regularTasks, {
+    statusFilter,
+    priorityFilter,
+    categoryFilter,
+    projectFilter,
+    sortBy,
+    categories,
+    projects
+  });
 
   const handleAddQuickTask = (content: string) => {
     handleAddTask(content, true); // Create as quick task
@@ -60,13 +80,19 @@ export default function Tasks() {
             setStatusFilter={setStatusFilter}
             priorityFilter={priorityFilter}
             setPriorityFilter={setPriorityFilter}
+            categoryFilter={categoryFilter}
+            setCategoryFilter={setCategoryFilter}
+            projectFilter={projectFilter}
+            setProjectFilter={setProjectFilter}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
           />
 
           {/* Main Content Layout */}
           <div className="flex flex-col lg:flex-row gap-6">
             {/* Left: Main Tasks (70% width) */}
             <TasksMainContent
-              regularTasks={regularTasks}
+              regularTasks={filteredRegularTasks}
               onTaskComplete={handleCompleteTask}
               onTaskDelete={handleDeleteTask}
               onUpdateTaskStatus={handleUpdateTaskStatus}
