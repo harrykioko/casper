@@ -7,6 +7,7 @@ import { ProjectContext } from "@/components/projects/ProjectContext";
 import { ProjectTasksList } from "@/components/projects/ProjectTasksList";
 import { ProjectPromptsList } from "@/components/projects/ProjectPromptsList";
 import { ProjectLinksList } from "@/components/projects/ProjectLinksList";
+import { AssetsSection } from "@/components/projects/AssetsSection";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectDetail } from "@/hooks/useProjectDetail";
 import { motion } from "framer-motion";
@@ -50,8 +51,9 @@ export default function ProjectDetail() {
           </div>
           <Skeleton className="h-32 w-full mb-6" />
           <div className="grid lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 space-y-6">
               <Skeleton className="h-64 w-full" />
+              <Skeleton className="h-48 w-full" />
             </div>
             <div className="space-y-6">
               <Skeleton className="h-48 w-full" />
@@ -100,12 +102,19 @@ export default function ProjectDetail() {
         />
         
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Project Tasks */}
-          <ProjectTasksList 
-            tasks={tasks}
-            onAddTask={addTask}
-          />
+          {/* Left column - Tasks and Assets */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Project Tasks */}
+            <ProjectTasksList 
+              tasks={tasks}
+              onAddTask={addTask}
+            />
+            
+            {/* Project Assets */}
+            <AssetsSection projectId={project.id} />
+          </div>
           
+          {/* Right column - Prompts and Links */}
           <div className="space-y-6">
             {/* Project Prompts */}
             <ProjectPromptsList 
