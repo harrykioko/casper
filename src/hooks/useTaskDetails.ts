@@ -24,6 +24,8 @@ export function useTaskDetails({ task }: UseTaskDetailsProps): UseTaskDetailsRet
   const [status, setStatus] = useState<"todo" | "inprogress" | "done">("todo");
   const [scheduledFor, setScheduledFor] = useState<Date | undefined>(undefined);
   const [selectedProject, setSelectedProject] = useState<Task["project"] | undefined>(undefined);
+  const [priority, setPriority] = useState<"low" | "medium" | "high" | undefined>(undefined);
+  const [category, setCategory] = useState<string | undefined>(undefined);
   
   // Initialize form when task changes
   useEffect(() => {
@@ -31,6 +33,8 @@ export function useTaskDetails({ task }: UseTaskDetailsProps): UseTaskDetailsRet
       setContent(task.content);
       setStatus(task.status || "todo");
       setSelectedProject(task.project);
+      setPriority(task.priority);
+      setCategory(task.category);
       
       // Handle date parsing
       if (task.scheduledFor) {
@@ -61,6 +65,8 @@ export function useTaskDetails({ task }: UseTaskDetailsProps): UseTaskDetailsRet
     setStatus("todo");
     setScheduledFor(undefined);
     setSelectedProject(undefined);
+    setPriority(undefined);
+    setCategory(undefined);
   };
   
   // Create an updated task object based on current form state
@@ -73,6 +79,8 @@ export function useTaskDetails({ task }: UseTaskDetailsProps): UseTaskDetailsRet
       status,
       completed: status === "done",
       project: selectedProject,
+      priority,
+      category,
       scheduledFor: scheduledFor ? scheduledFor.toISOString() : undefined,
       is_quick_task: false // Always convert to a regular task when edited
     };
@@ -87,6 +95,10 @@ export function useTaskDetails({ task }: UseTaskDetailsProps): UseTaskDetailsRet
     setScheduledFor,
     selectedProject,
     setSelectedProject,
+    priority,
+    setPriority,
+    category,
+    setCategory,
     resetForm,
     createUpdatedTask
   };

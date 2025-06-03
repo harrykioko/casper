@@ -13,23 +13,23 @@ interface DateSelectorProps {
 
 export function DateSelector({ scheduledFor, onSelectDate }: DateSelectorProps) {
   return (
-    <div className="space-y-2">
-      <label className="text-xs uppercase text-white/50 tracking-wide block">Due Date</label>
+    <div className="space-y-1">
+      <label className="text-sm text-muted-foreground mb-1 block">Due Date</label>
       <div className="relative">
         <Popover>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               className={cn(
-                "w-full justify-start text-left relative pl-9 bg-white/5 border border-white/10 hover:bg-white/10 rounded-md text-sm py-2",
-                !scheduledFor && "text-white/40"
+                "w-full justify-start text-left relative pl-9 bg-muted/20 border border-muted/40 rounded-md text-base py-2",
+                !scheduledFor && "text-muted-foreground"
               )}
             >
-              <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-white/40" />
+              <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               {scheduledFor ? format(scheduledFor, "PPP") : "Select date"}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0 bg-white/10 backdrop-blur-md border border-white/10" align="start">
+          <PopoverContent className="w-auto p-0 bg-popover backdrop-blur-md border border-muted/40 z-50" align="start">
             <Calendar
               mode="single"
               selected={scheduledFor}
@@ -45,7 +45,7 @@ export function DateSelector({ scheduledFor, onSelectDate }: DateSelectorProps) 
           type="button"
           variant="ghost"
           size="sm"
-          className="text-xs text-zinc-400 hover:underline mt-1 h-auto p-0"
+          className="text-xs text-muted-foreground hover:underline mt-1 h-auto p-0"
           onClick={() => onSelectDate(undefined)}
         >
           Clear date

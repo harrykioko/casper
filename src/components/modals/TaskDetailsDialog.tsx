@@ -1,7 +1,7 @@
 
 import { useEffect } from "react";
 import { Edit, Trash } from "lucide-react";
-import { GlassModal, GlassModalContent, GlassModalHeader, GlassModalTitle, GlassModalFooter } from "@/components/ui/GlassModal";
+import { GlassModal, GlassModalContent, GlassModalHeader, GlassModalTitle } from "@/components/ui/GlassModal";
 import { Button } from "@/components/ui/button";
 import { Task } from "@/hooks/useTasks";
 import { TaskDetailsForm } from "./task-details/TaskDetailsForm";
@@ -32,6 +32,10 @@ export function TaskDetailsDialog({
     setScheduledFor,
     selectedProject,
     setSelectedProject,
+    priority,
+    setPriority,
+    category,
+    setCategory,
     createUpdatedTask
   } = useTaskDetails({ task });
 
@@ -78,10 +82,10 @@ export function TaskDetailsDialog({
 
   return (
     <GlassModal open={open} onOpenChange={onOpenChange}>
-      <GlassModalContent className="max-w-lg">
-        <GlassModalHeader className="border-b border-muted/20 mb-4 pb-3">
-          <GlassModalTitle className="flex items-center gap-2">
-            <Edit className="w-4 h-4 text-muted-foreground" /> Edit Task
+      <GlassModalContent className="w-full max-w-lg bg-muted/30 backdrop-blur-md rounded-xl shadow-xl p-6">
+        <GlassModalHeader className="mb-6">
+          <GlassModalTitle className="flex items-center gap-2 text-xl font-semibold">
+            <Edit className="w-5 h-5 text-muted-foreground" /> Edit Task
           </GlassModalTitle>
         </GlassModalHeader>
 
@@ -95,27 +99,34 @@ export function TaskDetailsDialog({
             setScheduledFor={setScheduledFor}
             selectedProject={selectedProject}
             setSelectedProject={setSelectedProject}
+            priority={priority}
+            setPriority={setPriority}
+            category={category}
+            setCategory={setCategory}
           />
         )}
 
-        <div className="flex justify-between items-center mt-6 pt-3 border-t border-muted/20">
+        <div className="flex justify-between pt-6 border-t border-muted mt-4">
           <Button
-            variant="destructive"
+            variant="ghost"
             onClick={handleDelete}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 text-muted-foreground hover:text-destructive"
           >
             <Trash className="h-4 w-4" />
-            Delete
+            Delete Task
           </Button>
           <div className="flex gap-2">
             <Button
               type="button"
-              variant="secondary"
+              variant="ghost"
               onClick={() => onOpenChange(false)}
             >
               Cancel
             </Button>
-            <Button onClick={handleSave}>
+            <Button 
+              onClick={handleSave}
+              className="bg-gradient-to-r from-[#FF6A79] to-[#415AFF] text-white hover:opacity-90"
+            >
               Save Changes
             </Button>
           </div>

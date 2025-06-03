@@ -1,5 +1,5 @@
 
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 
 interface TaskContentInputProps {
   content: string;
@@ -8,16 +8,16 @@ interface TaskContentInputProps {
 
 export function TaskContentInput({ content, onContentChange }: TaskContentInputProps) {
   return (
-    <div className="space-y-2">
-      <label htmlFor="task-content" className="text-xs uppercase text-white/50 tracking-wide block">
+    <div className="space-y-1">
+      <label htmlFor="task-content" className="text-sm text-muted-foreground mb-1 block">
         Task
       </label>
-      <Textarea
+      <Input
         id="task-content"
         value={content}
         onChange={(e) => onContentChange(e.target.value)}
-        placeholder="Write your task..."
-        className="min-h-[80px] resize-none w-full bg-white/5 border border-white/10 rounded-md text-sm px-3 py-2 placeholder-white/40 focus-visible:ring-1 focus-visible:ring-white/20 focus-visible:ring-offset-0 focus-visible:outline-none"
+        placeholder="Enter task name..."
+        className="w-full bg-muted/20 border border-muted/40 rounded-md text-base"
       />
     </div>
   );

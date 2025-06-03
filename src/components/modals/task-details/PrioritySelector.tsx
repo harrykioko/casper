@@ -2,54 +2,54 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-interface StatusSelectorProps {
-  status: "todo" | "inprogress" | "done";
-  onSelectStatus: (status: "todo" | "inprogress" | "done") => void;
+interface PrioritySelectorProps {
+  priority: "low" | "medium" | "high" | undefined;
+  onSelectPriority: (priority: "low" | "medium" | "high" | undefined) => void;
 }
 
-export function StatusSelector({ status, onSelectStatus }: StatusSelectorProps) {
+export function PrioritySelector({ priority, onSelectPriority }: PrioritySelectorProps) {
   return (
     <div className="space-y-1">
-      <label className="text-sm text-muted-foreground mb-1 block">Status</label>
+      <label className="text-sm text-muted-foreground mb-1 block">Priority</label>
       <div className="flex gap-2">
         <Button
           type="button"
           variant="outline"
           className={cn(
             "text-sm px-3 py-1 rounded-full border-muted/40 bg-muted/20",
-            status === "todo" 
+            priority === "low" 
               ? "bg-muted/40 text-foreground border-muted/60" 
               : "text-muted-foreground hover:bg-muted/30"
           )}
-          onClick={() => onSelectStatus("todo")}
+          onClick={() => onSelectPriority(priority === "low" ? undefined : "low")}
         >
-          To Do
+          Low
         </Button>
         <Button
           type="button"
           variant="outline"
           className={cn(
             "text-sm px-3 py-1 rounded-full border-muted/40 bg-muted/20",
-            status === "inprogress" 
+            priority === "medium" 
               ? "bg-muted/40 text-foreground border-muted/60" 
               : "text-muted-foreground hover:bg-muted/30"
           )}
-          onClick={() => onSelectStatus("inprogress")}
+          onClick={() => onSelectPriority(priority === "medium" ? undefined : "medium")}
         >
-          In Progress
+          Medium
         </Button>
         <Button
           type="button"
           variant="outline"
           className={cn(
             "text-sm px-3 py-1 rounded-full border-muted/40 bg-muted/20",
-            status === "done" 
+            priority === "high" 
               ? "bg-muted/40 text-foreground border-muted/60" 
               : "text-muted-foreground hover:bg-muted/30"
           )}
-          onClick={() => onSelectStatus("done")}
+          onClick={() => onSelectPriority(priority === "high" ? undefined : "high")}
         >
-          Done
+          High
         </Button>
       </div>
     </div>

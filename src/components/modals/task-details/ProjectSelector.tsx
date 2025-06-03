@@ -12,7 +12,8 @@ export function ProjectSelector({ selectedProject, setSelectedProject }: Project
   const { projects } = useProjects();
 
   return (
-    <div>
+    <div className="space-y-1">
+      <label className="text-sm text-muted-foreground mb-1 block">Project</label>
       <Select 
         value={selectedProject?.id || "none"} 
         onValueChange={(value) => {
@@ -30,16 +31,16 @@ export function ProjectSelector({ selectedProject, setSelectedProject }: Project
           }
         }}
       >
-        <SelectTrigger className="w-full">
+        <SelectTrigger className="w-full bg-muted/20 border border-muted/40 rounded-md text-base">
           <SelectValue placeholder="Select project" />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="bg-popover backdrop-blur-md border border-muted/40 z-50">
           {projects.map((project) => (
             <SelectItem key={project.id} value={project.id}>
               {project.name}
             </SelectItem>
           ))}
-          <SelectItem value="none">No project</SelectItem>
+          <SelectItem value="none">No Project</SelectItem>
         </SelectContent>
       </Select>
     </div>
