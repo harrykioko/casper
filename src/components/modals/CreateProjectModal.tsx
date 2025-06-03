@@ -137,21 +137,19 @@ export function CreateProjectModal({
                   <MetaSection control={form.control} />
                   <ResourcesSection control={form.control} />
 
-                  <div className="flex flex-col gap-2 pt-6 mt-6">
+                  <div className="flex justify-end gap-2 pt-6">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => onOpenChange(false)}
+                    >
+                      Cancel
+                    </Button>
                     <Button
                       type="submit"
-                      className="w-full py-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition shadow"
                       disabled={form.formState.isSubmitting}
                     >
                       {form.formState.isSubmitting ? "Creating..." : "Create Project"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => onOpenChange(false)}
-                      className="w-full text-sm text-muted-foreground hover:text-foreground transition"
-                    >
-                      Cancel
                     </Button>
                   </div>
                 </form>

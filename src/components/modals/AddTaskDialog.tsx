@@ -67,10 +67,10 @@ export function AddTaskDialog({ open, onOpenChange, onAddTask }: AddTaskDialogPr
             )}
           </div>
           
-          <GlassModalFooter className="sm:justify-between gap-2">
+          <GlassModalFooter>
             <Button
               type="button"
-              variant="ghost"
+              variant="secondary"
               onClick={() => onOpenChange(false)}
               disabled={isLoading}
             >
@@ -79,7 +79,6 @@ export function AddTaskDialog({ open, onOpenChange, onAddTask }: AddTaskDialogPr
             <Button 
               type="submit" 
               disabled={!taskContent.trim() || isLoading}
-              className="w-full py-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition shadow"
             >
               {isLoading ? (
                 <>

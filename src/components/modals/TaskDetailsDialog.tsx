@@ -98,32 +98,28 @@ export function TaskDetailsDialog({
           />
         )}
 
-        <GlassModalFooter className="flex justify-between items-center mt-6 pt-3 border-t border-muted/20">
+        <div className="flex justify-between items-center mt-6 pt-3 border-t border-muted/20">
           <Button
-            variant="ghost"
+            variant="destructive"
             onClick={handleDelete}
-            className="text-destructive hover:text-destructive hover:underline text-sm hover:bg-transparent p-0 h-auto"
+            className="flex items-center gap-2"
           >
-            <Trash className="mr-2 h-4 w-4" />
+            <Trash className="h-4 w-4" />
             Delete
           </Button>
           <div className="flex gap-2">
             <Button
               type="button"
-              variant="ghost"
+              variant="secondary"
               onClick={() => onOpenChange(false)}
-              className="text-muted-foreground hover:text-foreground text-sm"
             >
               Cancel
             </Button>
-            <Button 
-              onClick={handleSave}
-              className="w-full py-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition shadow"
-            >
+            <Button onClick={handleSave}>
               Save Changes
             </Button>
           </div>
-        </GlassModalFooter>
+        </div>
       </GlassModalContent>
     </GlassModal>
   );
