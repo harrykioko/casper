@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { Check, Loader2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { GlassModal, GlassModalContent, GlassModalHeader, GlassModalTitle, GlassModalFooter } from "@/components/ui/GlassModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -29,7 +29,6 @@ export function AddTaskDialog({ open, onOpenChange, onAddTask }: AddTaskDialogPr
     try {
       setIsLoading(true);
       
-      // Add the task
       onAddTask(taskContent);
       toast.success("Task added successfully");
       onOpenChange(false);
@@ -43,13 +42,13 @@ export function AddTaskDialog({ open, onOpenChange, onAddTask }: AddTaskDialogPr
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg rounded-2xl bg-white/10 dark:bg-zinc-900/30 backdrop-blur-sm ring-1 ring-white/10 dark:ring-white/5 shadow-2xl transition-all">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <GlassModal open={open} onOpenChange={onOpenChange}>
+      <GlassModalContent className="max-w-lg">
+        <GlassModalHeader>
+          <GlassModalTitle className="flex items-center gap-2">
             <Check className="h-4 w-4" /> Add New Task
-          </DialogTitle>
-        </DialogHeader>
+          </GlassModalTitle>
+        </GlassModalHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="relative">
@@ -57,7 +56,7 @@ export function AddTaskDialog({ open, onOpenChange, onAddTask }: AddTaskDialogPr
               placeholder="Enter task description..."
               value={taskContent}
               onChange={(e) => setTaskContent(e.target.value)}
-              className="pr-10 focus-visible:ring-0 focus-visible:ring-offset-0 border-gray-300 dark:border-gray-700 focus-visible:border-gray-400 dark:focus-visible:border-gray-500 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+              className="pr-10 focus-visible:ring-0 focus-visible:ring-offset-0 border-muted/30 focus-visible:border-muted/50 hover:border-muted/50 transition-colors"
               disabled={isLoading}
               autoFocus
             />
@@ -68,7 +67,7 @@ export function AddTaskDialog({ open, onOpenChange, onAddTask }: AddTaskDialogPr
             )}
           </div>
           
-          <DialogFooter className="sm:justify-between gap-2">
+          <GlassModalFooter className="sm:justify-between gap-2">
             <Button
               type="button"
               variant="ghost"
@@ -80,7 +79,7 @@ export function AddTaskDialog({ open, onOpenChange, onAddTask }: AddTaskDialogPr
             <Button 
               type="submit" 
               disabled={!taskContent.trim() || isLoading}
-              className="w-full py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition shadow"
+              className="w-full py-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition shadow"
             >
               {isLoading ? (
                 <>
@@ -91,9 +90,9 @@ export function AddTaskDialog({ open, onOpenChange, onAddTask }: AddTaskDialogPr
                 "Add Task"
               )}
             </Button>
-          </DialogFooter>
+          </GlassModalFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </GlassModalContent>
+    </GlassModal>
   );
 }

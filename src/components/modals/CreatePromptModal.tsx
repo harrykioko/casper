@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { MessageSquareText, Loader2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { GlassModal, GlassModalContent, GlassModalHeader, GlassModalTitle, GlassModalFooter } from "@/components/ui/GlassModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -98,13 +98,13 @@ export function CreatePromptModal({ open, onOpenChange, onCreatePrompt }: Create
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg rounded-2xl bg-white/10 dark:bg-zinc-900/30 backdrop-blur-sm ring-1 ring-white/10 dark:ring-white/5 shadow-2xl transition-all">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+    <GlassModal open={open} onOpenChange={onOpenChange}>
+      <GlassModalContent className="max-w-lg">
+        <GlassModalHeader>
+          <GlassModalTitle className="flex items-center gap-2">
             <MessageSquareText className="h-4 w-4" /> Create New Prompt
-          </DialogTitle>
-        </DialogHeader>
+          </GlassModalTitle>
+        </GlassModalHeader>
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -118,7 +118,7 @@ export function CreatePromptModal({ open, onOpenChange, onCreatePrompt }: Create
                     {...field}
                     placeholder="Enter prompt title" 
                     autoFocus
-                    className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-cyan-500 transition"
+                    className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-ring transition"
                     disabled={isLoading}
                   />
                   <FormMessage />
@@ -135,7 +135,7 @@ export function CreatePromptModal({ open, onOpenChange, onCreatePrompt }: Create
                   <Textarea 
                     {...field}
                     placeholder="Brief description of the prompt's purpose..."
-                    className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-cyan-500 transition min-h-[80px]"
+                    className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-ring transition min-h-[80px]"
                     rows={3}
                     disabled={isLoading}
                   />
@@ -153,7 +153,7 @@ export function CreatePromptModal({ open, onOpenChange, onCreatePrompt }: Create
                   <Textarea 
                     {...field}
                     placeholder="Enter your full prompt content (markdown supported)..."
-                    className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-cyan-500 transition min-h-[150px]"
+                    className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-ring transition min-h-[150px]"
                     rows={6}
                     disabled={isLoading}
                   />
@@ -170,7 +170,7 @@ export function CreatePromptModal({ open, onOpenChange, onCreatePrompt }: Create
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-cyan-500 transition"
+                  className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-ring transition"
                   disabled={isLoading}
                 />
                 <Button 
@@ -199,7 +199,7 @@ export function CreatePromptModal({ open, onOpenChange, onCreatePrompt }: Create
               )}
             </div>
             
-            <DialogFooter className="mt-6">
+            <GlassModalFooter className="mt-6">
               <Button
                 type="button"
                 variant="outline"
@@ -212,7 +212,7 @@ export function CreatePromptModal({ open, onOpenChange, onCreatePrompt }: Create
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition shadow"
+                className="w-full py-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition shadow"
               >
                 {isLoading ? (
                   <>
@@ -223,10 +223,10 @@ export function CreatePromptModal({ open, onOpenChange, onCreatePrompt }: Create
                   "Create Prompt"
                 )}
               </Button>
-            </DialogFooter>
+            </GlassModalFooter>
           </form>
         </Form>
-      </DialogContent>
-    </Dialog>
+      </GlassModalContent>
+    </GlassModal>
   );
 }

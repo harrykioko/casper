@@ -6,12 +6,12 @@ import { Check } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+  GlassModal,
+  GlassModalContent,
+  GlassModalHeader,
+  GlassModalTitle,
+  GlassModalDescription,
+} from "@/components/ui/GlassModal";
 import {
   Form,
 } from "@/components/ui/form";
@@ -47,7 +47,6 @@ export function CreateProjectModal({
     },
   });
 
-  // Reset form when modal opens
   useEffect(() => {
     if (open) {
       form.reset({
@@ -62,19 +61,14 @@ export function CreateProjectModal({
 
   const onSubmit = async (data: CreateProjectFormData) => {
     try {
-      // Filter out fields that don't exist in the database table
-      // Only send supported fields: name, description, color
       const projectData = {
         name: data.name,
         description: data.description,
         color: data.color,
-        // Note: dueDate and resources are not supported in the current database schema
       };
 
-      // Show success animation
       setShowSuccess(true);
       
-      // Call the callback after a brief delay
       setTimeout(() => {
         onCreateProject?.(projectData as CreateProjectFormData);
         onOpenChange(false);
@@ -91,8 +85,8 @@ export function CreateProjectModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg rounded-2xl bg-white/10 dark:bg-zinc-900/30 backdrop-blur-sm ring-1 ring-white/10 dark:ring-white/5 shadow-2xl transition-all">
+    <GlassModal open={open} onOpenChange={onOpenChange}>
+      <GlassModalContent className="max-w-lg">
         <AnimatePresence mode="wait">
           {showSuccess ? (
             <motion.div
@@ -115,7 +109,7 @@ export function CreateProjectModal({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4 }}
-                className="text-lg font-semibold text-gray-900 dark:text-gray-100"
+                className="text-lg font-semibold"
               >
                 Project Created!
               </motion.h3>
@@ -128,31 +122,25 @@ export function CreateProjectModal({
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ duration: 0.2 }}
             >
-              <DialogHeader>
-                <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              <GlassModalHeader>
+                <GlassModalTitle>
                   New Project
-                </DialogTitle>
-                <DialogDescription className="text-sm text-gray-600 dark:text-gray-400">
+                </GlassModalTitle>
+                <GlassModalDescription>
                   Create a new project to organize your tasks and resources.
-                </DialogDescription>
-              </DialogHeader>
+                </GlassModalDescription>
+              </GlassModalHeader>
 
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 divide-y divide-muted/20">
-                  {/* Basics Section */}
                   <BasicsSection control={form.control} />
-
-                  {/* Meta Section */}
                   <MetaSection control={form.control} />
-
-                  {/* Resources Section */}
                   <ResourcesSection control={form.control} />
 
-                  {/* Actions */}
                   <div className="flex flex-col gap-2 pt-6 mt-6">
                     <Button
                       type="submit"
-                      className="w-full py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition shadow"
+                      className="w-full py-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition shadow"
                       disabled={form.formState.isSubmitting}
                     >
                       {form.formState.isSubmitting ? "Creating..." : "Create Project"}
@@ -171,7 +159,7 @@ export function CreateProjectModal({
             </motion.div>
           )}
         </AnimatePresence>
-      </DialogContent>
-    </Dialog>
+      </GlassModalContent>
+    </GlassModal>
   );
 }

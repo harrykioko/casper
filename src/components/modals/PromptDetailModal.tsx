@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { MessageSquareText, Copy, Edit, Save, X, Loader2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { GlassModal, GlassModalContent, GlassModalHeader, GlassModalTitle, GlassModalFooter } from "@/components/ui/GlassModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -99,14 +99,14 @@ export function PromptDetailModal({ open, onOpenChange, prompt, onUpdatePrompt }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl rounded-2xl bg-white/10 dark:bg-zinc-900/30 backdrop-blur-sm ring-1 ring-white/10 dark:ring-white/5 shadow-2xl transition-all max-h-[80vh] overflow-hidden">
-        <DialogHeader className="border-b border-white/10 pb-3">
+    <GlassModal open={open} onOpenChange={onOpenChange}>
+      <GlassModalContent className="max-w-2xl max-h-[80vh]">
+        <GlassModalHeader className="border-b border-muted/20 pb-3">
           <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
+            <GlassModalTitle className="flex items-center gap-2">
               <MessageSquareText className="h-4 w-4" />
               {isEditing ? "Edit Prompt" : "Prompt Details"}
-            </DialogTitle>
+            </GlassModalTitle>
             <div className="flex gap-2">
               {!isEditing && (
                 <>
@@ -114,7 +114,7 @@ export function PromptDetailModal({ open, onOpenChange, prompt, onUpdatePrompt }
                     variant="ghost"
                     size="sm"
                     onClick={handleCopy}
-                    className="text-white/60 hover:text-white"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
@@ -122,7 +122,7 @@ export function PromptDetailModal({ open, onOpenChange, prompt, onUpdatePrompt }
                     variant="ghost"
                     size="sm"
                     onClick={handleEdit}
-                    className="text-white/60 hover:text-white"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
@@ -130,63 +130,59 @@ export function PromptDetailModal({ open, onOpenChange, prompt, onUpdatePrompt }
               )}
             </div>
           </div>
-        </DialogHeader>
+        </GlassModalHeader>
 
-        <div className="overflow-y-auto flex-1 space-y-4">
-          {/* Title */}
+        <div className="space-y-4 flex-1 min-h-0">
           <div className="space-y-2">
-            <label className="text-sm font-medium text-white/80">Title</label>
+            <label className="text-sm font-medium text-muted-foreground">Title</label>
             {isEditing ? (
               <Input
                 value={editedPrompt?.title || ""}
                 onChange={(e) => setEditedPrompt(prev => prev ? { ...prev, title: e.target.value } : null)}
-                className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-cyan-500 transition"
+                className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-ring transition"
                 disabled={isLoading}
               />
             ) : (
-              <h2 className="text-xl font-semibold text-white">{currentPrompt.title}</h2>
+              <h2 className="text-xl font-semibold">{currentPrompt.title}</h2>
             )}
           </div>
 
-          {/* Description */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-white/80">Description</label>
+            <label className="text-sm font-medium text-muted-foreground">Description</label>
             {isEditing ? (
               <Textarea
                 value={editedPrompt?.description || ""}
                 onChange={(e) => setEditedPrompt(prev => prev ? { ...prev, description: e.target.value } : null)}
-                className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-cyan-500 transition min-h-[80px]"
+                className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-ring transition min-h-[80px]"
                 rows={3}
                 disabled={isLoading}
               />
             ) : (
-              <p className="text-white/70">{currentPrompt.description}</p>
+              <p className="text-muted-foreground">{currentPrompt.description}</p>
             )}
           </div>
 
-          {/* Content */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-white/80">Prompt Content</label>
+            <label className="text-sm font-medium text-muted-foreground">Prompt Content</label>
             {isEditing ? (
               <Textarea
                 value={editedPrompt?.content || ""}
                 onChange={(e) => setEditedPrompt(prev => prev ? { ...prev, content: e.target.value } : null)}
-                className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-cyan-500 transition min-h-[200px]"
+                className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-ring transition min-h-[200px]"
                 rows={8}
                 disabled={isLoading}
               />
             ) : (
-              <div className="bg-black/20 rounded-md p-4 max-h-[300px] overflow-y-auto">
-                <pre className="text-sm text-white/90 whitespace-pre-wrap font-mono">
+              <div className="bg-muted/20 rounded-md p-4 max-h-[300px] overflow-y-auto">
+                <pre className="text-sm whitespace-pre-wrap font-mono">
                   {currentPrompt.content}
                 </pre>
               </div>
             )}
           </div>
 
-          {/* Tags */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-white/80">Tags</label>
+            <label className="text-sm font-medium text-muted-foreground">Tags</label>
             {isEditing ? (
               <div className="space-y-2">
                 <div className="flex gap-2">
@@ -195,7 +191,7 @@ export function PromptDetailModal({ open, onOpenChange, prompt, onUpdatePrompt }
                     value={newTag}
                     onChange={(e) => setNewTag(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-cyan-500 transition"
+                    className="bg-background/80 border border-muted/30 text-foreground placeholder:text-muted-foreground rounded-md focus:ring-2 focus:ring-ring transition"
                     disabled={isLoading}
                   />
                   <Button 
@@ -235,7 +231,7 @@ export function PromptDetailModal({ open, onOpenChange, prompt, onUpdatePrompt }
           </div>
         </div>
 
-        <DialogFooter className="border-t border-white/10 pt-3">
+        <GlassModalFooter className="border-t border-muted/20 pt-3">
           {isEditing ? (
             <div className="flex gap-2 w-full">
               <Button
@@ -250,7 +246,7 @@ export function PromptDetailModal({ open, onOpenChange, prompt, onUpdatePrompt }
               <Button
                 onClick={handleSave}
                 disabled={isLoading}
-                className="flex-1 py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition shadow"
+                className="flex-1 py-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition shadow"
               >
                 {isLoading ? (
                   <>
@@ -268,14 +264,14 @@ export function PromptDetailModal({ open, onOpenChange, prompt, onUpdatePrompt }
           ) : (
             <Button
               onClick={handleCopy}
-              className="w-full py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition shadow"
+              className="w-full py-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition shadow"
             >
               <Copy className="mr-2 h-4 w-4" />
               Copy Prompt
             </Button>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </GlassModalFooter>
+      </GlassModalContent>
+    </GlassModal>
   );
 }

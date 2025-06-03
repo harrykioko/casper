@@ -1,7 +1,7 @@
 
 import { useEffect } from "react";
 import { Edit, Trash } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { GlassModal, GlassModalContent, GlassModalHeader, GlassModalTitle, GlassModalFooter } from "@/components/ui/GlassModal";
 import { Button } from "@/components/ui/button";
 import { Task } from "@/hooks/useTasks";
 import { TaskDetailsForm } from "./task-details/TaskDetailsForm";
@@ -60,7 +60,6 @@ export function TaskDetailsDialog({
     });
   };
 
-  // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (open) {
@@ -78,13 +77,13 @@ export function TaskDetailsDialog({
   }, [open, onOpenChange, handleSave]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg rounded-2xl bg-white/10 dark:bg-zinc-900/30 backdrop-blur-sm ring-1 ring-white/10 dark:ring-white/5 shadow-2xl transition-all">
-        <DialogHeader className="border-b border-white/10 mb-4 pb-3">
-          <DialogTitle className="text-lg font-semibold tracking-tight flex items-center gap-2">
-            <Edit className="w-4 h-4 text-white/60" /> Edit Task
-          </DialogTitle>
-        </DialogHeader>
+    <GlassModal open={open} onOpenChange={onOpenChange}>
+      <GlassModalContent className="max-w-lg">
+        <GlassModalHeader className="border-b border-muted/20 mb-4 pb-3">
+          <GlassModalTitle className="flex items-center gap-2">
+            <Edit className="w-4 h-4 text-muted-foreground" /> Edit Task
+          </GlassModalTitle>
+        </GlassModalHeader>
 
         {task && (
           <TaskDetailsForm
@@ -99,11 +98,11 @@ export function TaskDetailsDialog({
           />
         )}
 
-        <DialogFooter className="flex justify-between items-center mt-6 pt-3 border-t border-white/10">
+        <GlassModalFooter className="flex justify-between items-center mt-6 pt-3 border-t border-muted/20">
           <Button
             variant="ghost"
             onClick={handleDelete}
-            className="text-red-500 hover:text-red-600 hover:underline text-sm hover:bg-transparent p-0 h-auto"
+            className="text-destructive hover:text-destructive hover:underline text-sm hover:bg-transparent p-0 h-auto"
           >
             <Trash className="mr-2 h-4 w-4" />
             Delete
@@ -113,19 +112,19 @@ export function TaskDetailsDialog({
               type="button"
               variant="ghost"
               onClick={() => onOpenChange(false)}
-              className="text-white/60 hover:text-white text-sm"
+              className="text-muted-foreground hover:text-foreground text-sm"
             >
               Cancel
             </Button>
             <Button 
               onClick={handleSave}
-              className="w-full py-2 rounded-md bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition shadow"
+              className="w-full py-2 rounded-md bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition shadow"
             >
               Save Changes
             </Button>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </GlassModalFooter>
+      </GlassModalContent>
+    </GlassModal>
   );
 }
