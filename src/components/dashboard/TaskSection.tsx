@@ -17,6 +17,7 @@ interface TaskSectionProps {
   onTaskComplete: (id: string) => void;
   onTaskDelete: (id: string) => void;
   onUpdateTaskStatus: (id: string, status: "todo" | "inprogress" | "done") => void;
+  onUpdateTask: (task: Task) => void;
 }
 
 export function TaskSection({ 
@@ -24,7 +25,8 @@ export function TaskSection({
   onAddTask, 
   onTaskComplete, 
   onTaskDelete,
-  onUpdateTaskStatus
+  onUpdateTaskStatus,
+  onUpdateTask
 }: TaskSectionProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("list");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -41,17 +43,9 @@ export function TaskSection({
     setTaskDetailsOpen(true);
   };
 
-  // Handler for updating a task
+  // Handler for updating a task - now uses the real update function
   const handleUpdateTask = (updatedTask: Task) => {
-    // Update status if changed
-    if (updatedTask.status !== selectedTask?.status) {
-      onUpdateTaskStatus(updatedTask.id, updatedTask.status || "todo");
-    }
-    
-    // Update completion status if changed
-    if (updatedTask.completed !== selectedTask?.completed) {
-      onTaskComplete(updatedTask.id);
-    }
+    onUpdateTask(updatedTask);
   };
 
   return (

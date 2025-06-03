@@ -68,6 +68,7 @@ export function DashboardMainContent({
           onTaskComplete={onTaskComplete}
           onTaskDelete={onTaskDelete}
           onUpdateTaskStatus={onUpdateTaskStatus}
+          onUpdateTask={onUpdateTask}
         />
 
         {/* Reading List Section */}
