@@ -57,6 +57,27 @@ export type Database = {
         }
         Relationships: []
       }
+      categories: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       nonnegotiables: {
         Row: {
           created_at: string
@@ -310,6 +331,7 @@ export type Database = {
       }
       tasks: {
         Row: {
+          category_id: string | null
           completed: boolean | null
           content: string
           created_at: string
@@ -322,6 +344,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          category_id?: string | null
           completed?: boolean | null
           content: string
           created_at?: string
@@ -334,6 +357,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          category_id?: string | null
           completed?: boolean | null
           content?: string
           created_at?: string
@@ -346,6 +370,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tasks_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tasks_created_by_fkey"
             columns: ["created_by"]

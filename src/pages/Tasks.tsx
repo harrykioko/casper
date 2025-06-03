@@ -1,23 +1,30 @@
 
-import { useState } from "react";
-import { Plus, List, Columns, Check, Trash2, Wrench } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Plus, List, LayoutGrid } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
-// Mock data for the triage panel
-const mockTriageTasks = [
-  { id: 1, title: "Review project proposal", timeLeft: 45 },
-  { id: 2, title: "Send follow-up email", timeLeft: 120 },
-  { id: 3, title: "Update documentation", timeLeft: 200 },
-  { id: 4, title: "Schedule team meeting", timeLeft: 320 },
+// Mock data for the quick tasks panel
+const mockQuickTasks = [
+  { id: 1, title: "Review project proposal", completion: 75, urgency: "high" },
+  { id: 2, title: "Send follow-up email", completion: 25, urgency: "medium" },
+  { id: 3, title: "Update documentation", completion: 90, urgency: "low" },
+  { id: 4, title: "Schedule team meeting", completion: 50, urgency: "medium" },
 ];
 
 export default function Tasks() {
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [newTask, setNewTask] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus input on page load
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,167 +34,145 @@ export default function Tasks() {
     }
   };
 
-  const getTimeLeftProgress = (minutes: number) => {
-    const totalMinutes = 24 * 60; // 24 hours
-    return Math.max(0, (minutes / totalMinutes) * 100);
+  const getUrgencyColor = (urgency: string) => {
+    switch (urgency) {
+      case "high": return "bg-red-500";
+      case "medium": return "bg-orange-500";
+      case "low": return "bg-green-500";
+      default: return "bg-gray-400";
+    }
   };
 
-  const formatTimeLeft = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours > 0) {
-      return `${hours}h ${mins}m`;
-    }
-    return `${mins}m`;
+  const handleQuickTaskClick = (taskId: number) => {
+    console.log("Opening task details for:", taskId);
+    // Future: open details modal
   };
 
   return (
     <div className="min-h-screen p-6">
-      {/* Top-level glassmorphic container */}
-      <div className="max-w-7xl mx-auto">
-        <div className="glassmorphic rounded-xl p-6 space-y-6">
-          {/* Quick Add Input Bar */}
-          <form onSubmit={handleAddTask} className="w-full">
-            <div className="relative flex items-center gap-3 p-3 rounded-xl glassmorphic hover:ring-1 hover:ring-white/20 transition-all">
-              <Button
-                type="submit"
-                size="icon"
-                variant="ghost"
-                className="rounded-full h-8 w-8 flex-shrink-0 text-primary hover:bg-primary/10"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-              <Input
-                type="text"
-                placeholder="Add a new task..."
-                value={newTask}
-                onChange={(e) => setNewTask(e.target.value)}
-                className="border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none text-base placeholder:text-muted-foreground"
-              />
-            </div>
-          </form>
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Quick Add Input Bar */}
+        <form onSubmit={handleAddTask} className="w-full">
+          <div className="relative flex items-center gap-3 p-3 rounded-xl bg-muted/20 backdrop-blur-md border border-muted/30 hover:ring-1 hover:ring-white/20 transition-all">
+            <Button
+              type="submit"
+              size="icon"
+              variant="ghost"
+              className="rounded-full h-8 w-8 flex-shrink-0 text-primary hover:bg-primary/10"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+            <Input
+              ref={inputRef}
+              type="text"
+              placeholder="Add a task… (press Tab to enrich)"
+              value={newTask}
+              onChange={(e) => setNewTask(e.target.value)}
+              className="border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none text-base placeholder:text-muted-foreground"
+            />
+          </div>
+        </form>
 
-          {/* Main Content Area */}
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Left: Main Workspace (70% width) */}
-            <div className="flex-1 lg:w-[70%] space-y-4">
-              <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as "list" | "kanban")}>
-                <TabsList className="glassmorphic">
-                  <TabsTrigger value="list" className="flex items-center gap-2">
-                    <List className="h-4 w-4" />
-                    List View
-                  </TabsTrigger>
-                  <TabsTrigger value="kanban" className="flex items-center gap-2">
-                    <Columns className="h-4 w-4" />
-                    Kanban View
-                  </TabsTrigger>
-                </TabsList>
+        {/* View Toggle */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant={viewMode === "list" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("list")}
+            className={cn(
+              "flex items-center gap-2 rounded-full transition-all",
+              viewMode === "list" 
+                ? "bg-primary text-primary-foreground shadow-sm" 
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <List className="h-4 w-4" />
+            List View
+          </Button>
+          <Button
+            variant={viewMode === "kanban" ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("kanban")}
+            className={cn(
+              "flex items-center gap-2 rounded-full transition-all",
+              viewMode === "kanban" 
+                ? "bg-primary text-primary-foreground shadow-sm" 
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Kanban View
+          </Button>
+        </div>
 
-                <TabsContent value="list" className="mt-4">
-                  <Card className="glassmorphic border-muted/30">
-                    <CardContent className="p-6">
-                      <div className="text-center py-12 text-muted-foreground">
-                        <List className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p className="text-lg font-medium mb-2">Task List View</p>
-                        <p className="text-sm">Your tasks will appear here in a clean list format</p>
+        {/* Main Content Layout */}
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Left: Main Workspace (70% width) */}
+          <div className="flex-1 lg:w-[70%]">
+            <Card className="glassmorphic border-muted/30">
+              <CardContent className="p-8">
+                <div className="text-center py-16 text-muted-foreground">
+                  <div className="flex justify-center mb-6">
+                    <div className="relative">
+                      <div className="w-16 h-16 rounded-xl bg-muted/30 flex items-center justify-center">
+                        <div className="grid grid-cols-2 gap-1">
+                          <div className="w-2 h-2 rounded-sm bg-primary/60"></div>
+                          <div className="w-2 h-2 rounded-sm bg-muted-foreground/40"></div>
+                          <div className="w-2 h-2 rounded-sm bg-muted-foreground/40"></div>
+                          <div className="w-2 h-2 rounded-sm bg-muted-foreground/40"></div>
+                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-medium mb-2 text-foreground">You're all set</h3>
+                  <p className="text-sm">Add tasks to get started. ✨</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-                <TabsContent value="kanban" className="mt-4">
-                  <Card className="glassmorphic border-muted/30">
-                    <CardContent className="p-6">
-                      <div className="text-center py-12 text-muted-foreground">
-                        <Columns className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p className="text-lg font-medium mb-2">Kanban Board View</p>
-                        <p className="text-sm">Drag and drop your tasks across different columns</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
-            </div>
-
-            {/* Right: Triage Panel (30% width) */}
-            <div className="lg:w-[30%] lg:min-w-[320px]">
-              <Card className="glassmorphic border-muted/30 sticky top-6">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                    ⚡ Quick Tasks
-                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                      Auto-expire at midnight
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {mockTriageTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      className="glassmorphic rounded-lg p-3 space-y-2 hover:bg-muted/40 transition-colors"
-                    >
-                      {/* Task Title */}
-                      <div className="font-medium text-sm leading-tight">
+          {/* Right: Quick Tasks Panel (30% width) */}
+          <div className="lg:w-[30%] lg:min-w-[320px]">
+            <Card className="glassmorphic border-muted/30 sticky top-6">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  ⚡ Quick Tasks
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {mockQuickTasks.map((task) => (
+                  <div
+                    key={task.id}
+                    onClick={() => handleQuickTaskClick(task.id)}
+                    className="rounded-xl p-3 bg-muted/30 backdrop-blur border border-muted/30 hover:bg-muted/40 hover:shadow-sm transition-all duration-200 cursor-pointer group"
+                  >
+                    {/* Task Header */}
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="font-medium text-sm leading-tight flex-1">
                         {task.title}
                       </div>
-
-                      {/* Progress Bar */}
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center text-xs text-muted-foreground">
-                          <span>Time left: {formatTimeLeft(task.timeLeft)}</span>
-                          <span>{Math.round(getTimeLeftProgress(task.timeLeft))}%</span>
-                        </div>
-                        <div className="w-full bg-muted/30 rounded-full h-1.5">
-                          <div
-                            className={cn(
-                              "h-1.5 rounded-full transition-all duration-300",
-                              task.timeLeft < 60 ? "bg-destructive" :
-                              task.timeLeft < 180 ? "bg-orange-500" :
-                              "bg-primary"
-                            )}
-                            style={{ width: `${getTimeLeftProgress(task.timeLeft)}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Action Icons */}
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 rounded-full text-green-600 hover:bg-green-600/10"
-                        >
-                          <Check className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 rounded-full text-blue-600 hover:bg-blue-600/10"
-                        >
-                          <Wrench className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 rounded-full text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                      <div 
+                        className={cn("w-2 h-2 rounded-full flex-shrink-0 mt-1", getUrgencyColor(task.urgency))}
+                      />
                     </div>
-                  ))}
 
-                  {/* Empty State */}
-                  {mockTriageTasks.length === 0 && (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <div className="text-2xl mb-2">⚡</div>
-                      <p className="text-sm">No quick tasks yet</p>
-                      <p className="text-xs mt-1">Tasks added will appear here temporarily</p>
+                    {/* Completion Percentage */}
+                    <div className="text-xs text-muted-foreground">
+                      {task.completion}% complete
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+                  </div>
+                ))}
+
+                {/* Empty State */}
+                {mockQuickTasks.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <div className="text-2xl mb-2">⚡</div>
+                    <p className="text-sm">No quick tasks yet</p>
+                    <p className="text-xs mt-1">Tasks added will appear here temporarily</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </div>
