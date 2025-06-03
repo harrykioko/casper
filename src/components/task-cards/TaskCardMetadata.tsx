@@ -29,15 +29,9 @@ export function TaskCardMetadata({
 
   if (layout === "list") {
     return (
-      <div className={cn("flex items-center gap-2 flex-wrap", className)}>
+      <div className={cn("flex items-center gap-2 mt-1", className)}>
         <TaskCardPriority priority={priority} />
-        {priority && (project || scheduledFor) && (
-          <span className="text-muted-foreground">•</span>
-        )}
         <TaskCardProject project={project} />
-        {project && scheduledFor && (
-          <span className="text-muted-foreground">•</span>
-        )}
         <TaskCardDate scheduledFor={scheduledFor} />
       </div>
     );
@@ -45,12 +39,9 @@ export function TaskCardMetadata({
 
   // Kanban layout
   return (
-    <div className={cn("flex items-center justify-between gap-2", className)}>
+    <div className={cn("flex items-center justify-between gap-2 mt-1", className)}>
       <div className="flex items-center gap-2">
         <TaskCardDate scheduledFor={scheduledFor} />
-        {scheduledFor && project && (
-          <span className="text-muted-foreground">•</span>
-        )}
         <TaskCardProject project={project} />
       </div>
       <TaskCardPriority priority={priority} />

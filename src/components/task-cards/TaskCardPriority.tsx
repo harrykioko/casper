@@ -12,20 +12,32 @@ export function TaskCardPriority({ priority, className }: TaskCardPriorityProps)
   const getPriorityConfig = (priority: "low" | "medium" | "high") => {
     switch (priority) {
       case "high":
-        return { color: "bg-red-500", label: "P1" };
+        return { 
+          style: "bg-gradient-to-r from-[#FF6A79]/20 to-[#FF6A79]/10 text-[#FF6A79]", 
+          label: "P1" 
+        };
       case "medium":
-        return { color: "bg-orange-500", label: "P2" };
+        return { 
+          style: "bg-gradient-to-r from-[#FF8A65]/20 to-[#FF8A65]/10 text-[#FF8A65]", 
+          label: "P2" 
+        };
       case "low":
-        return { color: "bg-gray-400", label: "P3" };
+        return { 
+          style: "bg-gradient-to-r from-muted-foreground/20 to-muted-foreground/10 text-muted-foreground", 
+          label: "P3" 
+        };
     }
   };
 
   const config = getPriorityConfig(priority);
 
   return (
-    <div className={cn("flex items-center gap-1", className)}>
-      <div className={cn("w-2 h-2 rounded-full", config.color)} />
-      <span className="text-xs text-muted-foreground">{config.label}</span>
-    </div>
+    <span className={cn(
+      "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
+      config.style,
+      className
+    )}>
+      {config.label}
+    </span>
   );
 }

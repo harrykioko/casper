@@ -17,15 +17,12 @@ export function TaskCardDate({ scheduledFor, className }: TaskCardDateProps) {
   if (!formattedDate) return null;
 
   return (
-    <div className={cn(
-      "flex items-center gap-1 text-xs",
-      variant === "overdue" && "text-destructive",
-      variant === "today" && "text-primary",
-      variant === "default" && "text-muted-foreground",
+    <span className={cn(
+      "inline-flex items-center gap-1.5 rounded-full bg-muted/20 text-muted-foreground px-3 py-1 text-xs font-medium",
       className
     )}>
       <Calendar className="h-3 w-3" />
       <span>{formattedDate}</span>
-    </div>
+    </span>
   );
 }

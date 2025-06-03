@@ -15,19 +15,15 @@ export function TaskCardProject({ project, className }: TaskCardProjectProps) {
   if (!project) return null;
 
   return (
-    <Badge 
-      variant="outline"
-      className={cn(
-        "text-xs px-2 py-0.5 rounded-full bg-muted/50 border-muted/30 backdrop-blur-sm",
-        className
-      )}
-      style={{
-        borderColor: `${project.color}40`,
-        backgroundColor: `${project.color}10`,
-        color: project.color,
-      }}
-    >
+    <span className={cn(
+      "inline-flex items-center gap-1.5 rounded-full bg-muted/20 text-muted-foreground px-3 py-1 text-xs font-medium",
+      className
+    )}>
+      <div 
+        className="w-1.5 h-1.5 rounded-full" 
+        style={{ backgroundColor: project.color }}
+      />
       {project.name}
-    </Badge>
+    </span>
   );
 }
