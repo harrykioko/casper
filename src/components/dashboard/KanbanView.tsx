@@ -2,9 +2,12 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Task } from "@/hooks/useTasks";
-import { GripVertical, MoveHorizontal } from "lucide-react";
+import { MoveHorizontal } from "lucide-react";
 import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
 import { toast } from "@/hooks/use-toast";
+import { TaskCardContent } from "@/components/task-cards/TaskCardContent";
+import { TaskCardMetadata } from "@/components/task-cards/TaskCardMetadata";
+import { cn } from "@/lib/utils";
 
 interface KanbanViewProps { 
   tasks: Task[]; 
@@ -21,14 +24,12 @@ type KanbanColumn = {
 };
 
 export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskStatus, onTaskClick }: KanbanViewProps) {
-  // Define our columns
   const columns: KanbanColumn[] = [
     { id: "todo", title: "To Do" },
     { id: "inprogress", title: "In Progress" },
     { id: "done", title: "Done", emptyMessage: "Drag a task here to mark it complete" }
   ];
 
-  // Filter tasks for each column based on status
   const getColumnTasks = (columnId: "todo" | "inprogress" | "done") => {
     if (columnId === "todo") {
       return tasks.filter(task => !task.status || task.status === "todo");
@@ -36,24 +37,19 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
     return tasks.filter(task => task.status === columnId);
   };
 
-  // Handle drag end event
   const handleDragEnd = (result: any) => {
     const { destination, source, draggableId } = result;
 
-    // Return if dropped outside a valid droppable area
     if (!destination) return;
     
-    // Return if dropped in the same position
     if (
       destination.droppableId === source.droppableId &&
       destination.index === source.index
     ) return;
 
-    // Find the task being moved
     const task = tasks.find(t => t.id === draggableId);
     if (!task) return;
 
-    // Update task status based on destination column
     if (destination.droppableId !== source.droppableId) {
       const newStatus = destination.droppableId as "todo" | "inprogress" | "done";
       onUpdateTaskStatus(task.id, newStatus);
@@ -77,12 +73,12 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
                 ref={provided.innerRef}
                 {...provided.droppableProps}
                 className={cn(
-                  "flex flex-col glassmorphic rounded-lg p-4 space-y-2 relative",
+                  "flex flex-col rounded-xl p-4 shadow-sm bg-muted/30 backdrop-blur border border-muted/30 space-y-2 relative",
                   snapshot.isDraggingOver ? "ring-2 ring-primary/40" : ""
                 )}
                 style={{ minHeight: 250 }}
               >
-                <h3 className="font-medium mb-3 text-zinc-800 dark:text-white/90 flex items-center gap-1">
+                <h3 className="font-medium mb-3 text-foreground flex items-center gap-1">
                   {column.title}
                 </h3>
                 
@@ -99,8 +95,9 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
                           {...provided.draggableProps}
                           {...provided.dragHandleProps}
                           className={cn(
-                            "p-3 rounded-xl glassmorphic shadow-lg ring-1 ring-white/10 bg-white/5 backdrop-blur relative cursor-pointer",
-                            snapshot.isDragging ? "shadow-xl z-50" : ""
+                            "p-3 rounded-xl shadow-sm bg-muted/30 backdrop-blur border border-muted/30 relative cursor-pointer flex flex-col gap-1",
+                            snapshot.isDragging ? "shadow-xl z-50 ring-2 ring-primary/40" : "hover:bg-muted/40 hover:ring-1 hover:ring-muted/50",
+                            task.completed && "opacity-60"
                           )}
                           style={{
                             ...provided.draggableProps.style,
@@ -110,35 +107,39 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
                           }}
                           onClick={() => onTaskClick(task)}
                         >
-                          <div className="flex">
-                            <div className="flex-1">
-                              <p className="text-sm text-zinc-800 dark:text-white/90">{task.content}</p>
-                              {task.project && (
-                                <div className="flex items-center mt-2">
-                                  <div 
-                                    className="w-2 h-2 rounded-full mr-1"
-                                    style={{ backgroundColor: task.project.color }}
-                                  />
-                                  <span className="text-xs text-zinc-500 dark:text-white/60">{task.project.name}</span>
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex items-center">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation(); // Prevent opening the task dialog
-                                  onTaskComplete(task.id);
-                                }}
-                                className="h-6 w-6 rounded-full"
-                              >
-                                <span className="sr-only">Toggle completion</span>
-                                <div className={`w-4 h-4 rounded-full border ${task.completed ? 'bg-primary border-primary' : 'border-zinc-400 dark:border-white/60'}`} />
-                              </Button>
-                            </div>
+                          <div className="flex justify-between items-start gap-2">
+                            <TaskCardContent 
+                              content={task.content} 
+                              completed={task.completed}
+                              className="flex-1"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onTaskComplete(task.id);
+                              }}
+                              className="h-6 w-6 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <span className="sr-only">Toggle completion</span>
+                              <div className={cn(
+                                "w-4 h-4 rounded-full border-2",
+                                task.completed 
+                                  ? 'bg-primary border-primary' 
+                                  : 'border-muted-foreground hover:border-primary'
+                              )} />
+                            </Button>
                           </div>
-                          <div className="absolute top-2 right-2 cursor-grab opacity-30 hover:opacity-70">
+                          
+                          <TaskCardMetadata
+                            priority={task.priority}
+                            project={task.project}
+                            scheduledFor={task.scheduledFor}
+                            layout="kanban"
+                          />
+                          
+                          <div className="absolute top-2 right-2 cursor-grab opacity-30 hover:opacity-70 transition-opacity">
                             <MoveHorizontal className="h-3 w-3" />
                           </div>
                         </div>
@@ -154,9 +155,4 @@ export function KanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskSt
       </div>
     </DragDropContext>
   );
-}
-
-// Helper function to conditionally join class names
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(' ');
 }

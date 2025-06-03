@@ -1,11 +1,12 @@
 
 import { useState } from "react";
-import { Check, Clock, Trash } from "lucide-react";
+import { Check, Trash } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Task } from "@/hooks/useTasks";
+import { TaskCardContent } from "@/components/task-cards/TaskCardContent";
+import { TaskCardMetadata } from "@/components/task-cards/TaskCardMetadata";
 
 interface TaskListProps {
   tasks: Task[];
@@ -18,33 +19,32 @@ export function TaskList({ tasks, onTaskComplete, onTaskDelete, onTaskClick }: T
   const [showConfetti, setShowConfetti] = useState<string | null>(null);
   
   const handleComplete = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation(); // Stop event bubbling to prevent opening the task dialog
+    e.stopPropagation();
     setShowConfetti(id);
     onTaskComplete(id);
     
-    // Reset confetti after animation completes
     setTimeout(() => {
       setShowConfetti(null);
     }, 1000);
   };
 
   const handleDelete = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation(); // Stop event bubbling
+    e.stopPropagation();
     onTaskDelete(id);
   };
 
   const getPriorityColor = (priority?: "low" | "medium" | "high") => {
     switch (priority) {
       case "high": return "border-red-500";
-      case "medium": return "border-yellow-500";
-      case "low": return "border-green-500";
-      default: return "border-transparent";
+      case "medium": return "border-orange-500";
+      case "low": return "border-gray-400";
+      default: return "border-muted/30";
     }
   };
 
   if (tasks.length === 0) {
     return (
-      <div className="text-center py-12 text-zinc-500 dark:text-muted-foreground">
+      <div className="text-center py-12 text-muted-foreground">
         <p>No tasks yet. Try adding some!</p>
       </div>
     );
@@ -56,8 +56,8 @@ export function TaskList({ tasks, onTaskComplete, onTaskDelete, onTaskClick }: T
         <li 
           key={task.id}
           className={cn(
-            "group flex items-start p-3 rounded-lg hover:glassmorphic transition-all duration-200 cursor-pointer",
-            task.completed && "opacity-50"
+            "group flex items-start rounded-xl p-3 shadow-sm bg-muted/30 backdrop-blur border border-muted/30 hover:bg-muted/40 hover:ring-1 hover:ring-muted/50 transition-all duration-200 cursor-pointer",
+            task.completed && "opacity-60"
           )}
           onClick={() => onTaskClick(task)}
         >
@@ -66,7 +66,7 @@ export function TaskList({ tasks, onTaskComplete, onTaskDelete, onTaskClick }: T
               size="icon"
               variant="outline"
               className={cn(
-                "rounded-full h-6 w-6 mr-3 mt-0.5 check-pulse",
+                "rounded-full h-6 w-6 mr-3 mt-0.5 check-pulse border-2",
                 getPriorityColor(task.priority)
               )}
               onClick={(e) => handleComplete(e, task.id)}
@@ -88,34 +88,20 @@ export function TaskList({ tasks, onTaskComplete, onTaskDelete, onTaskClick }: T
               )}
             </Button>
           </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <p className={cn(
-                "text-zinc-800 dark:text-white",
-                task.completed && "line-through text-zinc-500 dark:text-muted-foreground"
-              )}>
-                {task.content}
-              </p>
-              {task.project && (
-                <Badge 
-                  variant="outline"
-                  className="text-xs border border-zinc-300 bg-zinc-100 dark:bg-white/10 text-zinc-700 dark:text-white text-sm px-2 rounded-full backdrop-blur-sm transition-transform hover:shadow hover:scale-[1.02]"
-                  style={{
-                    borderColor: task.project.color,
-                    color: task.project.color,
-                  }}
-                >
-                  {task.project.name}
-                </Badge>
-              )}
-            </div>
-            {task.scheduledFor && (
-              <div className="flex items-center text-xs text-zinc-500 dark:text-muted-foreground mt-1">
-                <Clock className="h-3 w-3 mr-1" />
-                {task.scheduledFor}
-              </div>
-            )}
+          
+          <div className="flex-1 flex flex-col gap-1">
+            <TaskCardContent 
+              content={task.content} 
+              completed={task.completed}
+            />
+            <TaskCardMetadata
+              priority={task.priority}
+              project={task.project}
+              scheduledFor={task.scheduledFor}
+              layout="list"
+            />
           </div>
+          
           <Button
             size="icon"
             variant="ghost"
