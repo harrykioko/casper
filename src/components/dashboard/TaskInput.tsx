@@ -3,22 +3,22 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Plus, Calendar, Tag, Folder } from "lucide-react";
+import { Plus } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface TaskInputProps {
   onAddTask: (task: string, isQuickTask?: boolean) => void;
-  isQuickTask?: boolean;
 }
 
-export function TaskInput({ onAddTask, isQuickTask = true }: TaskInputProps) {
+export function TaskInput({ onAddTask }: TaskInputProps) {
   const [task, setTask] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (task.trim()) {
-      onAddTask(task, isQuickTask);
+      // Always create quick tasks from Dashboard input
+      onAddTask(task, true);
       setTask("");
     }
   };
@@ -54,35 +54,6 @@ export function TaskInput({ onAddTask, isQuickTask = true }: TaskInputProps) {
         onFocus={() => setIsFocused(true)}
         onBlur={() => setIsFocused(false)}
       />
-      
-      {isFocused && !isQuickTask && (
-        <div className="flex gap-1">
-          <Button 
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 rounded-full text-zinc-500 dark:text-white/60 hover:text-[#FF6A79] dark:hover:text-[#FF6A79]"
-          >
-            <Folder className="h-4 w-4" />
-          </Button>
-          <Button 
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 rounded-full text-zinc-500 dark:text-white/60 hover:text-[#415AFF] dark:hover:text-[#415AFF]"
-          >
-            <Tag className="h-4 w-4" />
-          </Button>
-          <Button 
-            type="button"
-            size="icon"
-            variant="ghost"
-            className="h-8 w-8 rounded-full text-zinc-500 dark:text-white/60 hover:text-[#FF6A79] dark:hover:text-[#FF6A79]"
-          >
-            <Calendar className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
     </form>
   );
 }
