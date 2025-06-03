@@ -53,9 +53,7 @@ export function AddLinkDialog({ open, onOpenChange, onAddLink }: AddLinkDialogPr
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSubmit = async () => {
     if (!url) return;
 
     try {
@@ -117,6 +115,11 @@ export function AddLinkDialog({ open, onOpenChange, onAddLink }: AddLinkDialogPr
     }
   };
 
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSubmit();
+  };
+
   return (
     <GlassModal open={open} onOpenChange={onOpenChange}>
       <GlassModalContent className="max-w-lg">
@@ -126,7 +129,7 @@ export function AddLinkDialog({ open, onOpenChange, onAddLink }: AddLinkDialogPr
           </GlassModalTitle>
         </GlassModalHeader>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleFormSubmit} className="space-y-4">
           <div className="relative">
             <Input
               placeholder="Enter URL (https://...)"
@@ -180,31 +183,31 @@ export function AddLinkDialog({ open, onOpenChange, onAddLink }: AddLinkDialogPr
               </div>
             </div>
           )}
-          
-          <GlassModalFooter>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => onOpenChange(false)}
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
-            <Button 
-              type="submit" 
-              disabled={!url || isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                "Add Link"
-              )}
-            </Button>
-          </GlassModalFooter>
         </form>
+
+        <GlassModalFooter>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => onOpenChange(false)}
+            disabled={isLoading}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit}
+            disabled={!url || isLoading}
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              "Add Link"
+            )}
+          </Button>
+        </GlassModalFooter>
       </GlassModalContent>
     </GlassModal>
   );
