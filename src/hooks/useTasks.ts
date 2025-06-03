@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Database } from '@/integrations/supabase/types';
@@ -16,29 +17,33 @@ export interface Task {
     color: string;
   };
   priority?: "low" | "medium" | "high";
+  category?: string;
   scheduledFor?: string;
   status?: "todo" | "inprogress" | "done";
   created_at?: string;
   updated_at?: string;
   created_by?: string;
   project_id?: string;
+  category_id?: string;
   is_quick_task?: boolean;
 }
 
 // Transform database row to frontend Task type
-const transformTask = (row: TaskRow & { project?: any }): Task => {
+const transformTask = (row: TaskRow & { project?: any; category?: any }): Task => {
   return {
     id: row.id,
     content: row.content,
     completed: row.completed || false,
     project: row.project,
     priority: (row.priority as "low" | "medium" | "high") || undefined,
+    category: row.category?.name || undefined,
     scheduledFor: row.scheduled_for || undefined,
     status: (row.status as "todo" | "inprogress" | "done") || "todo",
     created_at: row.created_at,
     updated_at: row.updated_at,
     created_by: row.created_by || undefined,
     project_id: row.project_id || undefined,
+    category_id: row.category_id || undefined,
     is_quick_task: row.is_quick_task || false
   };
 };
@@ -60,6 +65,13 @@ const transformTaskForDatabase = (taskData: any): any => {
     dbData.is_quick_task = taskData.isQuickTask;
     delete dbData.isQuickTask;
   }
+  if (taskData.categoryId !== undefined) {
+    dbData.category_id = taskData.categoryId;
+    delete dbData.categoryId;
+  }
+  
+  // Remove frontend-only fields
+  delete dbData.category;
   
   return dbData;
 };
@@ -76,7 +88,8 @@ export function useTasks() {
           .from('tasks')
           .select(`
             *,
-            project:projects(id, name, color)
+            project:projects(id, name, color),
+            category:categories(id, name)
           `)
           .order('created_at', { ascending: false });
 
@@ -111,7 +124,8 @@ export function useTasks() {
       })
       .select(`
         *,
-        project:projects(id, name, color)
+        project:projects(id, name, color),
+        category:categories(id, name)
       `)
       .single();
 
@@ -132,7 +146,8 @@ export function useTasks() {
       .eq('id', id)
       .select(`
         *,
-        project:projects(id, name, color)
+        project:projects(id, name, color),
+        category:categories(id, name)
       `)
       .single();
 

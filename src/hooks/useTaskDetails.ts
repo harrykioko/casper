@@ -15,6 +15,10 @@ interface UseTaskDetailsReturn {
   setScheduledFor: (date: Date | undefined) => void;
   selectedProject: Task["project"] | undefined;
   setSelectedProject: (project: Task["project"] | undefined) => void;
+  priority: "low" | "medium" | "high" | undefined;
+  setPriority: (priority: "low" | "medium" | "high" | undefined) => void;
+  category: string | undefined;
+  setCategory: (category: string | undefined) => void;
   resetForm: () => void;
   createUpdatedTask: () => Task | null;
 }

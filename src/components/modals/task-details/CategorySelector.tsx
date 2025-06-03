@@ -34,7 +34,7 @@ export function CategorySelector({ selectedCategory, setSelectedCategory }: Cate
         </SelectTrigger>
         <SelectContent className="bg-popover backdrop-blur-md border border-muted/40 z-50">
           {categories.map((category) => (
-            <SelectItem key={category.id} value={category.id}>
+            <SelectItem key={category.id} value={category.name}>
               {category.name}
             </SelectItem>
           ))}
