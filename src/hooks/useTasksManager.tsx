@@ -1,10 +1,11 @@
+
 import { useTasks } from './useTasks';
 
 export function useTasksManager() {
   const { tasks, createTask, updateTask, deleteTask } = useTasks();
   
-  const handleAddTask = (content: string) => {
-    createTask({ content });
+  const handleAddTask = (content: string, isQuickTask: boolean = false) => {
+    createTask({ content, is_quick_task: isQuickTask });
   };
   
   const handleCompleteTask = (id: string) => {
@@ -12,7 +13,9 @@ export function useTasksManager() {
     if (task) {
       updateTask(id, { 
         completed: !task.completed,
-        status: !task.completed ? 'done' : 'todo'
+        status: !task.completed ? 'done' : 'todo',
+        // Convert quick task to regular task when completed
+        is_quick_task: task.completed ? task.is_quick_task : false
       });
     }
   };
@@ -24,12 +27,15 @@ export function useTasksManager() {
   const handleUpdateTaskStatus = (id: string, status: "todo" | "inprogress" | "done") => {
     updateTask(id, { 
       status,
-      completed: status === 'done'
+      completed: status === 'done',
+      // Convert quick task to regular task when status is changed
+      is_quick_task: false
     });
   };
 
   const handleUpdateTask = (updatedTask: any) => {
-    updateTask(updatedTask.id, updatedTask);
+    // Convert quick task to regular task when edited
+    updateTask(updatedTask.id, { ...updatedTask, is_quick_task: false });
   };
 
   return {

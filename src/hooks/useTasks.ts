@@ -22,6 +22,7 @@ export interface Task {
   updated_at?: string;
   created_by?: string;
   project_id?: string;
+  is_quick_task?: boolean;
 }
 
 // Transform database row to frontend Task type
@@ -37,7 +38,8 @@ const transformTask = (row: TaskRow & { project?: any }): Task => {
     created_at: row.created_at,
     updated_at: row.updated_at,
     created_by: row.created_by || undefined,
-    project_id: row.project_id || undefined
+    project_id: row.project_id || undefined,
+    is_quick_task: row.is_quick_task || false
   };
 };
 
@@ -53,6 +55,10 @@ const transformTaskForDatabase = (taskData: any): any => {
   if (taskData.projectId !== undefined) {
     dbData.project_id = taskData.projectId;
     delete dbData.projectId;
+  }
+  if (taskData.isQuickTask !== undefined) {
+    dbData.is_quick_task = taskData.isQuickTask;
+    delete dbData.isQuickTask;
   }
   
   return dbData;

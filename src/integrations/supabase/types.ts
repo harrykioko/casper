@@ -337,6 +337,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          is_quick_task: boolean | null
           priority: string | null
           project_id: string | null
           scheduled_for: string | null
@@ -350,6 +351,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_quick_task?: boolean | null
           priority?: string | null
           project_id?: string | null
           scheduled_for?: string | null
@@ -363,6 +365,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          is_quick_task?: boolean | null
           priority?: string | null
           project_id?: string | null
           scheduled_for?: string | null

@@ -6,14 +6,19 @@ import { cn } from "@/lib/utils";
 import { Plus, Calendar, Tag, Folder } from "lucide-react";
 import { motion } from "framer-motion";
 
-export function TaskInput({ onAddTask }: { onAddTask: (task: string) => void }) {
+interface TaskInputProps {
+  onAddTask: (task: string, isQuickTask?: boolean) => void;
+  isQuickTask?: boolean;
+}
+
+export function TaskInput({ onAddTask, isQuickTask = true }: TaskInputProps) {
   const [task, setTask] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (task.trim()) {
-      onAddTask(task);
+      onAddTask(task, isQuickTask);
       setTask("");
     }
   };
@@ -50,7 +55,7 @@ export function TaskInput({ onAddTask }: { onAddTask: (task: string) => void }) 
         onBlur={() => setIsFocused(false)}
       />
       
-      {isFocused && (
+      {isFocused && !isQuickTask && (
         <div className="flex gap-1">
           <Button 
             type="button"

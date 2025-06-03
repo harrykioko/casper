@@ -8,14 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
-
-// Mock data for the quick tasks panel
-const mockQuickTasks = [
-  { id: 1, title: "Review project proposal" },
-  { id: 2, title: "Send follow-up email" },
-  { id: 3, title: "Update documentation" },
-  { id: 4, title: "Schedule team meeting" },
-];
+import { useTasksManager } from "@/hooks/useTasksManager";
+import { TaskSection } from "@/components/dashboard/TaskSection";
 
 export default function Tasks() {
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
@@ -24,6 +18,19 @@ export default function Tasks() {
   const [priorityFilter, setPriorityFilter] = useState("all");
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const {
+    tasks,
+    handleAddTask,
+    handleCompleteTask,
+    handleDeleteTask,
+    handleUpdateTaskStatus,
+    handleUpdateTask
+  } = useTasksManager();
+
+  // Filter tasks into quick tasks and regular tasks
+  const quickTasks = tasks.filter(task => task.is_quick_task);
+  const regularTasks = tasks.filter(task => !task.is_quick_task);
+
   // Auto-focus input on page load
   useEffect(() => {
     if (inputRef.current) {
@@ -31,10 +38,10 @@ export default function Tasks() {
     }
   }, []);
 
-  const handleAddTask = (e: React.FormEvent) => {
+  const handleAddQuickTask = (e: React.FormEvent) => {
     e.preventDefault();
     if (newTask.trim()) {
-      console.log("Adding task:", newTask);
+      handleAddTask(newTask, true); // Create as quick task
       setNewTask("");
     }
   };
@@ -57,7 +64,7 @@ export default function Tasks() {
       <div className="min-h-screen p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Quick Add Input Bar */}
-          <form onSubmit={handleAddTask} className="w-full">
+          <form onSubmit={handleAddQuickTask} className="w-full">
             <div className="relative flex items-center gap-3 p-3 rounded-xl bg-muted/20 backdrop-blur-md border border-muted/30 hover:ring-1 hover:ring-white/20 transition-all">
               <Button
                 type="submit"
@@ -70,7 +77,7 @@ export default function Tasks() {
               <Input
                 ref={inputRef}
                 type="text"
-                placeholder="Add a task… (press Tab to enrich)"
+                placeholder="Add a quick task… (press Tab to enrich)"
                 value={newTask}
                 onChange={(e) => setNewTask(e.target.value)}
                 className="border-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none text-base placeholder:text-muted-foreground"
@@ -188,26 +195,40 @@ export default function Tasks() {
 
           {/* Main Content Layout */}
           <div className="flex flex-col lg:flex-row gap-6">
-            {/* Left: Main Workspace (70% width) */}
+            {/* Left: Main Tasks (70% width) */}
             <div className="flex-1 lg:w-[70%]">
               <Card className="glassmorphic border-muted/30">
-                <CardContent className="p-8">
-                  <div className="text-center py-16 text-muted-foreground">
-                    <div className="flex justify-center mb-6">
-                      <div className="relative">
-                        <div className="w-16 h-16 rounded-xl bg-muted/30 flex items-center justify-center">
-                          <div className="grid grid-cols-2 gap-1">
-                            <div className="w-2 h-2 rounded-sm bg-primary/60"></div>
-                            <div className="w-2 h-2 rounded-sm bg-muted-foreground/40"></div>
-                            <div className="w-2 h-2 rounded-sm bg-muted-foreground/40"></div>
-                            <div className="w-2 h-2 rounded-sm bg-muted-foreground/40"></div>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg font-semibold">Tasks</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {regularTasks.length > 0 ? (
+                    <TaskSection
+                      tasks={regularTasks}
+                      onAddTask={(content) => handleAddTask(content, false)}
+                      onTaskComplete={handleCompleteTask}
+                      onTaskDelete={handleDeleteTask}
+                      onUpdateTaskStatus={handleUpdateTaskStatus}
+                      onUpdateTask={handleUpdateTask}
+                    />
+                  ) : (
+                    <div className="text-center py-16 text-muted-foreground">
+                      <div className="flex justify-center mb-6">
+                        <div className="relative">
+                          <div className="w-16 h-16 rounded-xl bg-muted/30 flex items-center justify-center">
+                            <div className="grid grid-cols-2 gap-1">
+                              <div className="w-2 h-2 rounded-sm bg-primary/60"></div>
+                              <div className="w-2 h-2 rounded-sm bg-muted-foreground/40"></div>
+                              <div className="w-2 h-2 rounded-sm bg-muted-foreground/40"></div>
+                              <div className="w-2 h-2 rounded-sm bg-muted-foreground/40"></div>
+                            </div>
                           </div>
                         </div>
                       </div>
+                      <h3 className="text-lg font-medium mb-2 text-foreground">No tasks yet</h3>
+                      <p className="text-sm">Add tasks to get started. ✨</p>
                     </div>
-                    <h3 className="text-lg font-medium mb-2 text-foreground">You're all set</h3>
-                    <p className="text-sm">Add tasks to get started. ✨</p>
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -219,27 +240,49 @@ export default function Tasks() {
                   <CardTitle className="text-lg font-semibold flex items-center gap-2">
                     ⚡ Quick Tasks
                   </CardTitle>
-                  <p className="text-sm text-muted-foreground">Auto-expire at midnight</p>
+                  <p className="text-sm text-muted-foreground">Quick capture for triage</p>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {mockQuickTasks.map((task) => (
-                    <div
-                      key={task.id}
-                      onClick={() => handleQuickTaskClick(task.id)}
-                      className="rounded-xl p-4 bg-muted/30 backdrop-blur border border-muted/30 hover:bg-muted/40 hover:shadow-md hover:scale-[1.01] transition-all duration-200 cursor-pointer"
-                    >
-                      <div className="font-medium text-sm leading-tight text-foreground">
-                        {task.title}
+                  {quickTasks.length > 0 ? (
+                    quickTasks.map((task) => (
+                      <div
+                        key={task.id}
+                        className="rounded-xl p-4 bg-muted/30 backdrop-blur border border-muted/30 hover:bg-muted/40 hover:shadow-md hover:scale-[1.01] transition-all duration-200 cursor-pointer"
+                      >
+                        <div className="font-medium text-sm leading-tight text-foreground">
+                          {task.content}
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCompleteTask(task.id);
+                            }}
+                            className="h-6 px-2 text-xs"
+                          >
+                            Complete
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTask(task.id);
+                            }}
+                            className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-
-                  {/* Empty State */}
-                  {mockQuickTasks.length === 0 && (
+                    ))
+                  ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <div className="text-2xl mb-2">⚡</div>
                       <p className="text-sm">No quick tasks yet</p>
-                      <p className="text-xs mt-1">Tasks added will appear here temporarily</p>
+                      <p className="text-xs mt-1">Tasks added above will appear here for triage</p>
                     </div>
                   )}
                 </CardContent>
