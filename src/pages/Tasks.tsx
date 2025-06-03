@@ -10,6 +10,7 @@ import { QuickTaskInput } from "@/components/tasks/QuickTaskInput";
 import { ViewModeToggle } from "@/components/tasks/ViewModeToggle";
 import { TasksFilters } from "@/components/tasks/TasksFilters";
 import { TasksMainContent } from "@/components/tasks/TasksMainContent";
+import { TasksKanbanView } from "@/components/tasks/TasksKanbanView";
 import { QuickTasksPanel } from "@/components/tasks/QuickTasksPanel";
 import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
 
@@ -89,25 +90,52 @@ export default function Tasks() {
           />
 
           {/* Main Content Layout */}
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Left: Main Tasks (70% width) */}
-            <TasksMainContent
-              regularTasks={filteredRegularTasks}
-              onTaskComplete={handleCompleteTask}
-              onTaskDelete={handleDeleteTask}
-              onUpdateTaskStatus={handleUpdateTaskStatus}
-              onUpdateTask={handleUpdateTask}
-              onTaskClick={handleTaskClick}
-            />
+          {viewMode === "list" ? (
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Left: Main Tasks (70% width) */}
+              <TasksMainContent
+                regularTasks={filteredRegularTasks}
+                onTaskComplete={handleCompleteTask}
+                onTaskDelete={handleDeleteTask}
+                onUpdateTaskStatus={handleUpdateTaskStatus}
+                onUpdateTask={handleUpdateTask}
+                onTaskClick={handleTaskClick}
+              />
 
-            {/* Right: Quick Tasks Panel (30% width) */}
-            <QuickTasksPanel
-              quickTasks={quickTasks}
-              onTaskComplete={handleCompleteTask}
-              onTaskDelete={handleDeleteTask}
-              onTaskClick={handleTaskClick}
-            />
-          </div>
+              {/* Right: Quick Tasks Panel (30% width) */}
+              <QuickTasksPanel
+                quickTasks={quickTasks}
+                onTaskComplete={handleCompleteTask}
+                onTaskDelete={handleDeleteTask}
+                onTaskClick={handleTaskClick}
+              />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Quick Tasks Section for Kanban View */}
+              {quickTasks.length > 0 && (
+                <div className="w-full">
+                  <QuickTasksPanel
+                    quickTasks={quickTasks}
+                    onTaskComplete={handleCompleteTask}
+                    onTaskDelete={handleDeleteTask}
+                    onTaskClick={handleTaskClick}
+                  />
+                </div>
+              )}
+
+              {/* Kanban Board - Full Width */}
+              <div className="w-full">
+                <TasksKanbanView
+                  tasks={filteredRegularTasks}
+                  onTaskComplete={handleCompleteTask}
+                  onTaskDelete={handleDeleteTask}
+                  onUpdateTaskStatus={handleUpdateTaskStatus}
+                  onTaskClick={handleTaskClick}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Task Details Modal */}
           <TaskDetailsDialog
