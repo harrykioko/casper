@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Task } from "@/hooks/useTasks";
 
@@ -72,7 +73,8 @@ export function useTaskDetails({ task }: UseTaskDetailsProps): UseTaskDetailsRet
       status,
       completed: status === "done",
       project: selectedProject,
-      scheduledFor: scheduledFor ? scheduledFor.toISOString() : undefined
+      scheduledFor: scheduledFor ? scheduledFor.toISOString() : undefined,
+      is_quick_task: false // Always convert to a regular task when edited
     };
   };
   
