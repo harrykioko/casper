@@ -2,16 +2,20 @@
 import { useState } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useTasksManager } from "@/hooks/useTasksManager";
+import { Task } from "@/hooks/useTasks";
 import { QuickTaskInput } from "@/components/tasks/QuickTaskInput";
 import { ViewModeToggle } from "@/components/tasks/ViewModeToggle";
 import { TasksFilters } from "@/components/tasks/TasksFilters";
 import { TasksMainContent } from "@/components/tasks/TasksMainContent";
 import { QuickTasksPanel } from "@/components/tasks/QuickTasksPanel";
+import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
 
 export default function Tasks() {
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
   const [statusFilter, setStatusFilter] = useState("all");
   const [priorityFilter, setPriorityFilter] = useState("all");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
 
   const {
     tasks,
@@ -30,8 +34,14 @@ export default function Tasks() {
     handleAddTask(content, true); // Create as quick task
   };
 
-  const handleAddRegularTask = (content: string) => {
-    handleAddTask(content, false); // Create as regular task
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setIsTaskDetailsOpen(true);
+  };
+
+  const handleTaskDetailsClose = () => {
+    setIsTaskDetailsOpen(false);
+    setSelectedTask(null);
   };
 
   return (
@@ -57,11 +67,11 @@ export default function Tasks() {
             {/* Left: Main Tasks (70% width) */}
             <TasksMainContent
               regularTasks={regularTasks}
-              onAddTask={handleAddRegularTask}
               onTaskComplete={handleCompleteTask}
               onTaskDelete={handleDeleteTask}
               onUpdateTaskStatus={handleUpdateTaskStatus}
               onUpdateTask={handleUpdateTask}
+              onTaskClick={handleTaskClick}
             />
 
             {/* Right: Quick Tasks Panel (30% width) */}
@@ -69,8 +79,18 @@ export default function Tasks() {
               quickTasks={quickTasks}
               onTaskComplete={handleCompleteTask}
               onTaskDelete={handleDeleteTask}
+              onTaskClick={handleTaskClick}
             />
           </div>
+
+          {/* Task Details Modal */}
+          <TaskDetailsDialog
+            open={isTaskDetailsOpen}
+            onOpenChange={handleTaskDetailsClose}
+            task={selectedTask}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+          />
         </div>
       </div>
     </TooltipProvider>

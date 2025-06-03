@@ -1,24 +1,24 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TaskSection } from "@/components/dashboard/TaskSection";
+import { TaskList } from "@/components/dashboard/TaskList";
 import { Task } from "@/hooks/useTasks";
 
 interface TasksMainContentProps {
   regularTasks: Task[];
-  onAddTask: (content: string) => void;
   onTaskComplete: (id: string) => void;
   onTaskDelete: (id: string) => void;
   onUpdateTaskStatus: (id: string, status: "todo" | "inprogress" | "done") => void;
   onUpdateTask: (task: Task) => void;
+  onTaskClick: (task: Task) => void;
 }
 
 export function TasksMainContent({ 
   regularTasks, 
-  onAddTask, 
   onTaskComplete, 
   onTaskDelete, 
   onUpdateTaskStatus, 
-  onUpdateTask 
+  onUpdateTask,
+  onTaskClick
 }: TasksMainContentProps) {
   return (
     <div className="flex-1 lg:w-[70%]">
@@ -28,13 +28,11 @@ export function TasksMainContent({
         </CardHeader>
         <CardContent>
           {regularTasks.length > 0 ? (
-            <TaskSection
+            <TaskList
               tasks={regularTasks}
-              onAddTask={(content) => onAddTask(content)}
               onTaskComplete={onTaskComplete}
               onTaskDelete={onTaskDelete}
-              onUpdateTaskStatus={onUpdateTaskStatus}
-              onUpdateTask={onUpdateTask}
+              onTaskClick={onTaskClick}
             />
           ) : (
             <div className="text-center py-16 text-muted-foreground">
