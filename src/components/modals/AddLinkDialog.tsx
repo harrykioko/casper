@@ -1,21 +1,12 @@
 
-import { useState } from "react";
-import { LinkIcon, Loader2, ExternalLink } from "lucide-react";
+import { LinkIcon, Loader2 } from "lucide-react";
 import { GlassModal, GlassModalContent, GlassModalHeader, GlassModalTitle, GlassModalFooter } from "@/components/ui/GlassModal";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ReadingItem } from "@/types/readingItem";
-import { fetchLinkMetadata } from "@/hooks/useReadingItems";
+import { LinkMetadataPreview } from "./add-link/LinkMetadataPreview";
+import { LinkInputField } from "./add-link/LinkInputField";
+import { useAddLinkForm } from "@/hooks/useAddLinkForm";
 import { toast } from "sonner";
-
-interface LinkMetadata {
-  title: string;
-  description?: string;
-  image?: string;
-  favicon?: string;
-  hostname?: string;
-  url: string;
-}
 
 interface AddLinkDialogProps {
   open: boolean;
@@ -24,85 +15,24 @@ interface AddLinkDialogProps {
 }
 
 export function AddLinkDialog({ open, onOpenChange, onAddLink }: AddLinkDialogProps) {
-  const [url, setUrl] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [metadata, setMetadata] = useState<LinkMetadata | null>(null);
-  const [fetchingMetadata, setFetchingMetadata] = useState(false);
-
-  const resetForm = () => {
-    setUrl("");
-    setMetadata(null);
-    setIsLoading(false);
-    setFetchingMetadata(false);
-  };
-
-  const handleUrlChange = async (value: string) => {
-    setUrl(value);
-    setMetadata(null);
-
-    if (value && (value.startsWith('http://') || value.startsWith('https://'))) {
-      try {
-        setFetchingMetadata(true);
-        const fetchedMetadata = await fetchLinkMetadata(value);
-        setMetadata(fetchedMetadata);
-      } catch (error) {
-        console.error("Error fetching metadata:", error);
-      } finally {
-        setFetchingMetadata(false);
-      }
-    }
-  };
+  const {
+    url,
+    isLoading,
+    metadata,
+    fetchingMetadata,
+    setIsLoading,
+    resetForm,
+    handleUrlChange,
+    createLinkData,
+    validateUrl
+  } = useAddLinkForm();
 
   const handleSubmit = async () => {
-    if (!url) return;
-
-    try {
-      new URL(url);
-    } catch (e) {
-      toast.error("Please enter a valid URL");
-      return;
-    }
+    if (!validateUrl(url)) return;
 
     try {
       setIsLoading(true);
-      
-      let linkData: Omit<ReadingItem, 'id'>;
-      
-      if (metadata) {
-        linkData = {
-          url: metadata.url,
-          title: metadata.title,
-          description: metadata.description || null,
-          favicon: metadata.favicon || null,
-          image: metadata.image || null,
-          hostname: metadata.hostname || null,
-          isRead: false
-        };
-      } else {
-        try {
-          const urlObj = new URL(url);
-          linkData = {
-            url,
-            title: urlObj.hostname,
-            description: null,
-            favicon: null,
-            image: null,
-            hostname: urlObj.hostname,
-            isRead: false
-          };
-        } catch {
-          linkData = {
-            url,
-            title: url,
-            description: null,
-            favicon: null,
-            image: null,
-            hostname: null,
-            isRead: false
-          };
-        }
-      }
-
+      const linkData = createLinkData(url, metadata);
       onAddLink(linkData);
       toast.success("Link added to reading list");
       onOpenChange(false);
@@ -130,59 +60,14 @@ export function AddLinkDialog({ open, onOpenChange, onAddLink }: AddLinkDialogPr
         </GlassModalHeader>
         
         <form onSubmit={handleFormSubmit} className="space-y-4">
-          <div className="relative">
-            <Input
-              placeholder="Enter URL (https://...)"
-              value={url}
-              onChange={(e) => handleUrlChange(e.target.value)}
-              className="pr-10 focus-visible:ring-0 focus-visible:ring-offset-0 border-muted/30 focus-visible:border-muted/50 hover:border-muted/50 transition-colors"
-              disabled={isLoading}
-              autoFocus
-            />
-            {fetchingMetadata && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-              </div>
-            )}
-          </div>
+          <LinkInputField
+            url={url}
+            onUrlChange={handleUrlChange}
+            isLoading={isLoading}
+            fetchingMetadata={fetchingMetadata}
+          />
 
-          {metadata && (
-            <div className="rounded-lg border border-muted/30 p-3 bg-muted/10">
-              <div className="flex gap-3">
-                {(metadata.image || metadata.favicon) && (
-                  <div className="flex-shrink-0">
-                    <img 
-                      src={metadata.image || metadata.favicon} 
-                      alt=""
-                      className="w-12 h-12 rounded object-cover"
-                      onError={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        if (img.src === metadata.image && metadata.favicon) {
-                          img.src = metadata.favicon;
-                        } else {
-                          img.style.display = 'none';
-                        }
-                      }}
-                    />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium text-sm line-clamp-2">
-                    {metadata.title}
-                  </h4>
-                  {metadata.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2 mt-1">
-                      {metadata.description}
-                    </p>
-                  )}
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                    <ExternalLink className="h-3 w-3" />
-                    {metadata.hostname}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          {metadata && <LinkMetadataPreview metadata={metadata} />}
         </form>
 
         <GlassModalFooter>
