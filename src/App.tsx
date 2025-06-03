@@ -15,6 +15,7 @@ import { SidebarStateProvider, useSidebarState } from "@/contexts/SidebarStateCo
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import Tasks from "./pages/Tasks";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import Prompts from "./pages/Prompts";
@@ -93,6 +94,7 @@ const MainContent = () => {
       <AnimatePresence mode="wait">
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/tasks" element={<Tasks />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/prompts" element={<Prompts />} />

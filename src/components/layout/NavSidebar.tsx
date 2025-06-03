@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
+  List,
   FolderKanban, 
   MessageSquareText, 
   BookOpen
@@ -24,6 +25,12 @@ export function NavSidebar() {
       path: "/dashboard", 
       label: "Dashboard",
       active: location.pathname === "/dashboard" 
+    },
+    { 
+      icon: List, 
+      path: "/tasks", 
+      label: "Tasks",
+      active: location.pathname.startsWith("/tasks") 
     },
     { 
       icon: FolderKanban, 
