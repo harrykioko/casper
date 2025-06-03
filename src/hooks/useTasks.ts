@@ -49,7 +49,7 @@ const transformTask = (row: TaskRow & { project?: any; category?: any }): Task =
 };
 
 // Transform frontend Task data to database format
-const transformTaskForDatabase = (taskData: any): any => {
+export const transformTaskForDatabase = (taskData: any): any => {
   const dbData: any = { ...taskData };
   
   // Convert camelCase to snake_case

@@ -1,8 +1,10 @@
 
-import { useTasks } from './useTasks';
+import { useTasks, transformTaskForDatabase } from './useTasks';
+import { useCategories } from './useCategories';
 
 export function useTasksManager() {
   const { tasks, createTask, updateTask, deleteTask } = useTasks();
+  const { getCategoryIdByName } = useCategories();
   
   const handleAddTask = (content: string, isQuickTask: boolean = false) => {
     createTask({ content, is_quick_task: isQuickTask });
@@ -34,8 +36,25 @@ export function useTasksManager() {
   };
 
   const handleUpdateTask = (updatedTask: any) => {
-    // Convert quick task to regular task when edited
-    updateTask(updatedTask.id, { ...updatedTask, is_quick_task: false });
+    // Get category_id from category name if category exists
+    const categoryId = updatedTask.category ? getCategoryIdByName(updatedTask.category) : null;
+    
+    // Transform the frontend task object to database format
+    const dbTaskData = transformTaskForDatabase({
+      content: updatedTask.content,
+      status: updatedTask.status,
+      completed: updatedTask.completed,
+      priority: updatedTask.priority,
+      scheduledFor: updatedTask.scheduledFor,
+      project_id: updatedTask.project?.id || null,
+      category_id: categoryId,
+      is_quick_task: false // Always convert to regular task when edited
+    });
+
+    // Remove the id from the update data since it's used in the WHERE clause
+    const { id, ...updateData } = dbTaskData;
+    
+    updateTask(updatedTask.id, updateData);
   };
 
   return {
