@@ -12,6 +12,7 @@ import { CalendarTab } from "@/components/settings/CalendarTab";
 import { GitHubTab } from "@/components/settings/GitHubTab";
 import { AccountTab } from "@/components/settings/AccountTab";
 import { HabitsTab } from "@/components/settings/HabitsTab";
+import { CategoriesTab } from "@/components/settings/CategoriesTab";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -56,6 +57,7 @@ export default function Settings() {
             <TabsTrigger value="github">GitHub</TabsTrigger>
             <TabsTrigger value="account">Account</TabsTrigger>
             <TabsTrigger value="habits">Habits</TabsTrigger>
+            <TabsTrigger value="categories">Categories</TabsTrigger>
           </TabsList>
           
           <TabsContent value="appearance" className="space-y-6">
@@ -76,6 +78,10 @@ export default function Settings() {
           
           <TabsContent value="habits" className="space-y-6">
             <HabitsTab />
+          </TabsContent>
+          
+          <TabsContent value="categories" className="space-y-6">
+            <CategoriesTab />
           </TabsContent>
         </Tabs>
       </div>

@@ -36,6 +36,53 @@ export function useCategories() {
     fetchCategories();
   }, []);
 
+  const createCategory = async (name: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase
+      .from('categories')
+      .insert({
+        name,
+        created_by: user.id
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+    return data;
+  };
+
+  const updateCategory = async (id: string, name: string) => {
+    const { data, error } = await supabase
+      .from('categories')
+      .update({ name })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    setCategories(prev => 
+      prev.map(cat => cat.id === id ? data : cat)
+         .sort((a, b) => a.name.localeCompare(b.name))
+    );
+    return data;
+  };
+
+  const deleteCategory = async (id: string) => {
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    setCategories(prev => prev.filter(cat => cat.id !== id));
+  };
+
   const getCategoryIdByName = (categoryName: string): string | null => {
     const category = categories.find(cat => cat.name === categoryName);
     return category ? category.id : null;
@@ -44,6 +91,9 @@ export function useCategories() {
   return {
     categories,
     loading,
-    getCategoryIdByName
+    getCategoryIdByName,
+    createCategory,
+    updateCategory,
+    deleteCategory
   };
 }

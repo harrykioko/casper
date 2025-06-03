@@ -1,21 +1,26 @@
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCategories } from "@/hooks/useCategories";
 
 interface CategorySelectorProps {
   selectedCategory: string | undefined;
   setSelectedCategory: (category: string | undefined) => void;
 }
 
-const categories = [
-  { id: "work", name: "Work" },
-  { id: "personal", name: "Personal" },
-  { id: "health", name: "Health" },
-  { id: "learning", name: "Learning" },
-  { id: "creative", name: "Creative" },
-  { id: "social", name: "Social" }
-];
-
 export function CategorySelector({ selectedCategory, setSelectedCategory }: CategorySelectorProps) {
+  const { categories, loading } = useCategories();
+
+  if (loading) {
+    return (
+      <div className="space-y-1">
+        <label className="text-sm text-muted-foreground mb-1 block">Category</label>
+        <div className="w-full bg-muted/20 border border-muted/40 rounded-md text-base p-2 text-muted-foreground">
+          Loading categories...
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-1">
       <label className="text-sm text-muted-foreground mb-1 block">Category</label>
