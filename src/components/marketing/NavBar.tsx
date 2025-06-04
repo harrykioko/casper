@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Sun, Moon } from 'lucide-react';
 
 export default function NavBar() {
-  const { theme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const navLinks = [
@@ -28,17 +28,9 @@ export default function NavBar() {
           {/* Logo */}
           <motion.div
             whileHover={{ scale: 1.05 }}
-            className="flex items-center"
+            className="font-heading text-xl tracking-tight"
           >
-            <img 
-              src="/lovable-uploads/90a8f6b4-a090-4ae5-99fa-ec4f27894ebf.png"
-              alt="Casper"
-              className={`h-8 w-auto transition-all duration-300 ${
-                theme === 'dark' 
-                  ? 'brightness-0 invert' 
-                  : 'brightness-0'
-              }`}
-            />
+            Casper
           </motion.div>
 
           {/* Desktop Navigation */}
