@@ -6,22 +6,22 @@ import FeatureCard from './FeatureCard';
 export default function FeatureCarousel() {
   const features = [
     {
-      title: 'Quick-Add Tasks',
+      title: 'Instant Task Capture',
       description: 'Capture thoughts instantly with our lightning-fast task entry system.',
       icon: PlusCircle,
     },
     {
-      title: 'Command Palette',
+      title: 'Universal Command Bar',
       description: 'Navigate anywhere in seconds with keyboard-first commands.',
       icon: Terminal,
     },
     {
-      title: 'AI Prompt Library',
+      title: 'Context-Aware Prompts',
       description: 'Store and organize your most powerful prompts for instant access.',
       icon: Sparkles,
     },
     {
-      title: 'Reading List',
+      title: 'Smart Link Inbox',
       description: 'Save articles and resources with auto-generated metadata.',
       icon: BookOpen,
     },

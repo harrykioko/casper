@@ -48,12 +48,12 @@ export default function SocialProof() {
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1, duration: 0.5 }}
                 viewport={{ once: true }}
-                className="glass-card p-6 text-left"
+                className="rounded-xl shadow-sm p-4 bg-card"
               >
-                <p className="mb-4 italic">"{testimonial.quote}"</p>
+                <p className="mb-4 italic text-muted-foreground text-sm">"{testimonial.quote}"</p>
                 <div>
-                  <div className="font-semibold">{testimonial.author}</div>
-                  <div className="text-sm text-muted-foreground">{testimonial.title}</div>
+                  <div className="font-medium text-foreground">{testimonial.author}</div>
+                  <div className="text-xs text-muted-foreground">{testimonial.title}</div>
                 </div>
               </motion.div>
             ))}
@@ -68,8 +68,10 @@ export default function SocialProof() {
           viewport={{ once: true }}
           className="text-center"
         >
-          <p className="text-muted-foreground mb-8">Integrates with your favorite tools</p>
-          <div className="flex justify-center items-center gap-12 flex-wrap">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground text-center mb-2">
+            Connects with tools you already use
+          </h3>
+          <div className="flex justify-center items-center gap-x-6 flex-wrap">
             {integrations.map((integration, index) => (
               <motion.div
                 key={integration.name}
@@ -77,7 +79,8 @@ export default function SocialProof() {
                 whileInView={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.1, duration: 0.3 }}
                 viewport={{ once: true }}
-                className="flex flex-col items-center gap-2 text-2xl"
+                className="flex flex-col items-center gap-2 text-2xl grayscale hover:grayscale-0 transition-all"
+                style={{ maxHeight: '32px' }}
               >
                 <span>{integration.logo}</span>
                 <span className="text-sm text-muted-foreground">{integration.name}</span>

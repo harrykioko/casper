@@ -10,7 +10,7 @@ export default function Footer() {
   };
 
   return (
-    <footer className="py-16 border-t border-border/50">
+    <footer className="border-t border-border mt-16 pt-8 py-16">
       <div className="container mx-auto px-6">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-12">
           {/* Logo column */}
@@ -59,9 +59,9 @@ export default function Footer() {
           whileInView={{ opacity: 1 }}
           transition={{ duration: 0.5 }}
           viewport={{ once: true }}
-          className="pt-8 border-t border-border/50 text-center"
+          className="pt-8 border-t border-border/50"
         >
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground text-center">
             Made with ☕ in NYC • © 2024 Casper. All rights reserved.
           </p>
         </motion.div>

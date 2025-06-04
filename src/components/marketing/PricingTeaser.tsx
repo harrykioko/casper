@@ -60,7 +60,7 @@ export default function PricingTeaser() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1, duration: 0.5 }}
               viewport={{ once: true }}
-              className={`glass-card p-8 relative ${
+              className={`glass-card p-8 relative shadow-md hover:shadow-lg transition ${
                 plan.popular ? 'ring-2 ring-accent-blue' : ''
               }`}
             >
@@ -89,15 +89,15 @@ export default function PricingTeaser() {
                 ))}
               </ul>
 
-              <Button 
-                className={`w-full ${
-                  plan.popular 
-                    ? 'bg-accent-blue hover:bg-accent-blue/90' 
-                    : 'bg-transparent border border-accent-blue text-accent-blue hover:bg-accent-blue hover:text-white'
-                }`}
-              >
-                {plan.cta}
-              </Button>
+              {plan.popular ? (
+                <Button variant="default" size="lg" className="w-full">
+                  {plan.cta}
+                </Button>
+              ) : (
+                <Button variant="outline" size="lg" className="w-full">
+                  {plan.cta}
+                </Button>
+              )}
             </motion.div>
           ))}
         </div>

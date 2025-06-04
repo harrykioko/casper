@@ -10,17 +10,20 @@ export default function HeroSection() {
     ? '/lovable-uploads/a0bc704e-d639-40e2-ab50-7e92619df1f8.png'
     : '/lovable-uploads/cc17065c-ceb5-4257-8e5e-a393f4523c87.png';
 
-  const overlayClasses = theme === 'light'
-    ? 'bg-white/60 backdrop-blur-sm'
-    : 'bg-gradient-to-b from-black/50 to-black/80';
-
   return (
     <section 
       className="relative min-h-screen flex flex-col items-center justify-center text-center bg-cover bg-center"
       style={{ backgroundImage: `url(${backgroundImage})` }}
     >
       {/* Overlay */}
-      <div className={`absolute inset-0 ${overlayClasses}`} />
+      <div
+        className="absolute inset-0 z-0"
+        style={{
+          background: theme === 'light'
+            ? 'rgba(255,255,255,0.65)'
+            : 'linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0.8))'
+        }}
+      />
       
       {/* Content */}
       <div className="relative z-10 max-w-4xl mx-auto px-6">
@@ -39,7 +42,7 @@ export default function HeroSection() {
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-          className="mt-4 max-w-xl mx-auto text-lg md:text-2xl text-white/80"
+          className="mt-6 max-w-xl mx-auto text-lg md:text-2xl text-white/80"
         >
           One cockpit for tasks, prompts, and priorities — built for flow.
         </motion.h3>
@@ -51,16 +54,13 @@ export default function HeroSection() {
           transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
           className="mt-8 flex gap-4 justify-center flex-wrap"
         >
-          <Button 
-            size="lg" 
-            className="bg-accent-blue hover:bg-accent-blue/90 text-white px-8"
-          >
+          <Button variant="default" size="lg">
             Get Early Access
           </Button>
           <Button 
-            size="lg" 
             variant="ghost" 
-            className="text-white border border-white/20 hover:bg-white/10"
+            size="lg" 
+            className="text-muted-foreground hover:text-foreground"
           >
             Watch 60-sec demo
           </Button>

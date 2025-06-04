@@ -19,8 +19,8 @@ export default function FeatureCard({ title, description, icon: Icon, index }: F
       className="min-w-[240px] max-w-[240px] snap-center"
     >
       <div className="glass-card p-6 h-64 flex flex-col items-center justify-center text-center">
-        <div className="w-16 h-16 rounded-2xl bg-accent-blue/20 flex items-center justify-center mb-4">
-          <Icon className="h-8 w-8 text-accent-blue" />
+        <div className="mb-2">
+          <Icon className="h-6 w-6 text-accent-blue" />
         </div>
         
         <h3 className="font-heading text-lg mb-2">{title}</h3>
