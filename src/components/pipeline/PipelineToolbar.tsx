@@ -19,7 +19,9 @@ const sectors: SectorEnum[] = [
 
 export function PipelineToolbar({ filters, onFiltersChange, viewMode, onViewModeChange }: PipelineToolbarProps) {
   return (
-    <div className="flex items-center justify-between gap-4 p-4 bg-white/10 dark:bg-slate-800/30 backdrop-blur-lg rounded-xl border border-white/20">
+    <div className="flex flex-wrap gap-4 items-center sticky top-24 z-20 
+                    bg-background/80 backdrop-blur rounded-xl px-4 py-3 w-full
+                    border border-white/20 shadow-lg">
       <div className="flex items-center gap-3 flex-1">
         {/* Search */}
         <div className="relative flex-1 max-w-sm">

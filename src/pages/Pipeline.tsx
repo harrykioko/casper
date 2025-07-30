@@ -4,10 +4,11 @@ import { PipelineViewMode, PipelineFilters, PipelineCompany } from '@/types/pipe
 import { usePipeline } from '@/hooks/usePipeline';
 import { NewPipelineInput } from '@/components/pipeline/NewPipelineInput';
 import { PipelineToolbar } from '@/components/pipeline/PipelineToolbar';
-import { PipelineSummary } from '@/components/pipeline/PipelineSummary';
+import { SummaryBox } from '@/components/pipeline/SummaryBox';
 import { ActiveDealsSidebar } from '@/components/pipeline/ActiveDealsSidebar';
 import { PipelineBoard } from '@/components/pipeline/PipelineBoard';
 import { PipelineDetailModal } from '@/components/pipeline/PipelineDetailModal';
+import { PipelineLayout } from '@/components/pipeline/PipelineLayout';
 import { DashboardLoading } from '@/components/dashboard/DashboardLoading';
 
 export default function Pipeline() {
@@ -46,34 +47,16 @@ export default function Pipeline() {
   const activeDeals = companies.filter(c => c.status === 'active');
   const stats = getStats();
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="h-screen flex flex-col bg-gradient-to-br from-background to-muted"
-    >
-      {/* Header */}
-      <div className="border-b border-white/10 bg-white/5 backdrop-blur-sm">
-        <div className="p-6 space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold">Pipeline</h1>
-            <p className="text-muted-foreground">Track and manage your deal flow</p>
-          </div>
-
-          <NewPipelineInput />
-          <PipelineSummary stats={stats} />
-          <PipelineToolbar
-            filters={filters}
-            onFiltersChange={setFilters}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-          />
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+  const boardContent = (
+    <>
+      <NewPipelineInput />
+      <PipelineToolbar
+        filters={filters}
+        onFiltersChange={setFilters}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+      />
+      <div className="overflow-x-auto">
         <PipelineBoard
           companies={companies}
           viewMode={viewMode}
@@ -81,11 +64,51 @@ export default function Pipeline() {
           onCardClick={setSelectedCompany}
           onStatusChange={handleStatusChange}
         />
+      </div>
+    </>
+  );
+
+  const sidebarContent = (
+    <>
+      <SummaryBox stats={stats} />
+      <ActiveDealsSidebar
+        activeDeals={activeDeals}
+        onCardClick={setSelectedCompany}
+      />
+    </>
+  );
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="min-h-screen bg-gradient-to-br from-background to-muted"
+    >
+      {/* Header */}
+      <div className="border-b border-white/10 bg-white/5 backdrop-blur-sm">
+        <div className="p-6">
+          <div>
+            <h1 className="text-3xl font-bold">Pipeline</h1>
+            <p className="text-muted-foreground">Track and manage your deal flow</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="p-6">
+        {/* Desktop Layout */}
+        <div className="hidden lg:block">
+          <PipelineLayout board={boardContent} sidebar={sidebarContent} />
+        </div>
         
-        <ActiveDealsSidebar
-          activeDeals={activeDeals}
-          onCardClick={setSelectedCompany}
-        />
+        {/* Mobile Layout */}
+        <div className="lg:hidden space-y-6">
+          {boardContent}
+          <div className="space-y-6">
+            {sidebarContent}
+          </div>
+        </div>
       </div>
 
       {/* Detail Modal */}

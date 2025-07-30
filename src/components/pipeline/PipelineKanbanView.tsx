@@ -30,14 +30,13 @@ function DraggableCard({ company, onCardClick }: { company: PipelineCompany; onC
     <div
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
       className={isDragging ? 'opacity-50' : ''}
     >
       <PipelineCard
         company={company}
         onClick={() => onCardClick(company)}
         isDragging={isDragging}
+        dragHandleProps={{ ...listeners, ...attributes }}
       />
     </div>
   );
@@ -96,17 +95,19 @@ function KanbanColumn({
 
 export function PipelineKanbanView({ companies, onCardClick }: PipelineKanbanViewProps) {
   return (
-    <div className="flex gap-6 h-full p-6">
-      {columns.map((column) => (
-        <KanbanColumn
-          key={column.id}
-          id={column.id}
-          title={column.title}
-          color={column.color}
-          companies={companies.filter(c => c.status === column.id)}
-          onCardClick={onCardClick}
-        />
-      ))}
+    <div className="overflow-x-auto pr-4">
+      <div className="flex gap-6 h-full p-6 min-w-max">
+        {columns.map((column) => (
+          <KanbanColumn
+            key={column.id}
+            id={column.id}
+            title={column.title}
+            color={column.color}
+            companies={companies.filter(c => c.status === column.id)}
+            onCardClick={onCardClick}
+          />
+        ))}
+      </div>
     </div>
   );
 }

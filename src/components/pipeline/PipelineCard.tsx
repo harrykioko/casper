@@ -2,12 +2,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PipelineCompany } from '@/types/pipeline';
 import { formatTaskDate } from '@/utils/dateUtils';
-import { ExternalLink, Calendar, DollarSign } from 'lucide-react';
+import { ExternalLink, Calendar, DollarSign, GripVertical } from 'lucide-react';
 
 interface PipelineCardProps {
   company: PipelineCompany;
   onClick: () => void;
   isDragging?: boolean;
+  dragHandleProps?: any;
 }
 
 const statusColors = {
@@ -29,7 +30,7 @@ const roundColors = {
   'Series F+': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300',
 };
 
-export function PipelineCard({ company, onClick, isDragging }: PipelineCardProps) {
+export function PipelineCard({ company, onClick, isDragging, dragHandleProps }: PipelineCardProps) {
   const statusBorderColor = statusColors[company.status as keyof typeof statusColors];
 
   return (
@@ -41,7 +42,21 @@ export function PipelineCard({ company, onClick, isDragging }: PipelineCardProps
     >
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <h3 className="font-semibold text-lg truncate pr-2">{company.company_name}</h3>
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          {/* Drag Handle */}
+          {dragHandleProps && (
+            <div 
+              {...dragHandleProps}
+              className="cursor-grab active:cursor-grabbing p-1 hover:bg-white/10 rounded transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GripVertical className="h-4 w-4 text-muted-foreground" />
+            </div>
+          )}
+          
+          <h3 className="font-semibold text-lg truncate flex-1">{company.company_name}</h3>
+        </div>
+        
         {company.website && (
           <Button
             variant="ghost"

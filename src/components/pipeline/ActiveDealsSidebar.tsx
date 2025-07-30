@@ -2,6 +2,7 @@ import { PipelineCompany } from '@/types/pipeline';
 import { PipelineCard } from './PipelineCard';
 import { useDroppable } from '@dnd-kit/core';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Card } from '@/components/ui/card';
 
 interface ActiveDealsSidebarProps {
   activeDeals: PipelineCompany[];
@@ -21,20 +22,21 @@ export function ActiveDealsSidebar({ activeDeals, onCardClick }: ActiveDealsSide
   });
 
   return (
-    <div className="w-80 bg-white/10 dark:bg-slate-800/30 backdrop-blur-lg border-l border-white/20">
-      <div className="p-4 border-b border-white/20">
+    <Card className="bg-white/15 dark:bg-slate-800/25 backdrop-blur-lg rounded-2xl shadow-2xl p-4 
+                     flex flex-col overflow-y-auto min-h-[calc(100vh-16rem)] border border-white/20">
+      <div className="p-2 border-b border-white/20 mb-4">
         <h2 className="font-semibold text-lg">Active Deals</h2>
         <p className="text-sm text-muted-foreground">{activeDeals.length} active</p>
       </div>
       
       <div
         ref={setNodeRef}
-        className={`h-full transition-colors duration-200 ${
+        className={`flex-1 transition-colors duration-200 ${
           isOver ? 'bg-emerald-500/10' : ''
         }`}
       >
-        <ScrollArea className="h-[calc(100vh-12rem)] p-4">
-          <div className="space-y-4">
+        <ScrollArea className="h-full">
+          <div className="space-y-4 p-2">
             {sortedDeals.length === 0 ? (
               <div className="text-center text-muted-foreground py-8">
                 <p>No active deals</p>
@@ -52,6 +54,6 @@ export function ActiveDealsSidebar({ activeDeals, onCardClick }: ActiveDealsSide
           </div>
         </ScrollArea>
       </div>
-    </div>
+    </Card>
   );
 }
