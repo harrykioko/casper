@@ -161,7 +161,10 @@ export function PipelineDetailModal({ company, isOpen, onClose }: PipelineDetail
               <Label htmlFor="sector">Sector</Label>
               <Select
                 value={formData.sector || ''}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, sector: value as SectorEnum }))}
+                onValueChange={(value) => setFormData(prev => ({ 
+                  ...prev, 
+                  sector: value === 'none' ? undefined : value as SectorEnum 
+                }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select sector" />

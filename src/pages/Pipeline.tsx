@@ -36,8 +36,7 @@ export default function Pipeline() {
   }, [viewMode]);
 
   const handleStatusChange = (companyId: string, newStatus: string) => {
-    // This will be handled by the usePipeline hook's optimistic updates
-    console.log(`Status changed for ${companyId}: ${newStatus}`);
+    // Optimistic updates are handled by the usePipeline hook
   };
 
   if (loading) {

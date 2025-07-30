@@ -75,6 +75,11 @@ export function PipelineBoard({
         await updateCompany(companyId, { status: 'active' });
         onStatusChange(companyId, 'active');
         
+        toast({
+          title: "Success",
+          description: `${company?.company_name} moved to Active Deals`,
+        });
+        
         // Analytics
         if ((window as any).gtag) {
           (window as any).gtag('event', 'pipeline_status_change', {
@@ -99,6 +104,11 @@ export function PipelineBoard({
       try {
         await updateCompany(companyId, { status: newStatus as any });
         onStatusChange(companyId, newStatus);
+        
+        toast({
+          title: "Success",
+          description: `${company?.company_name} moved to ${newStatus.replace('_', ' ')}`,
+        });
         
         // Analytics
         if ((window as any).gtag) {
