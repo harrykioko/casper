@@ -14,7 +14,7 @@ export function PipelineLayout({ board, sidebar }: PipelineLayoutProps) {
       </section>
       
       {/* Right Column - Sticky Sidebar */}
-      <aside className="w-80 border-l border-white/10 bg-white/5 backdrop-blur-sm sticky top-0 h-screen overflow-y-auto p-6 space-y-6">
+      <aside className="w-96 border-l border-white/10 bg-white/5 backdrop-blur-sm sticky top-0 h-screen overflow-y-auto p-6 space-y-6">
         {sidebar}
       </aside>
     </div>
