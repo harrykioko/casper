@@ -25,19 +25,21 @@ export function SummaryBox({
   };
 
   return (
-    <div className="glass bg-gradient-to-br from-white/25 via-white/10 to-white/0 dark:from-slate-700/40 dark:via-slate-800/30 dark:to-slate-900/10 rounded-2xl shadow-[0_8px_28px_-6px_rgba(0,0,0,0.25)] p-6 space-y-6 max-w-xs w-full">
+    <div className="glass bg-gradient-to-br from-white/25 via-white/10 to-white/0 dark:from-slate-700/40 dark:via-slate-800/30 dark:to-slate-900/10 rounded-2xl shadow-[0_8px_28px_-6px_rgba(0,0,0,0.25)] p-4 space-y-4 max-w-xs w-full">
       {/* Hero tile */}
-      <MetricTile
-        label="Total"
-        value={stats.total}
-        color={STATUS_META.total.color}
-        icon={STATUS_META.total.icon}
-        size="lg"
-        selected={false}
-      />
+      <div className="w-full">
+        <MetricTile
+          label="Total"
+          value={stats.total}
+          color={STATUS_META.total.color}
+          icon={STATUS_META.total.icon}
+          size="lg"
+          selected={false}
+        />
+      </div>
 
       {/* 3 × 2 grid for remaining six */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2">
         {[
           { key: 'active', meta: STATUS_META.active },
           { key: 'passed', meta: STATUS_META.passed },
