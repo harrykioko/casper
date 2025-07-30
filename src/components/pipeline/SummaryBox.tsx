@@ -1,41 +1,71 @@
-import { PipelineStats } from '@/types/pipeline';
-import { TrendingUp, TrendingDown, Clock, Share, Star, Gem, Plus } from 'lucide-react';
-import { Card } from '@/components/ui/card';
+import { PipelineStats, PipelineStatus } from '@/types/pipeline';
+import { MetricTile } from '@/components/pipeline/MetricTile';
+import { STATUS_META } from '@/lib/constants';
 
 interface SummaryBoxProps {
   stats: PipelineStats;
+  filterStatus?: PipelineStatus | null;
+  setFilterStatus?: (status: PipelineStatus | null) => void;
+  lastUpdated?: string;
+  totalActiveRaise?: number;
 }
 
-const statConfigs = [
-  { key: 'total', label: 'Total', icon: TrendingUp, color: 'text-foreground' },
-  { key: 'active', label: 'Active', icon: TrendingUp, color: 'text-emerald-500' },
-  { key: 'passed', label: 'Passed', icon: TrendingDown, color: 'text-rose-500' },
-  { key: 'to_share', label: 'To Share', icon: Share, color: 'text-amber-500' },
-  { key: 'interesting', label: 'Interesting', icon: Star, color: 'text-sky-500' },
-  { key: 'pearls', label: 'Pearls', icon: Gem, color: 'text-purple-500' },
-  { key: 'new', label: 'New', icon: Plus, color: 'text-slate-500' },
-] as const;
+export function SummaryBox({ 
+  stats, 
+  filterStatus, 
+  setFilterStatus, 
+  lastUpdated = 'now',
+  totalActiveRaise = 0 
+}: SummaryBoxProps) {
+  const handleTileClick = (status: string) => {
+    if (!setFilterStatus) return;
+    
+    const newStatus = filterStatus === status ? null : status as PipelineStatus;
+    setFilterStatus(newStatus);
+  };
 
-export function SummaryBox({ stats }: SummaryBoxProps) {
   return (
-    <Card className="bg-white/15 dark:bg-slate-800/25 backdrop-blur-lg rounded-2xl shadow-2xl p-6 border border-white/20">
-      <div className="mb-4">
-        <h2 className="text-lg font-semibold">Pipeline Summary</h2>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4">
-        {statConfigs.map(({ key, label, icon: Icon, color }) => (
-          <div key={key} className="text-center">
-            <div className={`text-2xl font-bold ${color}`}>
-              {stats[key as keyof PipelineStats]}
-            </div>
-            <div className="flex items-center justify-center gap-1 mt-1">
-              <Icon className={`h-3 w-3 ${color}`} />
-              <span className="text-xs text-muted-foreground">{label}</span>
-            </div>
-          </div>
+    <div className="glass bg-gradient-to-br from-white/25 via-white/10 to-white/0 dark:from-slate-700/40 dark:via-slate-800/30 dark:to-slate-900/10 rounded-2xl shadow-[0_8px_28px_-6px_rgba(0,0,0,0.25)] p-6 space-y-6 max-w-xs w-full">
+      {/* Hero tile */}
+      <MetricTile
+        label="Total"
+        value={stats.total}
+        color={STATUS_META.total.color}
+        icon={STATUS_META.total.icon}
+        size="lg"
+        selected={false}
+      />
+
+      {/* 3 × 2 grid for remaining six */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { key: 'active', meta: STATUS_META.active },
+          { key: 'passed', meta: STATUS_META.passed },
+          { key: 'to_share', meta: STATUS_META.to_share },
+          { key: 'interesting', meta: STATUS_META.interesting },
+          { key: 'pearls', meta: STATUS_META.pearls },
+          { key: 'new', meta: STATUS_META.new },
+        ].map(({ key, meta }) => (
+          <MetricTile
+            key={key}
+            label={meta.label}
+            value={stats[key as keyof PipelineStats]}
+            color={meta.color}
+            icon={meta.icon}
+            selected={filterStatus === key}
+            onClick={() => handleTileClick(key)}
+          />
         ))}
       </div>
-    </Card>
+
+      {/* Caption */}
+      <div className="text-xs text-muted-foreground pt-2 border-t border-white/10">
+        Last updated {lastUpdated} • {Intl.NumberFormat('en', { 
+          style: 'currency', 
+          currency: 'USD', 
+          notation: 'compact' 
+        }).format(totalActiveRaise)} in Active Deals
+      </div>
+    </div>
   );
 }

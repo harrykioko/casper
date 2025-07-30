@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { PipelineViewMode, PipelineFilters, PipelineCompany } from '@/types/pipeline';
+import { PipelineViewMode, PipelineFilters, PipelineCompany, PipelineStatus } from '@/types/pipeline';
 import { usePipeline } from '@/hooks/usePipeline';
 import { NewPipelineInput } from '@/components/pipeline/NewPipelineInput';
 import { PipelineToolbar } from '@/components/pipeline/PipelineToolbar';
@@ -23,6 +23,7 @@ export default function Pipeline() {
     sectors: [],
   });
   const [selectedCompany, setSelectedCompany] = useState<PipelineCompany | null>(null);
+  const [filterStatus, setFilterStatus] = useState<PipelineStatus | null>(null);
 
   // Persist view mode to localStorage
   useEffect(() => {
@@ -46,6 +47,11 @@ export default function Pipeline() {
 
   const activeDeals = companies.filter(c => c.status === 'active');
   const stats = getStats();
+  const totalActiveRaise = activeDeals.reduce((sum, deal) => sum + (deal.raise_amount_usd || 0), 0);
+  const lastUpdated = new Date().toLocaleTimeString('en-US', { 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  });
 
   const boardContent = (
     <>
@@ -70,7 +76,13 @@ export default function Pipeline() {
 
   const sidebarContent = (
     <>
-      <SummaryBox stats={stats} />
+      <SummaryBox 
+        stats={stats} 
+        filterStatus={filterStatus}
+        setFilterStatus={setFilterStatus}
+        lastUpdated={lastUpdated}
+        totalActiveRaise={totalActiveRaise}
+      />
       <ActiveDealsSidebar
         activeDeals={activeDeals}
         onCardClick={setSelectedCompany}

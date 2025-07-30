@@ -122,6 +122,11 @@
     @apply glass-surface rounded-2xl;
   }
 
+  /* Glass utility */
+  .glass {
+    @apply backdrop-blur-lg bg-white/15 dark:bg-slate-800/25;
+  }
+
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
