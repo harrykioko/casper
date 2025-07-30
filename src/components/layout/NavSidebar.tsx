@@ -6,7 +6,8 @@ import {
   List,
   FolderKanban, 
   MessageSquareText, 
-  BookOpen
+  BookOpen,
+  TrendingUp
 } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useSidebarState } from "@/contexts/SidebarStateContext";
@@ -49,6 +50,12 @@ export function NavSidebar() {
       path: "/reading-list", 
       label: "Reading List",
       active: location.pathname.startsWith("/reading-list") 
+    },
+    { 
+      icon: TrendingUp, 
+      path: "/pipeline", 
+      label: "Pipeline",
+      active: location.pathname.startsWith("/pipeline") 
     }
   ];
 

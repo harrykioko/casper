@@ -20,6 +20,7 @@ import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import Prompts from "./pages/Prompts";
 import ReadingList from "./pages/ReadingList";
+import Pipeline from "./pages/Pipeline";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import OAuthCallback from "./pages/OAuthCallback";
@@ -99,6 +100,7 @@ const MainContent = () => {
           <Route path="/projects/:id" element={<ProjectDetail />} />
           <Route path="/prompts" element={<Prompts />} />
           <Route path="/reading-list" element={<ReadingList />} />
+          <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
