@@ -166,9 +166,9 @@ export function PipelineDetailModal({ company, isOpen, onClose }: PipelineDetail
                 <SelectTrigger>
                   <SelectValue placeholder="Select sector" />
                 </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">No sector</SelectItem>
-                  {sectors.map(sector => (
+            <SelectContent>
+              <SelectItem value="none">No sector</SelectItem>
+              {sectors.map(sector => (
                     <SelectItem key={sector} value={sector}>{sector}</SelectItem>
                   ))}
                 </SelectContent>

@@ -38,7 +38,7 @@ export function PipelineToolbar({ filters, onFiltersChange, viewMode, onViewMode
           onValueChange={(value) => 
             onFiltersChange({ 
               ...filters, 
-              rounds: value ? [value as RoundEnum] : [] 
+              rounds: value && value !== 'all' ? [value as RoundEnum] : [] 
             })
           }
         >
@@ -46,7 +46,7 @@ export function PipelineToolbar({ filters, onFiltersChange, viewMode, onViewMode
             <SelectValue placeholder="Round" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Rounds</SelectItem>
+            <SelectItem value="all">All Rounds</SelectItem>
             {rounds.map(round => (
               <SelectItem key={round} value={round}>{round}</SelectItem>
             ))}
@@ -59,7 +59,7 @@ export function PipelineToolbar({ filters, onFiltersChange, viewMode, onViewMode
           onValueChange={(value) => 
             onFiltersChange({ 
               ...filters, 
-              sectors: value ? [value as SectorEnum] : [] 
+              sectors: value && value !== 'all' ? [value as SectorEnum] : [] 
             })
           }
         >
@@ -67,7 +67,7 @@ export function PipelineToolbar({ filters, onFiltersChange, viewMode, onViewMode
             <SelectValue placeholder="Sector" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Sectors</SelectItem>
+            <SelectItem value="all">All Sectors</SelectItem>
             {sectors.map(sector => (
               <SelectItem key={sector} value={sector}>{sector}</SelectItem>
             ))}
