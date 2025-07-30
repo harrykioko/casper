@@ -108,14 +108,17 @@ export default function Pipeline() {
       </div>
 
       {/* Main Content */}
-      <div className="p-6">
+      <div className="flex flex-1 min-h-0">
         {/* Desktop Layout */}
-        <div className="hidden lg:block">
-          <PipelineLayout board={boardContent} sidebar={sidebarContent} />
+        <div className="hidden lg:flex w-full">
+          <PipelineLayout 
+            board={<div className="p-6">{boardContent}</div>} 
+            sidebar={sidebarContent} 
+          />
         </div>
         
         {/* Mobile Layout */}
-        <div className="lg:hidden space-y-6">
+        <div className="lg:hidden w-full p-6 space-y-6">
           {boardContent}
           <div className="space-y-6">
             {sidebarContent}

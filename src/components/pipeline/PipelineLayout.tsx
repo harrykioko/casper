@@ -7,14 +7,14 @@ interface PipelineLayoutProps {
 
 export function PipelineLayout({ board, sidebar }: PipelineLayoutProps) {
   return (
-    <div className="grid lg:grid-cols-[4fr_1fr] gap-8 items-start">
-      {/* Left Column (80%) - Board Content */}
-      <section className="flex flex-col space-y-6 min-w-0">
+    <div className="flex w-full h-full">
+      {/* Left Column - Board Content */}
+      <section className="flex-1 min-w-0">
         {board}
       </section>
       
-      {/* Right Column (20%) - Sticky Sidebar */}
-      <aside className="hidden lg:flex flex-col sticky top-24 space-y-6 max-w-xs w-full">
+      {/* Right Column - Sticky Sidebar */}
+      <aside className="w-80 border-l border-white/10 bg-white/5 backdrop-blur-sm sticky top-0 h-screen overflow-y-auto p-6 space-y-6">
         {sidebar}
       </aside>
     </div>
