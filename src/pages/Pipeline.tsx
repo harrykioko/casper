@@ -12,7 +12,7 @@ import { PipelineLayout } from '@/components/pipeline/PipelineLayout';
 import { DashboardLoading } from '@/components/dashboard/DashboardLoading';
 
 export default function Pipeline() {
-  const { companies, loading, getStats } = usePipeline();
+  const { companies, loading, getStats, updateCompany } = usePipeline();
   const [viewMode, setViewMode] = useState<PipelineViewMode>(() => {
     const saved = localStorage.getItem('casper.pipeline.view');
     return (saved as PipelineViewMode) || 'kanban';
@@ -37,8 +37,12 @@ export default function Pipeline() {
     }
   }, [viewMode]);
 
-  const handleStatusChange = (companyId: string, newStatus: string) => {
-    // Optimistic updates are handled by the usePipeline hook
+  const handleStatusChange = async (companyId: string, newStatus: string) => {
+    try {
+      await updateCompany(companyId, { status: newStatus as PipelineStatus });
+    } catch (error) {
+      console.error('Failed to update company status:', error);
+    }
   };
 
   if (loading) {

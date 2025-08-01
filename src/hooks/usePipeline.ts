@@ -11,6 +11,36 @@ export function usePipeline() {
 
   useEffect(() => {
     fetchCompanies();
+    
+    // Set up real-time subscription
+    const channel = supabase
+      .channel('pipeline_companies_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'pipeline_companies'
+        },
+        (payload) => {
+          console.log('Real-time update:', payload);
+          
+          if (payload.eventType === 'INSERT') {
+            setCompanies(prev => [payload.new as PipelineCompany, ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setCompanies(prev => prev.map(c => 
+              c.id === payload.new.id ? payload.new as PipelineCompany : c
+            ));
+          } else if (payload.eventType === 'DELETE') {
+            setCompanies(prev => prev.filter(c => c.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchCompanies = async () => {
