@@ -62,7 +62,7 @@ export function NavSidebar() {
   return (
     <div 
       className={cn(
-        "fixed inset-y-0 left-0 flex flex-col items-center py-8 border-r border-white/10 transition-all duration-300 z-10 backdrop-blur-md", 
+        "fixed inset-y-0 left-0 flex flex-col items-center py-8 border-r border-white/10 transition-all duration-300 z-10 backdrop-blur-md relative", 
         expanded ? "w-64" : "w-16",
         theme === "dark" ? "bg-black/50" : "bg-white/60"
       )}
