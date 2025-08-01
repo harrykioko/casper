@@ -156,7 +156,7 @@ export default function Projects() {
 
   if (loading) {
     return (
-      <div className="p-8 min-h-screen">
+      <div className="p-8 pl-24 min-h-screen">
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <Skeleton className="h-9 w-32" />
@@ -177,7 +177,7 @@ export default function Projects() {
   
   return (
     <div 
-      className="p-8 min-h-screen"
+      className="p-8 pl-24 min-h-screen"
       tabIndex={0}
       onKeyDown={handleKeyDown}
     >

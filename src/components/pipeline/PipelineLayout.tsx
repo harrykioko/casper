@@ -9,7 +9,7 @@ export function PipelineLayout({ board, sidebar }: PipelineLayoutProps) {
   return (
     <div className="flex w-full h-full">
       {/* Left Column - Board Content */}
-      <section className="flex-1">
+      <section className="flex-1 min-w-0">
         {board}
       </section>
       

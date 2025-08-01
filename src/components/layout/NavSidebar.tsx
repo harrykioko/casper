@@ -62,14 +62,14 @@ export function NavSidebar() {
   return (
     <div 
       className={cn(
-        "fixed inset-y-0 left-0 flex flex-col items-center py-4 border-r border-white/10 transition-all duration-300 z-10 backdrop-blur-md relative h-screen", 
+        "fixed inset-y-0 left-0 flex flex-col items-center py-8 border-r border-white/10 transition-all duration-300 z-10 backdrop-blur-md", 
         expanded ? "w-64" : "w-16",
         theme === "dark" ? "bg-black/50" : "bg-white/60"
       )}
     >
       <SidebarBrand expanded={expanded} />
       
-      <div className="flex flex-col items-center gap-3 w-full flex-1 min-h-0">
+      <div className="flex flex-col items-center gap-4 w-full">
         {navItems.map((item) => (
           <NavItem
             key={item.path}

@@ -112,11 +112,11 @@ export default function Pipeline() {
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-1">
+      <div className="flex flex-1 min-h-0">
         {/* Desktop Layout */}
         <div className="hidden lg:flex w-full">
           <PipelineLayout 
-            board={<div className="pr-6 pt-6 pb-6">{boardContent}</div>} 
+            board={<div className="p-6">{boardContent}</div>} 
             sidebar={sidebarContent} 
           />
         </div>
