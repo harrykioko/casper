@@ -45,7 +45,7 @@ export function SidebarActions({ expanded, toggleSidebar }: SidebarActionsProps)
       </div>
 
       {/* Bottom Actions */}
-      <div className="mt-auto flex flex-col items-center gap-4 mb-8 w-full">
+      <div className="flex flex-col items-center gap-3 w-full">
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>
             <Link 
