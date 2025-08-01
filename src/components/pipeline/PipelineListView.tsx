@@ -37,20 +37,20 @@ export function PipelineListView({ companies, onCardClick }: PipelineListViewPro
         <ScrollArea className="h-[calc(100vh-12rem)]">
           <Table>
             <TableHeader>
-              <TableRow className="border-white/20">
-                <TableHead>Company</TableHead>
-                <TableHead>Round</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Sector</TableHead>
-                <TableHead>Raise Amount</TableHead>
-                <TableHead>Close Date</TableHead>
-                <TableHead>Actions</TableHead>
+              <TableRow className="border-b border-muted/20 h-12">
+                <TableHead className="font-semibold text-sm tracking-wide text-foreground/80 py-4">Company</TableHead>
+                <TableHead className="font-semibold text-sm tracking-wide text-foreground/80 py-4">Round</TableHead>
+                <TableHead className="font-semibold text-sm tracking-wide text-foreground/80 py-4">Status</TableHead>
+                <TableHead className="font-semibold text-sm tracking-wide text-foreground/80 py-4">Sector</TableHead>
+                <TableHead className="font-semibold text-sm tracking-wide text-foreground/80 py-4">Raise Amount</TableHead>
+                <TableHead className="font-semibold text-sm tracking-wide text-foreground/80 py-4">Close Date</TableHead>
+                <TableHead className="font-semibold text-sm tracking-wide text-foreground/80 py-4">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {companies.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground text-base">
                     No companies found
                   </TableCell>
                 </TableRow>
@@ -58,47 +58,47 @@ export function PipelineListView({ companies, onCardClick }: PipelineListViewPro
                 companies.map((company) => (
                   <TableRow 
                     key={company.id} 
-                    className="cursor-pointer hover:bg-white/5 border-white/10"
+                    className="cursor-pointer hover:bg-muted/8 dark:hover:bg-white/8 border-b border-muted/10 dark:border-white/10 transition-colors duration-150 h-16"
                     onClick={() => onCardClick(company)}
                   >
-                    <TableCell className="font-medium">{company.company_name}</TableCell>
-                    <TableCell>
+                    <TableCell className="font-medium text-base py-4 align-middle">{company.company_name}</TableCell>
+                    <TableCell className="py-4 align-middle">
                       <Badge variant="secondary" className={roundColors[company.current_round]}>
                         {company.current_round}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-4 align-middle">
                       <Badge variant="secondary" className={statusColors[company.status as keyof typeof statusColors]}>
                         {company.status.replace('_', ' ')}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-4 align-middle">
                       {company.sector && (
                         <Badge variant="outline">{company.sector}</Badge>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-4 align-middle text-base">
                       {company.raise_amount_usd && (
                         <span>${company.raise_amount_usd.toLocaleString()}</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-4 align-middle text-base">
                       {company.close_date && (
                         <span>{formatTaskDate(company.close_date) || company.close_date}</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-4 align-middle">
                       {company.website && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6"
+                          className="h-8 w-8 hover:bg-muted/20"
                           onClick={(e) => {
                             e.stopPropagation();
                             window.open(company.website, '_blank');
                           }}
                         >
-                          <ExternalLink className="h-3 w-3" />
+                          <ExternalLink className="h-4 w-4" />
                         </Button>
                       )}
                     </TableCell>
