@@ -35,7 +35,7 @@ export function SidebarActions({ expanded, toggleSidebar }: SidebarActionsProps)
               "flex h-10 items-center rounded-md transition-colors",
               expanded ? "w-[90%] px-4 justify-start" : "w-10 justify-center",
               location.pathname.startsWith("/settings") 
-                ? "text-white dark:text-white/90 font-medium" 
+                ? "text-zinc-900 dark:text-white bg-white/20 dark:bg-white/10 font-semibold shadow-sm" 
                 : "text-zinc-700 dark:text-white/70 hover:text-[#FF6A79] dark:hover:text-[#FF6A79]"
             )}
           >
