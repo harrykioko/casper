@@ -10,6 +10,10 @@ export default function PromptBuilder() {
   const [outputFormats, setOutputFormats] = useState<string[]>([]);
   const [constraints, setConstraints] = useState<string[]>([]);
   const [tone, setTone] = useState<string>("");
+  const [customInputType, setCustomInputType] = useState<string>("");
+  const [customOutputFormat, setCustomOutputFormat] = useState<string>("");
+  const [customConstraints, setCustomConstraints] = useState<string>("");
+  const [customTone, setCustomTone] = useState<string>("");
 
   const handleGenerate = () => {
     console.log("Prompt Builder Values:", {
@@ -18,6 +22,10 @@ export default function PromptBuilder() {
       outputFormats,
       constraints,
       tone,
+      customInputType,
+      customOutputFormat,
+      customConstraints,
+      customTone,
     });
   };
 
@@ -29,10 +37,10 @@ export default function PromptBuilder() {
     <div className="min-h-screen flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-2xl mx-auto space-y-8">
         <div className="text-center space-y-4">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent hover:drop-shadow-lg transition-all duration-300">
             Prompt Builder
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-base text-muted-foreground">
             Create high-quality AI prompts tailored to your specific needs
           </p>
         </div>
@@ -51,6 +59,14 @@ export default function PromptBuilder() {
             setConstraints={setConstraints}
             tone={tone}
             setTone={setTone}
+            customInputType={customInputType}
+            setCustomInputType={setCustomInputType}
+            customOutputFormat={customOutputFormat}
+            setCustomOutputFormat={setCustomOutputFormat}
+            customConstraints={customConstraints}
+            setCustomConstraints={setCustomConstraints}
+            customTone={customTone}
+            setCustomTone={setCustomTone}
           />
           
           <GenerateButton 
