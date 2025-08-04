@@ -6,6 +6,7 @@ import {
   List,
   FolderKanban, 
   MessageSquareText, 
+  Sparkles,
   BookOpen,
   TrendingUp
 } from "lucide-react";
@@ -44,6 +45,12 @@ export function NavSidebar() {
       path: "/prompts", 
       label: "Prompts",
       active: location.pathname.startsWith("/prompts") 
+    },
+    { 
+      icon: Sparkles, 
+      path: "/prompt-builder", 
+      label: "Prompt Builder",
+      active: location.pathname.startsWith("/prompt-builder") 
     },
     { 
       icon: BookOpen, 
