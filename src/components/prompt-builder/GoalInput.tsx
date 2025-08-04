@@ -12,7 +12,7 @@ export function GoalInput({ value, onChange }: GoalInputProps) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="What do you want this prompt to help you do?"
-        className="min-h-[120px] text-base resize-none glassmorphic border-white/20 focus:border-primary/50"
+        className="min-h-[120px] text-base resize-none glassmorphic focus:border-primary/50"
         rows={5}
       />
     </div>
