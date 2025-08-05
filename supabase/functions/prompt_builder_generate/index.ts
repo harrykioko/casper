@@ -48,12 +48,12 @@ serve(async (req) => {
     // Parse the JSON response from OpenAI if it's a string
     const result = typeof content === 'string' ? JSON.parse(content) : content;
     
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify(JSON.stringify(result)), {
       headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error(e);
-    return new Response(JSON.stringify({ error: "Prompt generation failed." }), {
+    return new Response(JSON.stringify(JSON.stringify({ error: "Prompt generation failed." })), {
       status: 500,
       headers: { ...corsHeaders(), "Content-Type": "application/json" }
     });
