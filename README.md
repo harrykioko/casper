@@ -60,6 +60,8 @@ This project is built with:
 - shadcn-ui
 - Tailwind CSS
 
+Run `npm run test:prompt-builder` to verify the Prompt Builder backend.
+
 ## How can I deploy this project?
 
 Simply open [Lovable](https://lovable.dev/projects/098f4f6a-2ab4-4785-a043-afb0bcfbe41c) and click on Share -> Publish.

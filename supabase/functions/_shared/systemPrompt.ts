@@ -1,3 +1,3 @@
 export const SYSTEM_PROMPT = Deno.readTextFileSync(
-  new URL(".docs/prompt-builder-system-prompts.md", import.meta.url),
+  new URL("../../../.docs/prompt_builder_system_prompts.md", import.meta.url),
 );
