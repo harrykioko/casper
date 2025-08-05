@@ -24,7 +24,7 @@ The \`prompt\` string MUST follow this template (do **not** mention the template
 You are **widely recognized** as a {domain-expertise inferred from goal}.
 
 ### Goal  
-{one-sentence rephrase of user goal}
+{accurate rephrase of user goal}
 
 ### Context  
 - Input: {input_type | input_description}  
