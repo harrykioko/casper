@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
 interface FollowUpFormProps {
+  questions: string[];
   answers: Record<string, string>;
   onAnswersChange: (answers: Record<string, string>) => void;
   onSubmit: () => void;
@@ -18,7 +19,7 @@ const mockFollowUps = [
   "What's the desired response length or format?"
 ];
 
-export function FollowUpForm({ answers, onAnswersChange, onSubmit, isLoading }: FollowUpFormProps) {
+export function FollowUpForm({ questions, answers, onAnswersChange, onSubmit, isLoading }: FollowUpFormProps) {
   const handleAnswerChange = (question: string, value: string) => {
     onAnswersChange({
       ...answers,
@@ -38,7 +39,7 @@ export function FollowUpForm({ answers, onAnswersChange, onSubmit, isLoading }: 
       </CardHeader>
       <CardContent className="flex-1 flex flex-col space-y-4">
         <div className="space-y-4 flex-1">
-          {mockFollowUps.map((question, index) => (
+          {questions.map((question, index) => (
             <div key={index} className="space-y-2">
               <Label htmlFor={`question-${index}`} className="text-sm font-medium text-foreground">
                 {question}
@@ -58,7 +59,7 @@ export function FollowUpForm({ answers, onAnswersChange, onSubmit, isLoading }: 
         <div className="flex-shrink-0 pt-2">
           <Button 
             onClick={onSubmit}
-            disabled={!hasAnswers || isLoading}
+            disabled={questions.length === 0 || Object.values(answers).every(answer => !answer.trim()) || isLoading}
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             {isLoading ? (
