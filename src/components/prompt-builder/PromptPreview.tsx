@@ -1,14 +1,15 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { PromptActions } from "./PromptActions";
 import { motion } from "framer-motion";
 
 interface PromptPreviewProps {
   isLoading: boolean;
-  mockPrompt: string;
+  generatedPrompt: string;
 }
 
-export function PromptPreview({ isLoading, mockPrompt }: PromptPreviewProps) {
+export function PromptPreview({ isLoading, generatedPrompt }: PromptPreviewProps) {
   if (isLoading) {
     return (
       <Card className="h-full bg-background/30 backdrop-blur-sm border-border/50">
@@ -45,10 +46,14 @@ export function PromptPreview({ isLoading, mockPrompt }: PromptPreviewProps) {
         </CardHeader>
         <CardContent className="flex-1 flex flex-col space-y-4">
           <div className="flex-1 min-h-0">
-            <div className="bg-background/40 border border-border/60 rounded-md p-4 h-full overflow-auto">
-              <pre className="text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed">
-                {mockPrompt}
-              </pre>
+            <div className="bg-background/40 border border-border/60 rounded-md h-full">
+              <ScrollArea className="h-full">
+                <div className="p-4">
+                  <pre className="text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed">
+                    {generatedPrompt}
+                  </pre>
+                </div>
+              </ScrollArea>
             </div>
           </div>
           

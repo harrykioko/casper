@@ -16,8 +16,9 @@ interface BuilderLayoutProps {
   customTone: string;
   followUpAnswers: Record<string, string>;
   onFollowUpAnswersChange: (answers: Record<string, string>) => void;
+  followUpQuestions: string[];
   isLoading: boolean;
-  mockPrompt: string;
+  generatedPrompt: string;
   onSubmitAnswers: () => void;
 }
 
@@ -33,8 +34,9 @@ export function BuilderLayout({
   customTone,
   followUpAnswers,
   onFollowUpAnswersChange,
+  followUpQuestions,
   isLoading,
-  mockPrompt,
+  generatedPrompt,
   onSubmitAnswers
 }: BuilderLayoutProps) {
   const containerVariants = {
@@ -79,12 +81,13 @@ export function BuilderLayout({
               />
               
               <div className="flex-1 min-h-0">
-                <FollowUpForm
-                  answers={followUpAnswers}
-                  onAnswersChange={onFollowUpAnswersChange}
-                  onSubmit={onSubmitAnswers}
-                  isLoading={isLoading}
-                />
+              <FollowUpForm
+                questions={followUpQuestions}
+                answers={followUpAnswers}
+                onAnswersChange={onFollowUpAnswersChange}
+                onSubmit={onSubmitAnswers}
+                isLoading={isLoading}
+              />
               </div>
             </div>
           </motion.div>
@@ -100,9 +103,9 @@ export function BuilderLayout({
               visible: { y: 0, opacity: 1 }
             }}
           >
-            <PromptPreview
-              isLoading={isLoading}
-              mockPrompt={mockPrompt}
+            <PromptPreview 
+              isLoading={isLoading} 
+              generatedPrompt={generatedPrompt} 
             />
           </motion.div>
         </ResizablePanel>

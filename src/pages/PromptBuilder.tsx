@@ -5,6 +5,8 @@ import { ExamplePills } from "@/components/prompt-builder/ExamplePills";
 import { PromptDetailsForm } from "@/components/prompt-builder/PromptDetailsForm";
 import { GenerateButton } from "@/components/prompt-builder/GenerateButton";
 import { BuilderLayout } from "@/components/prompt-builder/BuilderLayout";
+import { PromptBuilderService } from "@/services/promptBuilderService";
+import { useToast } from "@/hooks/use-toast";
 
 export default function PromptBuilder() {
   const [goalInput, setGoalInput] = useState<string>("");
@@ -20,70 +22,88 @@ export default function PromptBuilder() {
   // Builder mode state
   const [mode, setMode] = useState<'idle' | 'generating' | 'active'>('idle');
   const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
+  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [mockPrompt, setMockPrompt] = useState<string>("");
+  const [generatedPrompt, setGeneratedPrompt] = useState<string>("");
+  const { toast } = useToast();
 
-  const handleGenerate = () => {
-    console.log("Prompt Builder Values:", {
-      goalInput,
-      inputTypes,
-      outputFormats,
-      constraints,
-      tone,
-      customInputType,
-      customOutputFormat,
-      customConstraints,
-      customTone,
-    });
-    
-    setMode('generating');
-    
-    // Mock generation delay
-    setTimeout(() => {
-      const generatedPrompt = generateMockPrompt();
-      setMockPrompt(generatedPrompt);
-      setMode('active');
-    }, 2000);
-  };
+  const handleGenerate = async () => {
+    try {
+      setMode('generating');
+      setIsLoading(true);
 
-  const generateMockPrompt = () => {
-    const toneText = tone || customTone;
-    const inputText = inputTypes.length > 0 ? inputTypes[0] : customInputType || "content";
-    const outputText = outputFormats.length > 0 ? outputFormats[0] : customOutputFormat || "response";
-    const constraintText = constraints.length > 0 ? constraints.join(", ") : customConstraints;
-    
-    let prompt = `Write a ${toneText ? `${toneText} ` : ""}${outputText} based on the following ${inputText}.`;
-    
-    if (constraintText) {
-      prompt += ` Ensure that you ${constraintText}.`;
-    }
-    
-    prompt += `\n\nGoal: ${goalInput}`;
-    
-    return prompt;
-  };
+      const payload = PromptBuilderService.buildPayload({
+        goalInput,
+        inputTypes,
+        outputFormats,
+        constraints,
+        tone,
+        customInputType,
+        customOutputFormat,
+        customConstraints,
+        customTone
+      });
 
-  const handleSubmitAnswers = () => {
-    console.log("Follow-up answers:", followUpAnswers);
-    setIsLoading(true);
-    
-    // Mock processing delay
-    setTimeout(() => {
-      const improvedPrompt = generateImprovedPrompt();
-      setMockPrompt(improvedPrompt);
+      const response = await PromptBuilderService.getFollowUps(payload);
+
+      if (response.followup_questions && response.followup_questions.length > 0) {
+        setFollowUpQuestions(response.followup_questions);
+        setFollowUpAnswers({});
+        setMode('active');
+      } else if (response.prompt) {
+        setGeneratedPrompt(response.prompt);
+        setMode('active');
+      } else {
+        throw new Error('Invalid response from API');
+      }
+    } catch (error) {
+      console.error('Error generating prompt:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to generate prompt. Please try again.",
+        variant: "destructive"
+      });
+      setMode('idle');
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
-  const generateImprovedPrompt = () => {
-    const basePrompt = generateMockPrompt();
-    const answersText = Object.entries(followUpAnswers)
-      .filter(([_, answer]) => answer.trim())
-      .map(([question, answer]) => `${question}: ${answer}`)
-      .join('\n');
-    
-    return `${basePrompt}\n\nAdditional Context:\n${answersText}`;
+  const handleSubmitAnswers = async () => {
+    try {
+      setIsLoading(true);
+
+      const clarifications = followUpQuestions.map(question => 
+        followUpAnswers[question] || ""
+      );
+
+      const payload = PromptBuilderService.buildPayload({
+        goalInput,
+        inputTypes,
+        outputFormats,
+        constraints,
+        tone,
+        customInputType,
+        customOutputFormat,
+        customConstraints,
+        customTone,
+        clarifications
+      });
+
+      const response = await PromptBuilderService.generatePrompt(payload);
+      setGeneratedPrompt(response.prompt);
+    } catch (error) {
+      console.error('Error generating final prompt:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to generate final prompt. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
   const handleExampleClick = (example: string) => {
     setGoalInput(example);
@@ -109,8 +129,9 @@ export default function PromptBuilder() {
           customTone={customTone}
           followUpAnswers={followUpAnswers}
           onFollowUpAnswersChange={setFollowUpAnswers}
+          followUpQuestions={followUpQuestions}
           isLoading={mode === 'generating' || isLoading}
-          mockPrompt={mockPrompt}
+          generatedPrompt={generatedPrompt}
           onSubmitAnswers={handleSubmitAnswers}
         />
       </AnimatePresence>
