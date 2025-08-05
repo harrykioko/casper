@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { PromptActions } from "./PromptActions";
 import { motion } from "framer-motion";
 
@@ -45,10 +46,14 @@ export function PromptPreview({ isLoading, generatedPrompt }: PromptPreviewProps
         </CardHeader>
         <CardContent className="flex-1 flex flex-col space-y-4">
           <div className="flex-1 min-h-0">
-            <div className="bg-background/40 border border-border/60 rounded-md p-4 h-full overflow-auto">
-              <pre className="text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed">
-                {generatedPrompt}
-              </pre>
+            <div className="bg-background/40 border border-border/60 rounded-md h-full">
+              <ScrollArea className="h-full">
+                <div className="p-4">
+                  <pre className="text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed">
+                    {generatedPrompt}
+                  </pre>
+                </div>
+              </ScrollArea>
             </div>
           </div>
           
