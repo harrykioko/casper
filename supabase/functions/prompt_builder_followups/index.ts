@@ -2,7 +2,20 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { SYSTEM_PROMPT } from "../_shared/systemPrompt.ts";
 
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
 serve(async (req) => {
+  // Handle the browser's pre-flight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders() });
+  }
   try {
     const body: any = await req.json();
 
@@ -35,14 +48,22 @@ serve(async (req) => {
     });
 
     const data = await resp.json();
-    return new Response(JSON.stringify(data.choices[0].message.content), {
-      headers: { "Content-Type": "application/json" },
+    const content = data.choices[0].message.content;
+    
+    // Parse the JSON response from OpenAI if it's a string
+    const result = typeof content === 'string' ? JSON.parse(content) : content;
+    
+    return new Response(JSON.stringify(result), {
+      headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error(e);
     return new Response(
       JSON.stringify({ error: "Failed to generate follow-ups." }),
-      { status: 500 }
+      { 
+        status: 500,
+        headers: { ...corsHeaders(), "Content-Type": "application/json" }
+      }
     );
   }
 });
