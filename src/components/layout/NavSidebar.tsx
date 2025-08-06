@@ -41,6 +41,12 @@ export function NavSidebar() {
       path: "/projects", 
       label: "Projects",
       active: location.pathname.startsWith("/projects") 
+    },
+    { 
+      icon: TrendingUp, 
+      path: "/pipeline", 
+      label: "Pipeline",
+      active: location.pathname.startsWith("/pipeline") 
     }
   ];
 
@@ -62,12 +68,6 @@ export function NavSidebar() {
       path: "/reading-list", 
       label: "Reading List",
       active: location.pathname.startsWith("/reading-list") 
-    },
-    { 
-      icon: TrendingUp, 
-      path: "/pipeline", 
-      label: "Pipeline",
-      active: location.pathname.startsWith("/pipeline") 
     }
   ];
 
