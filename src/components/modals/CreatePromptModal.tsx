@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MessageSquareText, Loader2 } from "lucide-react";
 import { GlassModal, GlassModalContent, GlassModalHeader, GlassModalTitle, GlassModalFooter } from "@/components/ui/GlassModal";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ interface CreatePromptModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreatePrompt: (prompt: Omit<Prompt, 'id'>) => void;
+  initialContent?: string;
 }
 
 const promptSchema = z.object({
@@ -35,7 +36,7 @@ const promptSchema = z.object({
 
 type PromptFormValues = z.infer<typeof promptSchema>;
 
-export function CreatePromptModal({ open, onOpenChange, onCreatePrompt }: CreatePromptModalProps) {
+export function CreatePromptModal({ open, onOpenChange, onCreatePrompt, initialContent }: CreatePromptModalProps) {
   const [newTag, setNewTag] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -44,12 +45,25 @@ export function CreatePromptModal({ open, onOpenChange, onCreatePrompt }: Create
     defaultValues: {
       title: "",
       description: "",
-      content: "",
+      content: initialContent || "",
       tags: []
     }
   });
 
   const watchedTags = form.watch("tags");
+
+  // Reset form when modal opens with new content
+  useEffect(() => {
+    if (open) {
+      form.reset({
+        title: "",
+        description: "",
+        content: initialContent || "",
+        tags: []
+      });
+      setNewTag("");
+    }
+  }, [open, initialContent, form]);
 
   const addTag = () => {
     if (newTag.trim() && !watchedTags.includes(newTag.trim())) {

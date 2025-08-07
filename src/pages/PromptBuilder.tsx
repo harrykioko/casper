@@ -5,8 +5,10 @@ import { ExamplePills } from "@/components/prompt-builder/ExamplePills";
 import { PromptDetailsForm } from "@/components/prompt-builder/PromptDetailsForm";
 import { GenerateButton } from "@/components/prompt-builder/GenerateButton";
 import { BuilderLayout } from "@/components/prompt-builder/BuilderLayout";
+import { CreatePromptModal } from "@/components/modals/CreatePromptModal";
 import { PromptBuilderService } from "@/services/promptBuilderService";
 import { useToast } from "@/hooks/use-toast";
+import { usePrompts } from "@/hooks/usePrompts";
 
 export default function PromptBuilder() {
   const [goalInput, setGoalInput] = useState<string>("");
@@ -25,7 +27,9 @@ export default function PromptBuilder() {
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [generatedPrompt, setGeneratedPrompt] = useState<string>("");
+  const [showSaveModal, setShowSaveModal] = useState(false);
   const { toast } = useToast();
+  const { createPrompt } = usePrompts();
 
   const handleGenerate = async () => {
     try {
@@ -105,6 +109,65 @@ export default function PromptBuilder() {
   };
 
 
+  const handleRegenerate = async () => {
+    const clarifications = followUpQuestions.map(question => 
+      followUpAnswers[question] || ""
+    );
+
+    try {
+      setIsLoading(true);
+      const payload = PromptBuilderService.buildPayload({
+        goalInput,
+        inputTypes,
+        outputFormats,
+        constraints,
+        tone,
+        customInputType,
+        customOutputFormat,
+        customConstraints,
+        customTone,
+        clarifications
+      });
+
+      const response = await PromptBuilderService.generatePrompt(payload);
+      setGeneratedPrompt(response.prompt);
+      
+      toast({
+        title: "Success",
+        description: "Prompt regenerated successfully!",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to regenerate prompt. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSave = () => {
+    setShowSaveModal(true);
+  };
+
+  const handleCreatePrompt = async (promptData: { title: string; description: string; content: string; tags: string[] }) => {
+    try {
+      await createPrompt(promptData);
+      setShowSaveModal(false);
+      toast({
+        title: "Success",
+        description: "Prompt saved successfully!",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save prompt. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleExampleClick = (example: string) => {
     setGoalInput(example);
   };
@@ -133,6 +196,14 @@ export default function PromptBuilder() {
           isLoading={mode === 'generating' || isLoading}
           generatedPrompt={generatedPrompt}
           onSubmitAnswers={handleSubmitAnswers}
+          onRegenerate={handleRegenerate}
+          onSave={handleSave}
+        />
+        <CreatePromptModal
+          open={showSaveModal}
+          onOpenChange={setShowSaveModal}
+          onCreatePrompt={handleCreatePrompt}
+          initialContent={generatedPrompt}
         />
       </AnimatePresence>
     );

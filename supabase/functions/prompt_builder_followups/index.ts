@@ -64,13 +64,13 @@ serve(async (req) => {
     }
     // -------------------------------------------------------------------
 
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify(JSON.stringify(result)), {
       headers: { ...corsHeaders(), "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error(e);
     return new Response(
-      JSON.stringify({ error: "Failed to generate follow-ups." }),
+      JSON.stringify(JSON.stringify({ error: "Failed to generate follow-ups." })),
       {
         status: 500,
         headers: { ...corsHeaders(), "Content-Type": "application/json" },

@@ -20,6 +20,8 @@ interface BuilderLayoutProps {
   isLoading: boolean;
   generatedPrompt: string;
   onSubmitAnswers: () => void;
+  onRegenerate: () => void;
+  onSave: () => void;
 }
 
 export function BuilderLayout({
@@ -37,7 +39,9 @@ export function BuilderLayout({
   followUpQuestions,
   isLoading,
   generatedPrompt,
-  onSubmitAnswers
+  onSubmitAnswers,
+  onRegenerate,
+  onSave
 }: BuilderLayoutProps) {
   const containerVariants = {
     hidden: { x: 100, opacity: 0 },
@@ -105,7 +109,9 @@ export function BuilderLayout({
           >
             <PromptPreview 
               isLoading={isLoading} 
-              generatedPrompt={generatedPrompt} 
+              generatedPrompt={generatedPrompt}
+              onRegenerate={onRegenerate}
+              onSave={onSave}
             />
           </motion.div>
         </ResizablePanel>

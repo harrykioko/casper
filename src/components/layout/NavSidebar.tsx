@@ -13,15 +13,17 @@ import {
 import { useTheme } from "@/hooks/use-theme";
 import { useSidebarState } from "@/contexts/SidebarStateContext";
 import { NavItem } from "./NavItem";
+import { NavSection } from "./NavSection";
 import { SidebarBrand } from "./SidebarBrand";
 import { SidebarActions } from "./SidebarActions";
+import { Separator } from "@/components/ui/separator";
 
 export function NavSidebar() {
   const location = useLocation();
   const { theme } = useTheme();
   const { expanded, toggleSidebar } = useSidebarState();
 
-  const navItems = [
+  const workspaceItems = [
     { 
       icon: LayoutDashboard, 
       path: "/dashboard", 
@@ -41,6 +43,15 @@ export function NavSidebar() {
       active: location.pathname.startsWith("/projects") 
     },
     { 
+      icon: TrendingUp, 
+      path: "/pipeline", 
+      label: "Pipeline",
+      active: location.pathname.startsWith("/pipeline") 
+    }
+  ];
+
+  const knowledgeToolsItems = [
+    { 
       icon: MessageSquareText, 
       path: "/prompts", 
       label: "Prompts",
@@ -57,12 +68,6 @@ export function NavSidebar() {
       path: "/reading-list", 
       label: "Reading List",
       active: location.pathname.startsWith("/reading-list") 
-    },
-    { 
-      icon: TrendingUp, 
-      path: "/pipeline", 
-      label: "Pipeline",
-      active: location.pathname.startsWith("/pipeline") 
     }
   ];
 
@@ -76,17 +81,36 @@ export function NavSidebar() {
     >
       <SidebarBrand expanded={expanded} />
       
-      <div className="flex flex-col items-center gap-4 w-full">
-        {navItems.map((item) => (
-          <NavItem
-            key={item.path}
-            icon={item.icon}
-            path={item.path}
-            label={item.label}
-            active={item.active}
-            expanded={expanded}
-          />
-        ))}
+      <div className="flex flex-col w-full flex-1 gap-6 px-2">
+        {/* Workspace Section */}
+        <NavSection title="Workspace" expanded={expanded}>
+          {workspaceItems.map((item) => (
+            <NavItem
+              key={item.path}
+              icon={item.icon}
+              path={item.path}
+              label={item.label}
+              active={item.active}
+              expanded={expanded}
+            />
+          ))}
+        </NavSection>
+
+        <Separator className="bg-white/10" />
+
+        {/* Knowledge & Tools Section */}
+        <NavSection title="Knowledge & Tools" expanded={expanded}>
+          {knowledgeToolsItems.map((item) => (
+            <NavItem
+              key={item.path}
+              icon={item.icon}
+              path={item.path}
+              label={item.label}
+              active={item.active}
+              expanded={expanded}
+            />
+          ))}
+        </NavSection>
       </div>
       
       <SidebarActions expanded={expanded} toggleSidebar={toggleSidebar} />
