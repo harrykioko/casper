@@ -3,11 +3,12 @@ import { useTasks, transformTaskForDatabase } from './useTasks';
 import { useCategories } from './useCategories';
 
 export function useTasksManager() {
-  const { tasks, createTask, updateTask, deleteTask } = useTasks();
+  const { tasks, createTask, updateTask, deleteTask, getInboxTasks, getNonInboxTasks } = useTasks();
   const { getCategoryIdByName } = useCategories();
   
-  const handleAddTask = (content: string, isQuickTask: boolean = false) => {
-    createTask({ content, is_quick_task: isQuickTask });
+  const handleAddTask = (content: string) => {
+    // All new tasks go to inbox by default
+    createTask({ content, is_quick_task: true });
   };
   
   const handleCompleteTask = (id: string) => {
@@ -15,9 +16,7 @@ export function useTasksManager() {
     if (task) {
       updateTask(id, { 
         completed: !task.completed,
-        status: !task.completed ? 'done' : 'todo',
-        // Convert quick task to regular task when completed
-        is_quick_task: task.completed ? task.is_quick_task : false
+        status: !task.completed ? 'done' : 'todo'
       });
     }
   };
@@ -29,9 +28,8 @@ export function useTasksManager() {
   const handleUpdateTaskStatus = (id: string, status: "todo" | "inprogress" | "done") => {
     updateTask(id, { 
       status,
-      completed: status === 'done',
-      // Convert quick task to regular task when status is changed
-      is_quick_task: false
+      completed: status === 'done'
+      // DB trigger will set inbox = false when status !== 'todo'
     });
   };
 
@@ -47,8 +45,8 @@ export function useTasksManager() {
       priority: updatedTask.priority,
       scheduledFor: updatedTask.scheduledFor,
       project_id: updatedTask.project?.id || null,
-      category_id: categoryId,
-      is_quick_task: false // Always convert to regular task when edited
+      category_id: categoryId
+      // DB trigger will handle inbox = false when scheduled_for or project_id is set
     });
 
     // Remove the id from the update data since it's used in the WHERE clause
@@ -57,12 +55,28 @@ export function useTasksManager() {
     updateTask(updatedTask.id, updateData);
   };
 
+  const quickInlineUpdate = (taskId: string, patch: Partial<any>) => {
+    // Quick inline update for chips with optimistic updates
+    const dbPatch = transformTaskForDatabase(patch);
+    updateTask(taskId, dbPatch);
+  };
+
+  const bulkUpdate = (ids: string[], patch: Partial<any>) => {
+    // Bulk update multiple tasks
+    const dbPatch = transformTaskForDatabase(patch);
+    ids.forEach(id => updateTask(id, dbPatch));
+  };
+
   return {
     tasks,
+    inboxTasks: getInboxTasks(),
+    nonInboxTasks: getNonInboxTasks(),
     handleAddTask,
     handleCompleteTask,
     handleDeleteTask,
     handleUpdateTaskStatus,
-    handleUpdateTask
+    handleUpdateTask,
+    quickInlineUpdate,
+    bulkUpdate
   };
 }

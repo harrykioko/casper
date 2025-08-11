@@ -8,9 +8,11 @@ import { toast } from "@/hooks/use-toast";
 import { TaskCardContent } from "@/components/task-cards/TaskCardContent";
 import { TaskCardMetadata } from "@/components/task-cards/TaskCardMetadata";
 import { cn } from "@/lib/utils";
+import { InboxColumn } from "./kanban/InboxColumn";
 
 interface TasksKanbanViewProps { 
   tasks: Task[]; 
+  inboxTasks: Task[];
   onTaskComplete: (id: string) => void; 
   onTaskDelete: (id: string) => void; 
   onUpdateTaskStatus: (id: string, status: "todo" | "inprogress" | "done") => void;
@@ -23,7 +25,7 @@ type KanbanColumn = {
   emptyMessage?: string;
 };
 
-export function TasksKanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateTaskStatus, onTaskClick }: TasksKanbanViewProps) {
+export function TasksKanbanView({ tasks, inboxTasks, onTaskComplete, onTaskDelete, onUpdateTaskStatus, onTaskClick }: TasksKanbanViewProps) {
   const columns: KanbanColumn[] = [
     { id: "todo", title: "To Do" },
     { id: "inprogress", title: "In Progress" },
@@ -31,13 +33,15 @@ export function TasksKanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateT
   ];
 
   const getColumnTasks = (columnId: "todo" | "inprogress" | "done") => {
+    // Exclude inbox tasks from regular columns
+    const nonInboxTasks = tasks.filter(task => !task.inbox);
     if (columnId === "todo") {
-      return tasks.filter(task => !task.status || task.status === "todo");
+      return nonInboxTasks.filter(task => !task.status || task.status === "todo");
     }
-    return tasks.filter(task => task.status === columnId);
+    return nonInboxTasks.filter(task => task.status === columnId);
   };
 
-  const handleDragEnd = (result: any) => {
+  const handleDragEnd = (result: { destination: { droppableId: string; index: number } | null; source: { droppableId: string; index: number }; draggableId: string }) => {
     const { destination, source, draggableId } = result;
 
     if (!destination) return;
@@ -47,25 +51,49 @@ export function TasksKanbanView({ tasks, onTaskComplete, onTaskDelete, onUpdateT
       destination.index === source.index
     ) return;
 
-    const task = tasks.find(t => t.id === draggableId);
+    // Find task in either inbox or regular tasks
+    const task = [...inboxTasks, ...tasks].find(t => t.id === draggableId);
     if (!task) return;
 
     if (destination.droppableId !== source.droppableId) {
-      const newStatus = destination.droppableId as "todo" | "inprogress" | "done";
-      onUpdateTaskStatus(task.id, newStatus);
-      
-      if (newStatus === "done" && !task.completed) {
+      // Moving from inbox to a workflow column
+      if (source.droppableId === "inbox" && destination.droppableId !== "inbox") {
+        const newStatus = destination.droppableId as "todo" | "inprogress" | "done";
+        onUpdateTaskStatus(task.id, newStatus);
+        // DB trigger will set inbox = false automatically
+        
         toast({
-          title: "Task completed",
-          description: "Your task has been marked as complete.",
+          title: "Task triaged",
+          description: "Task moved out of inbox.",
         });
       }
+      // Moving between workflow columns
+      else if (source.droppableId !== "inbox" && destination.droppableId !== "inbox") {
+        const newStatus = destination.droppableId as "todo" | "inprogress" | "done";
+        onUpdateTaskStatus(task.id, newStatus);
+        
+        if (newStatus === "done" && !task.completed) {
+          toast({
+            title: "Task completed",
+            description: "Your task has been marked as complete.",
+          });
+        }
+      }
+      // Note: We don't allow dragging back to inbox
     }
   };
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="grid grid-cols-3 gap-6 min-h-[500px]">
+      <div className="grid grid-cols-4 gap-6 min-h-[500px]">
+        {/* Inbox Column */}
+        <InboxColumn 
+          tasks={inboxTasks}
+          onTaskComplete={onTaskComplete}
+          onTaskClick={onTaskClick}
+        />
+        
+        {/* Regular Workflow Columns */}
         {columns.map((column) => (
           <Droppable key={column.id} droppableId={column.id}>
             {(provided, snapshot) => (

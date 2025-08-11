@@ -14,11 +14,17 @@ interface FilterOptions {
   sortBy: string;
   categories: Category[];
   projects: Project[];
+  excludeInbox?: boolean;
 }
 
 export function useTaskFiltering(tasks: Task[], filters: FilterOptions) {
   const filteredAndSortedTasks = useMemo(() => {
     let filtered = [...tasks];
+
+    // By default, exclude inbox tasks from regular views
+    if (filters.excludeInbox !== false) {
+      filtered = filtered.filter(task => !task.inbox);
+    }
 
     // Filter by status
     if (filters.statusFilter && filters.statusFilter !== 'all') {

@@ -11,7 +11,7 @@ import { ViewModeToggle } from "@/components/tasks/ViewModeToggle";
 import { TasksFilters } from "@/components/tasks/TasksFilters";
 import { TasksMainContent } from "@/components/tasks/TasksMainContent";
 import { TasksKanbanView } from "@/components/tasks/TasksKanbanView";
-import { QuickTasksPanel } from "@/components/tasks/QuickTasksPanel";
+import { InboxSection } from "@/components/tasks/InboxSection";
 import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
 
 export default function Tasks() {
@@ -23,25 +23,26 @@ export default function Tasks() {
   const [sortBy, setSortBy] = useState("date");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
+  const [showInbox, setShowInbox] = useState(true); // Show inbox by default
 
   const {
     tasks,
+    inboxTasks,
+    nonInboxTasks,
     handleAddTask,
     handleCompleteTask,
     handleDeleteTask,
     handleUpdateTaskStatus,
-    handleUpdateTask
+    handleUpdateTask,
+    quickInlineUpdate,
+    bulkUpdate
   } = useTasksManager();
 
   const { categories } = useCategories();
   const { projects } = useProjects();
 
-  // Filter tasks into quick tasks and regular tasks
-  const quickTasks = tasks.filter(task => task.is_quick_task);
-  const regularTasks = tasks.filter(task => !task.is_quick_task);
-
-  // Apply filtering to regular tasks
-  const filteredRegularTasks = useTaskFiltering(regularTasks, {
+  // Apply filtering to non-inbox tasks
+  const filteredTasks = useTaskFiltering(nonInboxTasks, {
     statusFilter,
     priorityFilter,
     categoryFilter,
@@ -51,8 +52,30 @@ export default function Tasks() {
     projects
   });
 
-  const handleAddQuickTask = (content: string) => {
-    handleAddTask(content, true); // Create as quick task
+  const handleAddTask_click = (content: string) => {
+    handleAddTask(content); // All tasks go to inbox by default
+  };
+
+  const handleBulkAction = (ids: string[], action: string, value?: string | boolean) => {
+    const patch: Record<string, string | boolean> = {};
+    switch (action) {
+      case 'schedule':
+        if (typeof value === 'string') patch.scheduled_for = value;
+        break;
+      case 'project':
+        if (typeof value === 'string') patch.project_id = value;
+        break;
+      case 'priority':
+        if (typeof value === 'string') patch.priority = value;
+        break;
+      case 'complete':
+        if (typeof value === 'boolean') {
+          patch.completed = value;
+          patch.status = 'done';
+        }
+        break;
+    }
+    bulkUpdate(ids, patch);
   };
 
   const handleTaskClick = (task: Task) => {
@@ -70,10 +93,15 @@ export default function Tasks() {
       <div className="min-h-screen p-6">
         <div className="max-w-7xl mx-auto space-y-6">
           {/* Quick Add Input Bar */}
-          <QuickTaskInput onAddTask={handleAddQuickTask} />
+          <QuickTaskInput onAddTask={handleAddTask_click} />
 
           {/* View Toggle */}
-          <ViewModeToggle viewMode={viewMode} onViewModeChange={setViewMode} />
+          <ViewModeToggle 
+            viewMode={viewMode} 
+            onViewModeChange={setViewMode}
+            showInbox={showInbox}
+            onShowInboxChange={setShowInbox}
+          />
 
           {/* Filters Row */}
           <TasksFilters
@@ -91,49 +119,39 @@ export default function Tasks() {
 
           {/* Main Content Layout */}
           {viewMode === "list" ? (
-            <div className="flex flex-col lg:flex-row gap-6">
-              {/* Left: Main Tasks (70% width) */}
+            <div className="space-y-6">
+              {/* Inbox Section - Show when inbox preset is active */}
+              {showInbox && (
+                <InboxSection
+                  tasks={inboxTasks}
+                  onInlineUpdate={quickInlineUpdate}
+                  onBulkAction={handleBulkAction}
+                  onTaskComplete={handleCompleteTask}
+                  onTaskClick={handleTaskClick}
+                />
+              )}
+
+              {/* Main Tasks */}
               <TasksMainContent
-                regularTasks={filteredRegularTasks}
+                regularTasks={filteredTasks}
                 onTaskComplete={handleCompleteTask}
                 onTaskDelete={handleDeleteTask}
                 onUpdateTaskStatus={handleUpdateTaskStatus}
                 onUpdateTask={handleUpdateTask}
                 onTaskClick={handleTaskClick}
               />
-
-              {/* Right: Quick Tasks Panel (30% width) */}
-              <QuickTasksPanel
-                quickTasks={quickTasks}
-                onTaskComplete={handleCompleteTask}
-                onTaskDelete={handleDeleteTask}
-                onTaskClick={handleTaskClick}
-              />
             </div>
           ) : (
-            <div className="space-y-6">
-              {/* Quick Tasks Section for Kanban View */}
-              {quickTasks.length > 0 && (
-                <div className="w-full">
-                  <QuickTasksPanel
-                    quickTasks={quickTasks}
-                    onTaskComplete={handleCompleteTask}
-                    onTaskDelete={handleDeleteTask}
-                    onTaskClick={handleTaskClick}
-                  />
-                </div>
-              )}
-
-              {/* Kanban Board - Full Width */}
-              <div className="w-full">
-                <TasksKanbanView
-                  tasks={filteredRegularTasks}
-                  onTaskComplete={handleCompleteTask}
-                  onTaskDelete={handleDeleteTask}
-                  onUpdateTaskStatus={handleUpdateTaskStatus}
-                  onTaskClick={handleTaskClick}
-                />
-              </div>
+            <div className="w-full">
+              {/* Kanban Board with Inbox Column */}
+              <TasksKanbanView
+                tasks={filteredTasks}
+                inboxTasks={showInbox ? inboxTasks : []}
+                onTaskComplete={handleCompleteTask}
+                onTaskDelete={handleDeleteTask}
+                onUpdateTaskStatus={handleUpdateTaskStatus}
+                onTaskClick={handleTaskClick}
+              />
             </div>
           )}
 

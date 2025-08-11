@@ -25,7 +25,7 @@ export interface Task {
   created_by?: string;
   project_id?: string;
   category_id?: string;
-  is_quick_task?: boolean;
+  inbox?: boolean;
 }
 
 // Transform database row to frontend Task type
@@ -44,7 +44,7 @@ const transformTask = (row: TaskRow & { project?: any; category?: any }): Task =
     created_by: row.created_by || undefined,
     project_id: row.project_id || undefined,
     category_id: row.category_id || undefined,
-    is_quick_task: row.is_quick_task || false
+    inbox: row.is_quick_task || false // Map is_quick_task to inbox for now
   };
 };
 
@@ -61,9 +61,9 @@ export const transformTaskForDatabase = (taskData: any): any => {
     dbData.project_id = taskData.projectId;
     delete dbData.projectId;
   }
-  if (taskData.isQuickTask !== undefined) {
-    dbData.is_quick_task = taskData.isQuickTask;
-    delete dbData.isQuickTask;
+  if (taskData.inbox !== undefined) {
+    dbData.is_quick_task = taskData.inbox; // Map inbox to is_quick_task for now
+    delete dbData.inbox;
   }
   if (taskData.categoryId !== undefined) {
     dbData.category_id = taskData.categoryId;
@@ -108,6 +108,16 @@ export function useTasks() {
 
     fetchTasks();
   }, []);
+
+  const getInboxTasks = () => {
+    return tasks
+      .filter(task => task.inbox === true && !task.completed)
+      .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
+  };
+
+  const getNonInboxTasks = () => {
+    return tasks.filter(task => !task.inbox);
+  };
 
   const createTask = async (taskData: Omit<TaskInsert, 'id' | 'created_at' | 'updated_at' | 'created_by'>) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -175,6 +185,8 @@ export function useTasks() {
     error, 
     createTask, 
     updateTask, 
-    deleteTask 
+    deleteTask,
+    getInboxTasks,
+    getNonInboxTasks 
   };
 }

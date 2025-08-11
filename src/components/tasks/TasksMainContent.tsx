@@ -21,7 +21,7 @@ export function TasksMainContent({
   onTaskClick
 }: TasksMainContentProps) {
   return (
-    <div className="flex-1 lg:w-[70%]">
+    <div className="w-full">
       <Card className="glassmorphic border-muted/30">
         <CardHeader className="pb-4">
           <CardTitle className="text-lg font-semibold">Tasks</CardTitle>
