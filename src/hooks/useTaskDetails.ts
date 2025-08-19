@@ -85,8 +85,7 @@ export function useTaskDetails({ task }: UseTaskDetailsProps): UseTaskDetailsRet
       project: selectedProject,
       priority,
       category,
-      scheduledFor: scheduledFor ? scheduledFor.toISOString() : undefined,
-      is_quick_task: false // Always convert to a regular task when edited
+      scheduledFor: scheduledFor ? scheduledFor.toISOString() : undefined
     };
   };
   

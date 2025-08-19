@@ -42,8 +42,7 @@ export function useProjectTasks() {
             updated_at: task.updated_at,
             created_by: task.created_by,
             project_id: task.project_id,
-            category_id: task.category_id,
-            is_quick_task: task.is_quick_task || false
+            category_id: task.category_id
           }));
           setTasks(transformedTasks);
         }
@@ -72,8 +71,7 @@ export function useProjectTasks() {
         .insert({
           content,
           project_id: id,
-          created_by: user.id,
-          is_quick_task: false
+          created_by: user.id
         })
         .select(`
           *,
@@ -97,8 +95,7 @@ export function useProjectTasks() {
         updated_at: data.updated_at,
         created_by: data.created_by,
         project_id: data.project_id,
-        category_id: data.category_id,
-        is_quick_task: data.is_quick_task || false
+        category_id: data.category_id
       };
       
       setTasks(prev => [newTask, ...prev]);
