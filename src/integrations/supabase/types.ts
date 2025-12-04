@@ -124,6 +124,137 @@ export type Database = {
         }
         Relationships: []
       }
+      companies: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          id: string
+          kind: Database["public"]["Enums"]["company_kind"]
+          last_interaction_at: string | null
+          logo_url: string | null
+          name: string
+          status: Database["public"]["Enums"]["company_status"]
+          updated_at: string | null
+          website_url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          id?: string
+          kind?: Database["public"]["Enums"]["company_kind"]
+          last_interaction_at?: string | null
+          logo_url?: string | null
+          name: string
+          status?: Database["public"]["Enums"]["company_status"]
+          updated_at?: string | null
+          website_url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["company_kind"]
+          last_interaction_at?: string | null
+          logo_url?: string | null
+          name?: string
+          status?: Database["public"]["Enums"]["company_status"]
+          updated_at?: string | null
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      company_contacts: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          created_by: string
+          email: string | null
+          id: string
+          is_founder: boolean
+          is_primary: boolean
+          name: string
+          role: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          created_by: string
+          email?: string | null
+          id?: string
+          is_founder?: boolean
+          is_primary?: boolean
+          name: string
+          role?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          created_by?: string
+          email?: string | null
+          id?: string
+          is_founder?: boolean
+          is_primary?: boolean
+          name?: string
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_interactions: {
+        Row: {
+          company_id: string
+          contact_id: string | null
+          content: string
+          created_at: string | null
+          created_by: string
+          id: string
+          interaction_type: Database["public"]["Enums"]["interaction_type"]
+          occurred_at: string
+        }
+        Insert: {
+          company_id: string
+          contact_id?: string | null
+          content: string
+          created_at?: string | null
+          created_by: string
+          id?: string
+          interaction_type: Database["public"]["Enums"]["interaction_type"]
+          occurred_at?: string
+        }
+        Update: {
+          company_id?: string
+          contact_id?: string | null
+          content?: string
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          interaction_type?: Database["public"]["Enums"]["interaction_type"]
+          occurred_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_interactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_interactions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "company_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       nonnegotiables: {
         Row: {
           created_at: string
@@ -455,6 +586,7 @@ export type Database = {
       tasks: {
         Row: {
           category_id: string | null
+          company_id: string | null
           completed: boolean | null
           completed_at: string | null
           content: string
@@ -470,6 +602,7 @@ export type Database = {
         }
         Insert: {
           category_id?: string | null
+          company_id?: string | null
           completed?: boolean | null
           completed_at?: string | null
           content: string
@@ -485,6 +618,7 @@ export type Database = {
         }
         Update: {
           category_id?: string | null
+          company_id?: string | null
           completed?: boolean | null
           completed_at?: string | null
           content?: string
@@ -504,6 +638,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
@@ -557,6 +698,9 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      company_kind: "portfolio" | "pipeline" | "other"
+      company_status: "active" | "watching" | "exited" | "archived"
+      interaction_type: "note" | "call" | "meeting" | "email" | "update"
       round_enum:
         | "Seed"
         | "Series A"
@@ -702,6 +846,9 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      company_kind: ["portfolio", "pipeline", "other"],
+      company_status: ["active", "watching", "exited", "archived"],
+      interaction_type: ["note", "call", "meeting", "email", "update"],
       round_enum: [
         "Seed",
         "Series A",

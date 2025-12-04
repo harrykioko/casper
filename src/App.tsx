@@ -21,6 +21,8 @@ import ProjectDetail from "./pages/ProjectDetail";
 import Prompts from "./pages/Prompts";
 import ReadingList from "./pages/ReadingList";
 import Pipeline from "./pages/Pipeline";
+import Portfolio from "./pages/Portfolio";
+import PortfolioCompanyDetail from "./pages/PortfolioCompanyDetail";
 import PromptBuilder from "./pages/PromptBuilder";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -103,6 +105,8 @@ const MainContent = () => {
           <Route path="/prompt-builder" element={<PromptBuilder />} />
           <Route path="/reading-list" element={<ReadingList />} />
           <Route path="/pipeline" element={<Pipeline />} />
+          <Route path="/portfolio" element={<Portfolio />} />
+          <Route path="/portfolio/:companyId" element={<PortfolioCompanyDetail />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
