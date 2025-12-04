@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import { useTasks, Task } from '@/hooks/useTasks';
 import { useDashboardPortfolioCompanies, DashboardPortfolioCompany } from '@/hooks/useDashboardPortfolioCompanies';
-import { differenceInDays, differenceInHours, isToday, isPast, parseISO, startOfDay } from 'date-fns';
+import { useDashboardPipelineFocus, DashboardPipelineCompany } from '@/hooks/useDashboardPipelineFocus';
+import { differenceInDays, isToday, isPast, parseISO, startOfDay } from 'date-fns';
 
-export type PriorityType = 'overdue' | 'due_today' | 'stale' | 'fresh';
+export type PriorityType = 'overdue' | 'due_today' | 'stale';
 
 export interface PriorityItem {
   id: string;
@@ -19,30 +20,37 @@ export interface PriorityItem {
 
 export function usePriorityItems() {
   const { tasks } = useTasks();
-  const { companies: portfolioCompanies, loading } = useDashboardPortfolioCompanies();
+  const { companies: portfolioCompanies, loading: portfolioLoading } = useDashboardPortfolioCompanies();
+  const { companies: pipelineCompanies, loading: pipelineLoading } = useDashboardPipelineFocus();
 
   const priorityItems = useMemo(() => {
     const items: PriorityItem[] = [];
     const now = new Date();
 
-    // Get tasks linked to companies
-    const companyTasks = tasks.filter(task => task.company_id && !task.completed);
-    
-    // Create a map of company IDs to company data
-    const companyMap = new Map<string, DashboardPortfolioCompany>();
+    // Create maps for quick lookup
+    const portfolioMap = new Map<string, DashboardPortfolioCompany>();
     portfolioCompanies.forEach(company => {
-      companyMap.set(company.id, company);
+      portfolioMap.set(company.id, company);
     });
 
-    // 1. Overdue tasks linked to companies
-    companyTasks.forEach(task => {
+    const pipelineMap = new Map<string, DashboardPipelineCompany>();
+    pipelineCompanies.forEach(company => {
+      pipelineMap.set(company.id, company);
+    });
+
+    // Get incomplete tasks linked to companies
+    const portfolioTasks = tasks.filter(task => task.company_id && !task.completed);
+    const pipelineTasks = tasks.filter(task => task.pipeline_company_id && !task.completed);
+
+    // 1. Overdue portfolio tasks
+    portfolioTasks.forEach(task => {
       if (task.scheduledFor) {
         const dueDate = parseISO(task.scheduledFor);
         if (isPast(startOfDay(dueDate)) && !isToday(dueDate)) {
-          const company = companyMap.get(task.company_id!);
+          const company = portfolioMap.get(task.company_id!);
           if (company) {
             items.push({
-              id: `overdue-${task.id}`,
+              id: `overdue-portfolio-${task.id}`,
               type: 'overdue',
               companyId: company.id,
               companyName: company.name,
@@ -57,13 +65,36 @@ export function usePriorityItems() {
       }
     });
 
-    // 2. Tasks due today linked to companies
-    companyTasks.forEach(task => {
+    // 2. Overdue pipeline tasks
+    pipelineTasks.forEach(task => {
+      if (task.scheduledFor) {
+        const dueDate = parseISO(task.scheduledFor);
+        if (isPast(startOfDay(dueDate)) && !isToday(dueDate)) {
+          const company = pipelineMap.get(task.pipeline_company_id!);
+          if (company) {
+            items.push({
+              id: `overdue-pipeline-${task.id}`,
+              type: 'overdue',
+              companyId: company.id,
+              companyName: company.company_name,
+              companyLogo: company.logo_url,
+              title: 'Overdue task',
+              description: task.content,
+              timestamp: task.scheduledFor,
+              entityType: 'pipeline',
+            });
+          }
+        }
+      }
+    });
+
+    // 3. Tasks due today - portfolio
+    portfolioTasks.forEach(task => {
       if (task.scheduledFor && isToday(parseISO(task.scheduledFor))) {
-        const company = companyMap.get(task.company_id!);
+        const company = portfolioMap.get(task.company_id!);
         if (company) {
           items.push({
-            id: `today-${task.id}`,
+            id: `today-portfolio-${task.id}`,
             type: 'due_today',
             companyId: company.id,
             companyName: company.name,
@@ -77,13 +108,33 @@ export function usePriorityItems() {
       }
     });
 
-    // 3. Stale companies (>14 days without interaction)
+    // 4. Tasks due today - pipeline
+    pipelineTasks.forEach(task => {
+      if (task.scheduledFor && isToday(parseISO(task.scheduledFor))) {
+        const company = pipelineMap.get(task.pipeline_company_id!);
+        if (company) {
+          items.push({
+            id: `today-pipeline-${task.id}`,
+            type: 'due_today',
+            companyId: company.id,
+            companyName: company.company_name,
+            companyLogo: company.logo_url,
+            title: 'Due today',
+            description: task.content,
+            timestamp: task.scheduledFor,
+            entityType: 'pipeline',
+          });
+        }
+      }
+    });
+
+    // 5. Stale portfolio companies (>14 days without interaction)
     portfolioCompanies.forEach(company => {
       if (company.last_interaction_at) {
         const daysSinceInteraction = differenceInDays(now, parseISO(company.last_interaction_at));
         if (daysSinceInteraction > 14) {
           items.push({
-            id: `stale-${company.id}`,
+            id: `stale-portfolio-${company.id}`,
             type: 'stale',
             companyId: company.id,
             companyName: company.name,
@@ -97,7 +148,7 @@ export function usePriorityItems() {
       } else {
         // No interactions ever
         items.push({
-          id: `stale-${company.id}`,
+          id: `stale-portfolio-${company.id}`,
           type: 'stale',
           companyId: company.id,
           companyName: company.name,
@@ -110,38 +161,52 @@ export function usePriorityItems() {
       }
     });
 
-    // 4. Fresh activity (<48h interaction)
-    portfolioCompanies.forEach(company => {
+    // 6. Stale pipeline companies (>14 days without interaction)
+    pipelineCompanies.forEach(company => {
       if (company.last_interaction_at) {
-        const hoursSinceInteraction = differenceInHours(now, parseISO(company.last_interaction_at));
-        if (hoursSinceInteraction <= 48) {
+        const daysSinceInteraction = differenceInDays(now, parseISO(company.last_interaction_at));
+        if (daysSinceInteraction > 14) {
           items.push({
-            id: `fresh-${company.id}`,
-            type: 'fresh',
+            id: `stale-pipeline-${company.id}`,
+            type: 'stale',
             companyId: company.id,
-            companyName: company.name,
+            companyName: company.company_name,
             companyLogo: company.logo_url,
-            title: 'Recent activity',
-            description: 'Follow up while fresh',
+            title: 'Needs attention',
+            description: `No contact in ${daysSinceInteraction} days`,
             timestamp: company.last_interaction_at,
-            entityType: 'portfolio',
+            entityType: 'pipeline',
           });
         }
+      } else {
+        // No interactions ever
+        items.push({
+          id: `stale-pipeline-${company.id}`,
+          type: 'stale',
+          companyId: company.id,
+          companyName: company.company_name,
+          companyLogo: company.logo_url,
+          title: 'Needs attention',
+          description: 'No recorded interactions',
+          timestamp: '',
+          entityType: 'pipeline',
+        });
       }
     });
 
-    // Sort by priority: overdue > due_today > stale > fresh
+    // Sort by priority: overdue > due_today > stale
     const priorityOrder: Record<PriorityType, number> = {
       overdue: 0,
       due_today: 1,
       stale: 2,
-      fresh: 3,
     };
 
     return items
       .sort((a, b) => priorityOrder[a.type] - priorityOrder[b.type])
-      .slice(0, 6);
-  }, [tasks, portfolioCompanies]);
+      .slice(0, 4);
+  }, [tasks, portfolioCompanies, pipelineCompanies]);
+
+  const loading = portfolioLoading || pipelineLoading;
 
   return { priorityItems, loading };
 }

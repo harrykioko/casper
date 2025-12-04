@@ -88,6 +88,11 @@ export function DashboardMainContent({
     setCommandPaneOpen(true);
   };
 
+  const openCommandPaneByEntityType = (companyId: string, entityType: 'portfolio' | 'pipeline') => {
+    setSelectedEntity({ type: entityType, id: companyId });
+    setCommandPaneOpen(true);
+  };
+
   const closeCommandPane = () => {
     setCommandPaneOpen(false);
     setSelectedEntity(null);
@@ -103,7 +108,7 @@ export function DashboardMainContent({
         <TaskInput onAddTask={onAddTask} />
 
         {/* Priority Items Section - Command Center Centerpiece */}
-        <DashboardPrioritySection onCompanyClick={openPortfolioCommandPane} />
+        <DashboardPrioritySection onCompanyClick={openCommandPaneByEntityType} />
 
         {/* Portfolio Section */}
         <DashboardPortfolioSection onCompanyClick={openPortfolioCommandPane} />
