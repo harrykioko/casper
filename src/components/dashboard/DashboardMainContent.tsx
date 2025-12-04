@@ -7,6 +7,7 @@ import { ReadingListSection } from "@/components/dashboard/ReadingListSection";
 import { TaskInput } from "@/components/dashboard/TaskInput";
 import { DashboardPortfolioSection } from "@/components/dashboard/DashboardPortfolioSection";
 import { DashboardPipelineFocusSection } from "@/components/dashboard/DashboardPipelineFocusSection";
+import { DashboardPrioritySection } from "@/components/dashboard/DashboardPrioritySection";
 import { CompanyCommandPane } from "@/components/command-pane/CompanyCommandPane";
 import { EnhancedCommandModal } from "@/components/modals/EnhancedCommandModal";
 import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
@@ -94,12 +95,15 @@ export function DashboardMainContent({
 
   return (
     <div className="flex-1 p-8">
-      <div className="max-w-4xl mx-auto space-y-8">
+      <div className="max-w-5xl mx-auto space-y-10">
         {/* Header with Command Button */}
         <DashboardHeader openCommandModal={openCommandModal} />
 
         {/* Task Input Bar */}
         <TaskInput onAddTask={onAddTask} />
+
+        {/* Priority Items Section - Command Center Centerpiece */}
+        <DashboardPrioritySection onCompanyClick={openPortfolioCommandPane} />
 
         {/* Portfolio Section */}
         <DashboardPortfolioSection onCompanyClick={openPortfolioCommandPane} />

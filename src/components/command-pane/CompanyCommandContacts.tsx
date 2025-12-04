@@ -19,16 +19,16 @@ export function CompanyCommandContacts({ contacts }: CompanyCommandContactsProps
   };
 
   return (
-    <div className="bg-card/60 border border-border/40 rounded-xl p-4 backdrop-blur-sm space-y-3">
+    <div className="bg-card/50 border border-border/30 rounded-xl p-4 backdrop-blur-sm space-y-4">
       <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Founders</h4>
       <div className="space-y-2">
         {contacts.map((contact) => (
           <div
             key={contact.id}
-            className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30"
+            className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30 hover:bg-muted/50 transition-colors"
           >
             <div className="min-w-0 flex-1">
-              <p className="text-base font-medium text-foreground truncate">{contact.name}</p>
+              <p className="text-[15px] font-medium text-foreground truncate">{contact.name}</p>
               {contact.role && (
                 <p className="text-sm text-muted-foreground truncate">{contact.role}</p>
               )}
