@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Star, Loader2, Globe } from 'lucide-react';
+import { Plus, Trash2, Star, Loader2, Globe, Upload, Check, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -16,8 +16,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { CompanyStatus, FounderInput } from '@/types/portfolio';
 import { fetchLinkMetadata } from '@/services/linkMetadataService';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface AddCompanyModalProps {
@@ -50,17 +52,44 @@ export function AddCompanyModal({
   const [name, setName] = useState(initialData?.name || '');
   const [websiteUrl, setWebsiteUrl] = useState(initialData?.website_url || '');
   const [logoUrl, setLogoUrl] = useState(initialData?.logo_url || '');
+  const [logoApproved, setLogoApproved] = useState(!!initialData?.logo_url);
+  const [pendingLogo, setPendingLogo] = useState<string | null>(null);
   const [status, setStatus] = useState<CompanyStatus>(initialData?.status || 'active');
   const [founders, setFounders] = useState<FounderInput[]>(
     initialData?.founders || [{ name: '', email: '', role: '', is_primary: true }]
   );
   const [loading, setLoading] = useState(false);
   const [fetchingLogo, setFetchingLogo] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const lastFetchedUrl = useRef<string>('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-fetch logo when website URL changes
+  // Reset form when modal opens/closes or initialData changes
   useEffect(() => {
-    if (!websiteUrl.trim() || websiteUrl === lastFetchedUrl.current) return;
+    if (open) {
+      setName(initialData?.name || '');
+      setWebsiteUrl(initialData?.website_url || '');
+      setLogoUrl(initialData?.logo_url || '');
+      setLogoApproved(!!initialData?.logo_url);
+      setPendingLogo(null);
+      setStatus(initialData?.status || 'active');
+      setFounders(initialData?.founders || [{ name: '', email: '', role: '', is_primary: true }]);
+      lastFetchedUrl.current = initialData?.website_url || '';
+    }
+  }, [open, initialData]);
+
+  // Auto-fetch logo when website URL changes (only for new companies without approved logo)
+  useEffect(() => {
+    // Don't auto-fetch if:
+    // - No website URL
+    // - Already fetched this URL
+    // - Editing with an existing approved logo
+    // - Currently has an approved logo
+    if (!websiteUrl.trim() || 
+        websiteUrl === lastFetchedUrl.current || 
+        logoApproved) {
+      return;
+    }
     
     // Validate URL format
     try {
@@ -75,11 +104,9 @@ export function AddCompanyModal({
         const metadata = await fetchLinkMetadata(websiteUrl);
         lastFetchedUrl.current = websiteUrl;
         
-        // Prefer image (usually higher quality) over favicon
         const logo = metadata.image || metadata.favicon;
         if (logo) {
-          setLogoUrl(logo);
-          toast.success('Logo fetched from website');
+          setPendingLogo(logo);
         }
       } catch (error) {
         console.error('Failed to fetch logo:', error);
@@ -89,7 +116,7 @@ export function AddCompanyModal({
     }, 800);
 
     return () => clearTimeout(timeoutId);
-  }, [websiteUrl]);
+  }, [websiteUrl, logoApproved]);
 
   const handleAddFounder = () => {
     setFounders([...founders, { name: '', email: '', role: '', is_primary: false }]);
@@ -97,7 +124,6 @@ export function AddCompanyModal({
 
   const handleRemoveFounder = (index: number) => {
     const newFounders = founders.filter((_, i) => i !== index);
-    // If removed founder was primary, make first one primary
     if (founders[index].is_primary && newFounders.length > 0) {
       newFounders[0].is_primary = true;
     }
@@ -107,7 +133,6 @@ export function AddCompanyModal({
   const handleFounderChange = (index: number, field: keyof FounderInput, value: string | boolean) => {
     const newFounders = [...founders];
     if (field === 'is_primary' && value === true) {
-      // Unset all other primaries
       newFounders.forEach((f, i) => {
         f.is_primary = i === index;
       });
@@ -131,15 +156,6 @@ export function AddCompanyModal({
         founders: founders.filter(f => f.name.trim()),
       });
       onOpenChange(false);
-      // Reset form
-      if (!isEditing) {
-        setName('');
-        setWebsiteUrl('');
-        setLogoUrl('');
-        setStatus('active');
-        setFounders([{ name: '', email: '', role: '', is_primary: true }]);
-        lastFetchedUrl.current = '';
-      }
     } finally {
       setLoading(false);
     }
@@ -160,8 +176,8 @@ export function AddCompanyModal({
       lastFetchedUrl.current = websiteUrl;
       const logo = metadata.image || metadata.favicon;
       if (logo) {
-        setLogoUrl(logo);
-        toast.success('Logo fetched from website');
+        setPendingLogo(logo);
+        setLogoApproved(false);
       } else {
         toast.error('No logo found on website');
       }
@@ -171,6 +187,71 @@ export function AddCompanyModal({
       setFetchingLogo(false);
     }
   };
+
+  const approvePendingLogo = () => {
+    if (pendingLogo) {
+      setLogoUrl(pendingLogo);
+      setLogoApproved(true);
+      setPendingLogo(null);
+      toast.success('Logo approved');
+    }
+  };
+
+  const clearPendingLogo = () => {
+    setPendingLogo(null);
+  };
+
+  const clearLogo = () => {
+    setLogoUrl('');
+    setLogoApproved(false);
+    setPendingLogo(null);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File must be under 5MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const ext = file.name.split('.').pop();
+      const filename = `${crypto.randomUUID()}.${ext}`;
+      
+      const { error } = await supabase.storage
+        .from('company-logos')
+        .upload(filename, file);
+        
+      if (error) throw error;
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('company-logos')
+        .getPublicUrl(filename);
+        
+      setLogoUrl(publicUrl);
+      setLogoApproved(true);
+      setPendingLogo(null);
+      toast.success('Logo uploaded');
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error('Failed to upload logo');
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const displayLogo = logoUrl || pendingLogo;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -204,56 +285,107 @@ export function AddCompanyModal({
               onChange={(e) => setWebsiteUrl(e.target.value)}
               placeholder="https://example.com"
             />
-            <p className="text-xs text-muted-foreground">
-              Logo will be auto-fetched from website
-            </p>
           </div>
 
-          {/* Logo URL with Preview */}
+          {/* Logo Section - Redesigned */}
           <div className="space-y-2">
-            <Label htmlFor="logo">Logo URL</Label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input
-                  id="logo"
-                  type="url"
-                  value={logoUrl}
-                  onChange={(e) => setLogoUrl(e.target.value)}
-                  placeholder="Auto-fetched or enter manually"
-                  className="pr-10"
-                />
-                {fetchingLogo && (
-                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+            <Label>Company Logo</Label>
+            
+            {/* Logo Preview Card */}
+            <div className="flex items-center gap-4 p-3 rounded-lg border bg-muted/30">
+              {/* Preview */}
+              <div className="flex-shrink-0 w-14 h-14 rounded-lg bg-background border flex items-center justify-center overflow-hidden">
+                {displayLogo ? (
+                  <img
+                    src={displayLogo}
+                    alt="Logo preview"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <span className="text-lg font-bold text-muted-foreground">
+                    {name?.charAt(0)?.toUpperCase() || '?'}
+                  </span>
                 )}
               </div>
+
+              {/* Status & Actions */}
+              <div className="flex-1 min-w-0 space-y-2">
+                {fetchingLogo && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Fetching logo...
+                  </div>
+                )}
+                
+                {pendingLogo && !logoApproved && !fetchingLogo && (
+                  <div className="flex items-center gap-2">
+                    <Button type="button" size="sm" variant="default" onClick={approvePendingLogo}>
+                      <Check className="h-3 w-3 mr-1" /> Approve
+                    </Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={clearPendingLogo}>
+                      <X className="h-3 w-3 mr-1" /> Clear
+                    </Button>
+                  </div>
+                )}
+                
+                {logoApproved && logoUrl && !fetchingLogo && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="text-xs">
+                      <Check className="h-3 w-3 mr-1" /> Logo set
+                    </Badge>
+                    <Button type="button" size="sm" variant="ghost" onClick={clearLogo} className="h-6 w-6 p-0">
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+
+                {!pendingLogo && !logoUrl && !fetchingLogo && (
+                  <p className="text-xs text-muted-foreground">
+                    No logo set
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
               <Button
                 type="button"
                 variant="outline"
-                size="icon"
+                size="sm"
                 onClick={handleManualFetch}
-                disabled={fetchingLogo || !websiteUrl.trim()}
-                title="Fetch logo from website"
+                disabled={fetchingLogo || uploading || !websiteUrl.trim()}
               >
-                <Globe className="h-4 w-4" />
+                <Globe className="h-4 w-4 mr-2" />
+                Fetch from website
               </Button>
+              
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading || fetchingLogo}
+              >
+                {uploading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4 mr-2" />
+                )}
+                Upload
+              </Button>
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
             </div>
-            
-            {/* Logo Preview */}
-            {logoUrl && (
-              <div className="flex items-center gap-3 p-2 rounded-md bg-muted/50">
-                <img
-                  src={logoUrl}
-                  alt="Logo preview"
-                  className="h-10 w-10 object-contain rounded"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-                <span className="text-xs text-muted-foreground truncate flex-1">
-                  {logoUrl}
-                </span>
-              </div>
-            )}
           </div>
 
           {/* Status */}
