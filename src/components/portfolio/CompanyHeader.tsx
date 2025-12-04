@@ -24,15 +24,15 @@ export function CompanyHeader({ company, onEdit }: CompanyHeaderProps) {
   return (
     <div className="flex items-start gap-4 p-6 rounded-xl bg-card/50 backdrop-blur-sm border">
       {/* Logo */}
-      <div className="flex-shrink-0 w-16 h-16 rounded-xl bg-muted flex items-center justify-center overflow-hidden">
+      <div className="flex-shrink-0 w-20 h-20 rounded-xl bg-white dark:bg-zinc-800 border flex items-center justify-center overflow-hidden p-2">
         {company.logo_url ? (
           <img
             src={company.logo_url}
             alt={company.name}
-            className="w-full h-full object-cover"
+            className="max-w-full max-h-full object-contain"
           />
         ) : (
-          <span className="text-2xl font-bold text-muted-foreground">
+          <span className="text-3xl font-bold text-muted-foreground">
             {company.name.charAt(0).toUpperCase()}
           </span>
         )}
