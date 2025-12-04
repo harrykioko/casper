@@ -26,6 +26,7 @@ export interface Task {
   project_id?: string;
   category_id?: string;
   company_id?: string;
+  pipeline_company_id?: string;
   inbox?: boolean;
 }
 
@@ -46,6 +47,7 @@ const transformTask = (row: TaskRow & { project?: any; category?: any }): Task =
     project_id: row.project_id || undefined,
     category_id: row.category_id || undefined,
     company_id: row.company_id || undefined,
+    pipeline_company_id: row.pipeline_company_id || undefined,
     inbox: row.is_quick_task || false // Map is_quick_task to inbox for now
   };
 };

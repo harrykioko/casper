@@ -14,6 +14,8 @@ export interface DashboardPipelineCompany {
   close_date: string | null;
   is_top_of_mind: boolean;
   updated_at: string;
+  last_interaction_at: string | null;
+  logo_url: string | null;
 }
 
 export function useDashboardPipelineFocus() {
@@ -53,6 +55,8 @@ export function useDashboardPipelineFocus() {
         close_date: company.close_date,
         is_top_of_mind: company.is_top_of_mind ?? false,
         updated_at: company.updated_at || company.created_at || '',
+        last_interaction_at: company.last_interaction_at,
+        logo_url: company.logo_url,
       }));
 
       setCompanies(mappedCompanies);

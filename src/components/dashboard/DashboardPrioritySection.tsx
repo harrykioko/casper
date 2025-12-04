@@ -1,10 +1,10 @@
-import { AlertTriangle, Clock, AlertCircle, Sparkles } from 'lucide-react';
+import { AlertTriangle, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { usePriorityItems, PriorityType } from '@/hooks/usePriorityItems';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface DashboardPrioritySectionProps {
-  onCompanyClick: (companyId: string) => void;
+  onCompanyClick: (companyId: string, entityType: 'portfolio' | 'pipeline') => void;
 }
 
 const priorityConfig: Record<PriorityType, { icon: typeof AlertTriangle; color: string; bgColor: string }> = {
@@ -22,11 +22,6 @@ const priorityConfig: Record<PriorityType, { icon: typeof AlertTriangle; color: 
     icon: AlertCircle,
     color: 'text-orange-500',
     bgColor: 'bg-orange-500/10',
-  },
-  fresh: {
-    icon: Sparkles,
-    color: 'text-emerald-500',
-    bgColor: 'bg-emerald-500/10',
   },
 };
 
@@ -51,7 +46,7 @@ export function DashboardPrioritySection({ onCompanyClick }: DashboardPrioritySe
       <section className="bg-muted/40 rounded-xl border border-border/40 p-5">
         <h3 className="text-lg font-semibold text-foreground mb-4">Priority Items</h3>
         <div className="flex items-center justify-center py-8 text-muted-foreground">
-          <Sparkles className="w-5 h-5 mr-2" />
+          <CheckCircle2 className="w-5 h-5 mr-2" />
           <span className="text-sm">All caught up! No priority items.</span>
         </div>
       </section>
@@ -69,7 +64,7 @@ export function DashboardPrioritySection({ onCompanyClick }: DashboardPrioritySe
           return (
             <button
               key={item.id}
-              onClick={() => onCompanyClick(item.companyId)}
+              onClick={() => onCompanyClick(item.companyId, item.entityType)}
               className="w-full flex items-center gap-4 p-3 rounded-lg bg-card/60 border border-border/30 hover:bg-card/80 hover:border-border/50 transition-all duration-150 text-left group"
             >
               {/* Icon */}
