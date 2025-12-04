@@ -1,4 +1,4 @@
-import { Plus, MessageSquare, Mail } from 'lucide-react';
+import { Plus, MessageSquare, Mail, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface CompanyCommandQuickActionsProps {
@@ -15,35 +15,44 @@ export function CompanyCommandQuickActions({
   onAddNote 
 }: CompanyCommandQuickActionsProps) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5">
       <Button 
-        variant="outline" 
+        variant="ghost" 
         size="sm" 
-        className="h-8 text-xs gap-1.5"
+        className="h-7 text-xs gap-1 px-2"
         onClick={onAddTask}
       >
-        <Plus className="w-3.5 h-3.5" />
-        Add Task
+        <Plus className="w-3 h-3" />
+        Task
       </Button>
       <Button 
-        variant="outline" 
+        variant="ghost" 
         size="sm" 
-        className="h-8 text-xs gap-1.5"
+        className="h-7 text-xs gap-1 px-2"
         onClick={onAddNote}
       >
-        <MessageSquare className="w-3.5 h-3.5" />
-        Add Note
+        <MessageSquare className="w-3 h-3" />
+        Note
+      </Button>
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        className="h-7 text-xs gap-1 px-2"
+        onClick={onAddNote}
+      >
+        <Phone className="w-3 h-3" />
+        Log Call
       </Button>
       {primaryFounderEmail && (
         <Button 
-          variant="outline" 
+          variant="ghost" 
           size="sm" 
-          className="h-8 text-xs gap-1.5"
+          className="h-7 text-xs gap-1 px-2"
           asChild
         >
           <a href={`mailto:${primaryFounderEmail}`}>
-            <Mail className="w-3.5 h-3.5" />
-            Email Founder
+            <Mail className="w-3 h-3" />
+            Email
           </a>
         </Button>
       )}

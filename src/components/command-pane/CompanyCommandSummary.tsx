@@ -1,4 +1,4 @@
-import { Clock, CheckSquare, Activity, ArrowRight } from 'lucide-react';
+import { ArrowRight, Clock, CheckSquare, Activity } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface CompanyCommandSummaryProps {
@@ -11,41 +11,45 @@ interface CompanyCommandSummaryProps {
 export function CompanyCommandSummary({ lastInteractionAt, openTaskCount, status, nextTask }: CompanyCommandSummaryProps) {
   const formattedLastInteraction = lastInteractionAt
     ? formatDistanceToNow(new Date(lastInteractionAt), { addSuffix: true })
-    : 'No interactions yet';
+    : 'No interactions';
 
   return (
-    <div className="space-y-3">
-      {/* Next Step highlight */}
+    <div className="space-y-2">
+      {/* Next Step - inline compact card */}
       {nextTask && (
-        <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex items-start gap-3">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <ArrowRight className="w-4 h-4 text-primary" />
-          </div>
+        <div className="bg-primary/5 border border-primary/20 rounded-lg px-3 py-2.5 flex items-center gap-2.5">
+          <ArrowRight className="w-4 h-4 text-primary flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-primary font-medium uppercase tracking-wide mb-1">Next Step</p>
-            <p className="text-sm font-medium text-foreground truncate">{nextTask}</p>
+            <span className="text-[10px] text-primary font-medium uppercase tracking-wide mr-2">Next Step</span>
+            <span className="text-sm font-medium text-foreground truncate">{nextTask}</span>
           </div>
         </div>
       )}
 
-      {/* Summary grid */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-card/50 border border-border/30 backdrop-blur-sm rounded-xl p-4 text-center">
-          <Clock className="w-5 h-5 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">Last Touch</p>
-          <p className="text-sm font-medium text-foreground mt-1 truncate">{formattedLastInteraction}</p>
+      {/* Overview stats - horizontal bar */}
+      <div className="bg-card/40 border border-border/30 rounded-lg px-3 py-2 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-1.5">
+          <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+          <div>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wide mr-1.5">Last Touch</span>
+            <span className="text-sm font-medium text-foreground">{formattedLastInteraction}</span>
+          </div>
         </div>
         
-        <div className="bg-card/50 border border-border/30 backdrop-blur-sm rounded-xl p-4 text-center">
-          <CheckSquare className="w-5 h-5 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">Open Tasks</p>
-          <p className="text-sm font-medium text-foreground mt-1">{openTaskCount}</p>
+        <div className="flex items-center gap-1.5">
+          <CheckSquare className="w-3.5 h-3.5 text-muted-foreground" />
+          <div>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wide mr-1.5">Tasks</span>
+            <span className="text-sm font-medium text-foreground">{openTaskCount} open</span>
+          </div>
         </div>
         
-        <div className="bg-card/50 border border-border/30 backdrop-blur-sm rounded-xl p-4 text-center">
-          <Activity className="w-5 h-5 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-xs text-muted-foreground uppercase tracking-wide">Status</p>
-          <p className="text-sm font-medium text-foreground mt-1 capitalize">{status}</p>
+        <div className="flex items-center gap-1.5">
+          <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+          <div>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-wide mr-1.5">Status</span>
+            <span className="text-sm font-medium text-foreground capitalize">{status}</span>
+          </div>
         </div>
       </div>
     </div>

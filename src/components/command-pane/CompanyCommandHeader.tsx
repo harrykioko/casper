@@ -18,9 +18,9 @@ const statusColors: Record<string, string> = {
 
 export function CompanyCommandHeader({ company, onClose }: CompanyCommandHeaderProps) {
   return (
-    <div className="p-5 pb-4 flex items-start gap-4">
+    <div className="px-4 py-3 flex items-center gap-3">
       {/* Logo */}
-      <div className="w-14 h-14 rounded-xl bg-white dark:bg-zinc-800 border flex items-center justify-center overflow-hidden p-2 flex-shrink-0">
+      <div className="w-11 h-11 rounded-lg bg-white dark:bg-zinc-800 border flex items-center justify-center overflow-hidden p-1.5 flex-shrink-0">
         {company.logo_url ? (
           <img
             src={company.logo_url}
@@ -28,7 +28,7 @@ export function CompanyCommandHeader({ company, onClose }: CompanyCommandHeaderP
             className="max-w-full max-h-full object-contain"
           />
         ) : (
-          <span className="text-2xl font-semibold text-muted-foreground">
+          <span className="text-lg font-semibold text-muted-foreground">
             {company.name.charAt(0).toUpperCase()}
           </span>
         )}
@@ -36,37 +36,37 @@ export function CompanyCommandHeader({ company, onClose }: CompanyCommandHeaderP
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2.5">
-          <h2 className="text-xl font-semibold text-foreground truncate">{company.name}</h2>
-          <Badge variant="secondary" className={`text-xs px-2.5 py-0.5 rounded-full ${statusColors[company.status] || ''}`}>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-foreground truncate">{company.name}</h2>
+          <Badge variant="secondary" className={`text-[10px] px-2 py-0 rounded-full ${statusColors[company.status] || ''}`}>
             {company.status}
           </Badge>
         </div>
         
-        <div className="flex items-center gap-3 mt-1.5">
+        <div className="flex items-center gap-2.5 mt-0.5">
           {company.website_url && (
             <a
               href={company.website_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
+              <ExternalLink className="w-3 h-3" />
               Website
             </a>
           )}
           <Link
             to={`/portfolio/${company.id}`}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1.5"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
           >
-            <ArrowUpRight className="w-3.5 h-3.5" />
+            <ArrowUpRight className="w-3 h-3" />
             Full page
           </Link>
         </div>
       </div>
 
       {/* Close button */}
-      <Button variant="ghost" size="icon" className="h-9 w-9 flex-shrink-0" onClick={onClose}>
+      <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onClose}>
         <X className="w-4 h-4" />
       </Button>
     </div>

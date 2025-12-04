@@ -49,13 +49,13 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent 
         side="right" 
-        className={`w-full sm:w-[580px] lg:w-[640px] xl:w-[680px] p-0 bg-background/95 backdrop-blur-xl border-l overflow-hidden flex flex-col data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=open]:duration-200 border-t-4 ${healthBorderColor}`}
+        className={`w-full sm:w-[600px] lg:w-[680px] xl:w-[720px] p-0 bg-background/95 backdrop-blur-xl border-l overflow-hidden flex flex-col data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=open]:duration-200 border-t-4 ${healthBorderColor}`}
       >
         {isLoading ? (
-          <div className="p-6 space-y-4">
-            <Skeleton className="h-16 w-full rounded-xl" />
-            <Skeleton className="h-24 w-full rounded-xl" />
-            <Skeleton className="h-32 w-full rounded-xl" />
+          <div className="p-4 space-y-3">
+            <Skeleton className="h-14 w-full rounded-lg" />
+            <Skeleton className="h-20 w-full rounded-lg" />
+            <Skeleton className="h-28 w-full rounded-lg" />
           </div>
         ) : entityType === 'portfolio' && company ? (
           <>
@@ -66,7 +66,7 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
               />
             </SheetHeader>
             
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {/* Action Overview - Next Step + Summary */}
               <CompanyCommandSummary
                 lastInteractionAt={company.last_interaction_at}
@@ -110,13 +110,13 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
             </div>
           </>
         ) : entityType === 'pipeline' ? (
-          <div className="p-6">
+          <div className="p-4">
             <p className="text-muted-foreground text-sm">
               Pipeline company details coming soon. Use the Pipeline page for full details.
             </p>
           </div>
         ) : (
-          <div className="p-6">
+          <div className="p-4">
             <p className="text-muted-foreground text-sm">No company selected.</p>
           </div>
         )}
