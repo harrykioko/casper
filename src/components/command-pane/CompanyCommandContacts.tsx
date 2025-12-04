@@ -19,18 +19,18 @@ export function CompanyCommandContacts({ contacts }: CompanyCommandContactsProps
   };
 
   return (
-    <div className="space-y-2">
-      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Founders</h4>
+    <div className="bg-card/60 border border-border/40 rounded-xl p-4 backdrop-blur-sm space-y-3">
+      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Founders</h4>
       <div className="space-y-2">
         {contacts.map((contact) => (
           <div
             key={contact.id}
-            className="flex items-center justify-between p-2 rounded-lg bg-muted/20 border border-border/50"
+            className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border/30"
           >
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-foreground truncate">{contact.name}</p>
+              <p className="text-base font-medium text-foreground truncate">{contact.name}</p>
               {contact.role && (
-                <p className="text-xs text-muted-foreground truncate">{contact.role}</p>
+                <p className="text-sm text-muted-foreground truncate">{contact.role}</p>
               )}
             </div>
             
@@ -39,23 +39,23 @@ export function CompanyCommandContacts({ contacts }: CompanyCommandContactsProps
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
+                  className="h-8 w-8"
                   asChild
                 >
                   <a href={`mailto:${contact.email}`}>
-                    <Mail className="w-3.5 h-3.5" />
+                    <Mail className="w-4 h-4" />
                   </a>
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
+                  className="h-8 w-8"
                   onClick={() => copyEmail(contact.email!, contact.id)}
                 >
                   {copiedId === contact.id ? (
-                    <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    <Check className="w-4 h-4 text-emerald-500" />
                   ) : (
-                    <Copy className="w-3.5 h-3.5" />
+                    <Copy className="w-4 h-4" />
                   )}
                 </Button>
               </div>

@@ -14,22 +14,22 @@ export function CompanyCommandSummary({ lastInteractionAt, openTaskCount, status
 
   return (
     <div className="grid grid-cols-3 gap-3">
-      <div className="bg-muted/30 rounded-lg p-3 text-center">
-        <Clock className="w-4 h-4 mx-auto mb-1 text-muted-foreground" />
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Last Touch</p>
-        <p className="text-xs font-medium text-foreground mt-0.5 truncate">{formattedLastInteraction}</p>
+      <div className="bg-card/60 border border-border/40 backdrop-blur-sm rounded-xl p-4 text-center">
+        <Clock className="w-5 h-5 mx-auto mb-1.5 text-muted-foreground" />
+        <p className="text-xs text-muted-foreground uppercase tracking-wide">Last Touch</p>
+        <p className="text-sm font-medium text-foreground mt-1 truncate">{formattedLastInteraction}</p>
       </div>
       
-      <div className="bg-muted/30 rounded-lg p-3 text-center">
-        <CheckSquare className="w-4 h-4 mx-auto mb-1 text-muted-foreground" />
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Open Tasks</p>
-        <p className="text-xs font-medium text-foreground mt-0.5">{openTaskCount}</p>
+      <div className="bg-card/60 border border-border/40 backdrop-blur-sm rounded-xl p-4 text-center">
+        <CheckSquare className="w-5 h-5 mx-auto mb-1.5 text-muted-foreground" />
+        <p className="text-xs text-muted-foreground uppercase tracking-wide">Open Tasks</p>
+        <p className="text-sm font-medium text-foreground mt-1">{openTaskCount}</p>
       </div>
       
-      <div className="bg-muted/30 rounded-lg p-3 text-center">
-        <Activity className="w-4 h-4 mx-auto mb-1 text-muted-foreground" />
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Status</p>
-        <p className="text-xs font-medium text-foreground mt-0.5 capitalize">{status}</p>
+      <div className="bg-card/60 border border-border/40 backdrop-blur-sm rounded-xl p-4 text-center">
+        <Activity className="w-5 h-5 mx-auto mb-1.5 text-muted-foreground" />
+        <p className="text-xs text-muted-foreground uppercase tracking-wide">Status</p>
+        <p className="text-sm font-medium text-foreground mt-1 capitalize">{status}</p>
       </div>
     </div>
   );

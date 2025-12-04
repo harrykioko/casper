@@ -38,19 +38,19 @@ export function CompanyTile({
 }: CompanyTileProps) {
   const formattedLastTouch = lastTouch
     ? formatDistanceToNow(new Date(lastTouch), { addSuffix: true })
-    : 'No interactions yet';
+    : 'No interactions';
 
   const statusColorClass = status ? statusColors[status] || 'bg-muted text-muted-foreground' : '';
 
   return (
     <Card
-      className="min-w-[180px] max-w-[200px] cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:shadow-lg bg-card/50 backdrop-blur-sm border-border/50 flex-shrink-0"
+      className="min-w-[200px] max-w-[220px] cursor-pointer transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-lg bg-card/60 backdrop-blur-sm border-border/40 rounded-xl flex-shrink-0"
       onClick={onClick}
     >
-      <CardContent className="p-3">
+      <CardContent className="p-4">
         {/* Top row: Logo and status */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="w-10 h-10 rounded-lg bg-white dark:bg-zinc-800 border flex items-center justify-center overflow-hidden p-1 flex-shrink-0">
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="w-11 h-11 rounded-lg bg-white dark:bg-zinc-800 border flex items-center justify-center overflow-hidden p-1.5 flex-shrink-0">
             {logoUrl ? (
               <img
                 src={logoUrl}
@@ -58,30 +58,30 @@ export function CompanyTile({
                 className="max-w-full max-h-full object-contain"
               />
             ) : (
-              <span className="text-base font-semibold text-muted-foreground">
+              <span className="text-lg font-semibold text-muted-foreground">
                 {name.charAt(0).toUpperCase()}
               </span>
             )}
           </div>
           {status && (
-            <Badge variant="secondary" className={`text-[10px] px-1.5 py-0.5 ${statusColorClass}`}>
+            <Badge variant="secondary" className={`text-xs px-2 py-0.5 rounded-full ${statusColorClass}`}>
               {status.replace('_', ' ')}
             </Badge>
           )}
         </div>
 
         {/* Company name */}
-        <h4 className="font-medium text-sm text-foreground truncate mb-2">{name}</h4>
+        <h4 className="font-medium text-base text-foreground truncate mb-3">{name}</h4>
 
         {/* Bottom row: Last touch and tasks */}
-        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-          <div className="flex items-center gap-1 truncate">
-            <Clock className="w-3 h-3 flex-shrink-0" />
-            <span className="truncate">{formattedLastTouch}</span>
+        <div className="space-y-1.5 text-sm text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate">Last touch: {formattedLastTouch}</span>
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <CheckSquare className="w-3 h-3" />
-            <span>{openTaskCount}</span>
+          <div className="flex items-center gap-1.5">
+            <CheckSquare className="w-3.5 h-3.5 flex-shrink-0" />
+            <span>Tasks: {openTaskCount} open</span>
           </div>
         </div>
       </CardContent>
