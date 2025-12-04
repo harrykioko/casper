@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Task } from "@/hooks/useTasks";
 import { ReadingItem } from "@/types/readingItem";
@@ -6,6 +5,9 @@ import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { TodayTasksSection } from "@/components/dashboard/TodayTasksSection";
 import { ReadingListSection } from "@/components/dashboard/ReadingListSection";
 import { TaskInput } from "@/components/dashboard/TaskInput";
+import { DashboardPortfolioSection } from "@/components/dashboard/DashboardPortfolioSection";
+import { DashboardPipelineFocusSection } from "@/components/dashboard/DashboardPipelineFocusSection";
+import { CompanyCommandPane } from "@/components/command-pane/CompanyCommandPane";
 import { EnhancedCommandModal } from "@/components/modals/EnhancedCommandModal";
 import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
 import { CreatePromptModal } from "@/components/modals/CreatePromptModal";
@@ -52,6 +54,13 @@ export function DashboardMainContent({
   const [showAddTask, setShowAddTask] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
+  
+  // Command pane state
+  const [commandPaneOpen, setCommandPaneOpen] = useState(false);
+  const [selectedEntity, setSelectedEntity] = useState<{
+    type: 'portfolio' | 'pipeline';
+    id: string;
+  } | null>(null);
 
   const handleCreatePrompt = (promptData: any) => {
     console.log('Creating prompt:', promptData);
@@ -68,6 +77,21 @@ export function DashboardMainContent({
     setSelectedTask(null);
   };
 
+  const openPortfolioCommandPane = (companyId: string) => {
+    setSelectedEntity({ type: 'portfolio', id: companyId });
+    setCommandPaneOpen(true);
+  };
+
+  const openPipelineCommandPane = (companyId: string) => {
+    setSelectedEntity({ type: 'pipeline', id: companyId });
+    setCommandPaneOpen(true);
+  };
+
+  const closeCommandPane = () => {
+    setCommandPaneOpen(false);
+    setSelectedEntity(null);
+  };
+
   return (
     <div className="flex-1 p-8">
       <div className="max-w-3xl mx-auto space-y-8">
@@ -76,6 +100,12 @@ export function DashboardMainContent({
 
         {/* Task Input Bar */}
         <TaskInput onAddTask={onAddTask} />
+
+        {/* Portfolio Section */}
+        <DashboardPortfolioSection onCompanyClick={openPortfolioCommandPane} />
+
+        {/* Pipeline Focus Section */}
+        <DashboardPipelineFocusSection onCompanyClick={openPipelineCommandPane} />
 
         {/* Today's Tasks Section */}
         <TodayTasksSection
@@ -93,6 +123,14 @@ export function DashboardMainContent({
           onAddReadingItem={onAddReadingItem}
         />
       </div>
+
+      {/* Company Command Pane */}
+      <CompanyCommandPane
+        open={commandPaneOpen}
+        onClose={closeCommandPane}
+        entityType={selectedEntity?.type || 'portfolio'}
+        entityId={selectedEntity?.id || null}
+      />
 
       {/* Enhanced Command Modal */}
       <EnhancedCommandModal

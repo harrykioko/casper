@@ -30,6 +30,7 @@ export interface PipelineCompany {
   close_date?: string;
   website?: string;
   next_steps?: string;
+  is_top_of_mind?: boolean;
   created_by: string;
   created_at: string;
   updated_at: string;
