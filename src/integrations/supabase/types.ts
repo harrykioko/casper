@@ -362,6 +362,7 @@ export type Database = {
           created_by: string
           current_round: Database["public"]["Enums"]["round_enum"]
           id: string
+          is_top_of_mind: boolean
           next_steps: string | null
           raise_amount_usd: number | null
           sector: Database["public"]["Enums"]["sector_enum"] | null
@@ -376,6 +377,7 @@ export type Database = {
           created_by: string
           current_round: Database["public"]["Enums"]["round_enum"]
           id?: string
+          is_top_of_mind?: boolean
           next_steps?: string | null
           raise_amount_usd?: number | null
           sector?: Database["public"]["Enums"]["sector_enum"] | null
@@ -390,6 +392,7 @@ export type Database = {
           created_by?: string
           current_round?: Database["public"]["Enums"]["round_enum"]
           id?: string
+          is_top_of_mind?: boolean
           next_steps?: string | null
           raise_amount_usd?: number | null
           sector?: Database["public"]["Enums"]["sector_enum"] | null

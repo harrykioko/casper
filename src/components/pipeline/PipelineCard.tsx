@@ -2,7 +2,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { PipelineCompany } from '@/types/pipeline';
 import { formatTaskDate } from '@/utils/dateUtils';
-import { ExternalLink, Calendar, DollarSign, GripVertical } from 'lucide-react';
+import { ExternalLink, Calendar, DollarSign, GripVertical, Star } from 'lucide-react';
+import { usePipeline } from '@/hooks/usePipeline';
+import { toast } from 'sonner';
 
 interface PipelineCardProps {
   company: PipelineCompany;
@@ -31,13 +33,25 @@ const roundColors = {
 };
 
 export function PipelineCard({ company, onClick, isDragging, dragHandleProps }: PipelineCardProps) {
+  const { updateCompany } = usePipeline();
   const statusBorderColor = statusColors[company.status as keyof typeof statusColors];
+  const isTopOfMind = company.is_top_of_mind ?? false;
+
+  const handleToggleTopOfMind = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await updateCompany(company.id, { is_top_of_mind: !isTopOfMind });
+      toast.success(isTopOfMind ? 'Removed from Dashboard' : 'Pinned to Dashboard');
+    } catch (error) {
+      toast.error('Failed to update');
+    }
+  };
 
   return (
     <div
       className={`bg-white/15 dark:bg-slate-800/30 backdrop-blur-lg rounded-2xl p-4 border-2 ${statusBorderColor} shadow-xl cursor-pointer transition-all duration-200 hover:scale-105 hover:shadow-2xl ${
         isDragging ? 'scale-90 opacity-80' : ''
-      }`}
+      } ${isTopOfMind ? 'ring-2 ring-amber-400/50' : ''}`}
       onClick={onClick}
     >
       {/* Header */}
@@ -57,19 +71,32 @@ export function PipelineCard({ company, onClick, isDragging, dragHandleProps }: 
           <h3 className="font-semibold text-lg truncate flex-1">{company.company_name}</h3>
         </div>
         
-        {company.website && (
+        <div className="flex items-center gap-1 shrink-0">
+          {/* Top of Mind Toggle */}
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open(company.website, '_blank');
-            }}
+            className={`h-6 w-6 ${isTopOfMind ? 'text-amber-500' : 'text-muted-foreground hover:text-amber-500'}`}
+            onClick={handleToggleTopOfMind}
+            title={isTopOfMind ? 'Remove from Dashboard' : 'Pin to Dashboard'}
           >
-            <ExternalLink className="h-3 w-3" />
+            <Star className={`h-3.5 w-3.5 ${isTopOfMind ? 'fill-current' : ''}`} />
           </Button>
-        )}
+          
+          {company.website && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(company.website, '_blank');
+              }}
+            >
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Round Badge */}

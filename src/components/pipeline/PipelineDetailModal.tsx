@@ -216,6 +216,20 @@ export function PipelineDetailModal({ company, isOpen, onClose }: PipelineDetail
             />
           </div>
 
+          <div className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <div>
+              <Label htmlFor="top_of_mind" className="text-sm font-medium">Top of Mind</Label>
+              <p className="text-xs text-muted-foreground">Show on Dashboard for quick access</p>
+            </div>
+            <input
+              type="checkbox"
+              id="top_of_mind"
+              checked={formData.is_top_of_mind || false}
+              onChange={(e) => setFormData(prev => ({ ...prev, is_top_of_mind: e.target.checked }))}
+              className="h-4 w-4 rounded border-border"
+            />
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="next_steps">Next Steps</Label>
             <Textarea
