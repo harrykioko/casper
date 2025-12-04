@@ -94,7 +94,7 @@ export function DashboardMainContent({
 
   return (
     <div className="flex-1 p-8">
-      <div className="max-w-3xl mx-auto space-y-8">
+      <div className="max-w-4xl mx-auto space-y-8">
         {/* Header with Command Button */}
         <DashboardHeader openCommandModal={openCommandModal} />
 

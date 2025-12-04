@@ -32,24 +32,24 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent 
         side="right" 
-        className="w-full sm:w-[480px] p-0 bg-background/95 backdrop-blur-xl border-l overflow-hidden flex flex-col"
+        className="w-full sm:w-[540px] lg:w-[580px] p-0 bg-background/95 backdrop-blur-xl border-l overflow-hidden flex flex-col data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=open]:duration-200"
       >
         {isLoading ? (
           <div className="p-6 space-y-4">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-32 w-full rounded-xl" />
           </div>
         ) : entityType === 'portfolio' && company ? (
           <>
-            <SheetHeader className="p-0 border-b sticky top-0 bg-background/95 backdrop-blur-xl z-10">
+            <SheetHeader className="p-0 sticky top-0 z-20 bg-background/95 backdrop-blur-md border-b border-border/40">
               <CompanyCommandHeader
                 company={company}
                 onClose={onClose}
               />
             </SheetHeader>
             
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="flex-1 overflow-y-auto p-5 space-y-5">
               <CompanyCommandSummary
                 lastInteractionAt={company.last_interaction_at}
                 openTaskCount={openTasks.length}

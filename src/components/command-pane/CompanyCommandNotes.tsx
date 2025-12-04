@@ -47,14 +47,14 @@ export function CompanyCommandNotes({ interactions, companyId, onCreateInteracti
   };
 
   return (
-    <div className="space-y-3">
-      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notes & Interactions</h4>
+    <div className="bg-card/60 border border-border/40 rounded-xl p-4 backdrop-blur-sm space-y-4">
+      <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Notes & Interactions</h4>
 
       {/* Quick add form */}
-      <form onSubmit={handleSubmit} className="space-y-2">
+      <form onSubmit={handleSubmit} className="space-y-3">
         <div className="flex gap-2">
           <Select value={type} onValueChange={(v) => setType(v as InteractionType)}>
-            <SelectTrigger className="w-[100px] h-8 text-xs">
+            <SelectTrigger className="w-[110px] h-9 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -65,15 +65,15 @@ export function CompanyCommandNotes({ interactions, companyId, onCreateInteracti
               <SelectItem value="update">Update</SelectItem>
             </SelectContent>
           </Select>
-          <Button type="submit" size="sm" disabled={isSubmitting || !content.trim()}>
-            <Send className="w-3.5 h-3.5" />
+          <Button type="submit" size="sm" className="h-9" disabled={isSubmitting || !content.trim()}>
+            <Send className="w-4 h-4" />
           </Button>
         </div>
         <Textarea
           placeholder="Add a note..."
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          className="min-h-[60px] text-sm resize-none"
+          className="min-h-[80px] text-sm resize-none bg-muted/30 rounded-lg px-3 py-2.5"
           disabled={isSubmitting}
         />
       </form>
@@ -86,18 +86,18 @@ export function CompanyCommandNotes({ interactions, companyId, onCreateInteracti
             return (
               <div
                 key={interaction.id}
-                className="p-2 rounded-lg bg-muted/20 border border-border/50"
+                className="p-3 rounded-lg bg-muted/30 border border-border/30"
               >
-                <div className="flex items-center gap-2 mb-1">
-                  <Icon className="w-3 h-3 text-muted-foreground" />
-                  <span className="text-[10px] text-muted-foreground capitalize">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground capitalize">
                     {interaction.interaction_type}
                   </span>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(interaction.occurred_at), { addSuffix: true })}
                   </span>
                 </div>
-                <p className="text-xs text-foreground line-clamp-2">{interaction.content}</p>
+                <p className="text-sm text-foreground line-clamp-2">{interaction.content}</p>
               </div>
             );
           })}

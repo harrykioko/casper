@@ -14,13 +14,13 @@ export function DashboardPortfolioSection({ onCompanyClick }: DashboardPortfolio
 
   if (loading) {
     return (
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-foreground">Portfolio</h3>
+      <section className="bg-muted/30 rounded-2xl p-5 my-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-semibold text-foreground">Portfolio</h3>
         </div>
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-muted">
+        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-muted">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="min-w-[180px] h-[120px] rounded-lg flex-shrink-0" />
+            <Skeleton key={i} className="min-w-[200px] h-[140px] rounded-xl flex-shrink-0" />
           ))}
         </div>
       </section>
@@ -29,11 +29,11 @@ export function DashboardPortfolioSection({ onCompanyClick }: DashboardPortfolio
 
   if (companies.length === 0) {
     return (
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-foreground">Portfolio</h3>
+      <section className="bg-muted/30 rounded-2xl p-5 my-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-semibold text-foreground">Portfolio</h3>
         </div>
-        <div className="flex flex-col items-center justify-center py-8 px-4 rounded-lg border border-dashed border-border/50 bg-muted/20">
+        <div className="flex flex-col items-center justify-center py-8 px-4 rounded-xl border border-dashed border-border/50 bg-card/40">
           <Briefcase className="w-8 h-8 text-muted-foreground/50 mb-2" />
           <p className="text-sm text-muted-foreground mb-3">No portfolio companies yet.</p>
           <Button variant="outline" size="sm" asChild>
@@ -45,17 +45,17 @@ export function DashboardPortfolioSection({ onCompanyClick }: DashboardPortfolio
   }
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-foreground">Portfolio</h3>
+    <section className="bg-muted/30 rounded-2xl p-5 my-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-base font-semibold text-foreground">Portfolio</h3>
         <Link
           to="/portfolio"
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
         >
-          View all <ArrowRight className="w-3 h-3" />
+          View all <ArrowRight className="w-3.5 h-3.5" />
         </Link>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-muted snap-x snap-mandatory">
+      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-muted snap-x snap-mandatory">
         {companies.map((company) => (
           <div key={company.id} className="snap-start">
             <CompanyTile
