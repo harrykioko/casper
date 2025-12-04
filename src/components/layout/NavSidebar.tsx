@@ -8,7 +8,8 @@ import {
   MessageSquareText, 
   Sparkles,
   BookOpen,
-  TrendingUp
+  TrendingUp,
+  Briefcase
 } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useSidebarState } from "@/contexts/SidebarStateContext";
@@ -47,6 +48,12 @@ export function NavSidebar() {
       path: "/pipeline", 
       label: "Pipeline",
       active: location.pathname.startsWith("/pipeline") 
+    },
+    { 
+      icon: Briefcase, 
+      path: "/portfolio", 
+      label: "Portfolio",
+      active: location.pathname.startsWith("/portfolio") 
     }
   ];
 
