@@ -5,18 +5,28 @@ import { CompanyCommandContacts } from './CompanyCommandContacts';
 import { CompanyCommandTasks } from './CompanyCommandTasks';
 import { CompanyCommandNotes } from './CompanyCommandNotes';
 import { CompanyCommandTimeline } from './CompanyCommandTimeline';
+import { CompanyCommandQuickActions } from './CompanyCommandQuickActions';
 import { useCompany } from '@/hooks/useCompany';
 import { useCompanyContacts } from '@/hooks/useCompanyContacts';
 import { useCompanyInteractions } from '@/hooks/useCompanyInteractions';
 import { useCompanyTasks } from '@/hooks/useCompanyTasks';
 import { useCompanyTimeline } from '@/hooks/useCompanyTimeline';
 import { Skeleton } from '@/components/ui/skeleton';
+import { differenceInDays, parseISO } from 'date-fns';
 
 interface CompanyCommandPaneProps {
   open: boolean;
   onClose: () => void;
   entityType: 'portfolio' | 'pipeline';
   entityId: string | null;
+}
+
+function getHealthBorderColor(lastInteractionAt: string | null | undefined): string {
+  if (!lastInteractionAt) return 'border-t-red-500';
+  const days = differenceInDays(new Date(), parseISO(lastInteractionAt));
+  if (days <= 7) return 'border-t-emerald-500';
+  if (days <= 14) return 'border-t-amber-500';
+  return 'border-t-red-500';
 }
 
 export function CompanyCommandPane({ open, onClose, entityType, entityId }: CompanyCommandPaneProps) {
@@ -27,12 +37,19 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
   const timeline = useCompanyTimeline(interactions, tasks);
 
   const isLoading = companyLoading;
+  const healthBorderColor = company ? getHealthBorderColor(company.last_interaction_at) : '';
+  
+  // Get earliest open task for "Next Step"
+  const nextTask = openTasks.length > 0 ? openTasks[0].content : null;
+  
+  // Get primary founder email
+  const primaryFounder = founders.find(f => f.is_primary) || founders[0];
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent 
         side="right" 
-        className="w-full sm:w-[540px] lg:w-[580px] p-0 bg-background/95 backdrop-blur-xl border-l overflow-hidden flex flex-col data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=open]:duration-200"
+        className={`w-full sm:w-[580px] lg:w-[640px] xl:w-[680px] p-0 bg-background/95 backdrop-blur-xl border-l overflow-hidden flex flex-col data-[state=open]:animate-in data-[state=open]:slide-in-from-right data-[state=open]:duration-200 border-t-4 ${healthBorderColor}`}
       >
         {isLoading ? (
           <div className="p-6 space-y-4">
@@ -50,10 +67,26 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
             </SheetHeader>
             
             <div className="flex-1 overflow-y-auto p-5 space-y-5">
+              {/* Action Overview - Next Step + Summary */}
               <CompanyCommandSummary
                 lastInteractionAt={company.last_interaction_at}
                 openTaskCount={openTasks.length}
                 status={company.status}
+                nextTask={nextTask}
+              />
+
+              {/* Quick Actions */}
+              <CompanyCommandQuickActions
+                companyId={company.id}
+                primaryFounderEmail={primaryFounder?.email}
+                onAddTask={() => {
+                  const input = document.querySelector<HTMLInputElement>('[data-task-input]');
+                  input?.focus();
+                }}
+                onAddNote={() => {
+                  const textarea = document.querySelector<HTMLTextAreaElement>('[data-note-input]');
+                  textarea?.focus();
+                }}
               />
 
               {founders.length > 0 && (

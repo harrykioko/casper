@@ -21,35 +21,35 @@ export function CompanyCommandTimeline({ events }: CompanyCommandTimelineProps) 
   }
 
   return (
-    <div className="bg-card/60 border border-border/40 rounded-xl p-4 backdrop-blur-sm space-y-3">
+    <div className="bg-card/50 border border-border/30 rounded-xl p-4 backdrop-blur-sm space-y-4">
       <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Timeline</h4>
       
       <div className="relative">
         {/* Timeline line */}
-        <div className="absolute left-[9px] top-2 bottom-2 w-px bg-border" />
+        <div className="absolute left-[11px] top-3 bottom-3 w-0.5 bg-border/60" />
         
-        <div className="space-y-3">
+        <div className="space-y-4">
           {events.map((event) => {
             const Icon = iconMap[event.icon] || Circle;
             const isTask = event.type === 'task_created' || event.type === 'task_completed';
             
             return (
-              <div key={event.id} className="flex gap-3 relative">
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${
-                  isTask ? 'bg-primary/10' : 'bg-muted'
+              <div key={event.id} className="flex gap-4 relative">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 z-10 ${
+                  isTask ? 'bg-primary/10 ring-2 ring-background' : 'bg-muted ring-2 ring-background'
                 }`}>
-                  <Icon className={`w-3 h-3 ${isTask ? 'text-primary' : 'text-muted-foreground'}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isTask ? 'text-primary' : 'text-muted-foreground'}`} />
                 </div>
                 
                 <div className="flex-1 min-w-0 pb-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-foreground">{event.title}</span>
                     <span className="text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(event.timestamp), { addSuffix: true })}
                     </span>
                   </div>
                   {event.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-1 mt-0.5">
+                    <p className="text-sm text-muted-foreground line-clamp-2 mt-0.5">
                       {event.description}
                     </p>
                   )}

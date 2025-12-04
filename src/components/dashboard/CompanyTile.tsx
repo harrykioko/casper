@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Clock, CheckSquare } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { Clock, CheckSquare, ArrowRight } from 'lucide-react';
+import { formatDistanceToNow, differenceInDays, parseISO } from 'date-fns';
 
 interface CompanyTileProps {
   type: 'portfolio' | 'pipeline';
@@ -10,6 +10,7 @@ interface CompanyTileProps {
   status?: string;
   lastTouch?: string | null;
   openTaskCount?: number;
+  nextTask?: string | null;
   onClick: () => void;
 }
 
@@ -27,6 +28,16 @@ const statusColors: Record<string, string> = {
   passed: 'bg-muted text-muted-foreground',
 };
 
+function getHealthDotColor(lastTouch: string | null): string {
+  if (!lastTouch) return 'bg-red-500';
+  
+  const days = differenceInDays(new Date(), parseISO(lastTouch));
+  
+  if (days <= 7) return 'bg-emerald-500';
+  if (days <= 14) return 'bg-amber-500';
+  return 'bg-red-500';
+}
+
 export function CompanyTile({
   type,
   name,
@@ -34,6 +45,7 @@ export function CompanyTile({
   status,
   lastTouch,
   openTaskCount = 0,
+  nextTask,
   onClick,
 }: CompanyTileProps) {
   const formattedLastTouch = lastTouch
@@ -41,27 +53,32 @@ export function CompanyTile({
     : 'No interactions';
 
   const statusColorClass = status ? statusColors[status] || 'bg-muted text-muted-foreground' : '';
+  const healthDotColor = getHealthDotColor(lastTouch);
 
   return (
     <Card
-      className="min-w-[200px] max-w-[220px] cursor-pointer transition-all duration-150 ease-out hover:-translate-y-0.5 hover:shadow-lg bg-card/60 backdrop-blur-sm border-border/40 rounded-xl flex-shrink-0"
+      className="min-w-[220px] max-w-[240px] cursor-pointer transition-all duration-150 ease-out hover:-translate-y-1 hover:shadow-lg shadow-sm bg-card/60 backdrop-blur-sm border-border/40 rounded-xl flex-shrink-0"
       onClick={onClick}
     >
       <CardContent className="p-4">
-        {/* Top row: Logo and status */}
+        {/* Top row: Logo, health dot, and status */}
         <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="w-11 h-11 rounded-lg bg-white dark:bg-zinc-800 border flex items-center justify-center overflow-hidden p-1.5 flex-shrink-0">
-            {logoUrl ? (
-              <img
-                src={logoUrl}
-                alt={name}
-                className="max-w-full max-h-full object-contain"
-              />
-            ) : (
-              <span className="text-lg font-semibold text-muted-foreground">
-                {name.charAt(0).toUpperCase()}
-              </span>
-            )}
+          <div className="relative">
+            <div className="w-11 h-11 rounded-lg bg-white dark:bg-zinc-800 border flex items-center justify-center overflow-hidden p-1.5 flex-shrink-0">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={name}
+                  className="max-w-full max-h-full object-contain"
+                />
+              ) : (
+                <span className="text-lg font-semibold text-muted-foreground">
+                  {name.charAt(0).toUpperCase()}
+                </span>
+              )}
+            </div>
+            {/* Health indicator dot */}
+            <div className={`absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full ${healthDotColor} border-2 border-card`} />
           </div>
           {status && (
             <Badge variant="secondary" className={`text-xs px-2 py-0.5 rounded-full ${statusColorClass}`}>
@@ -71,7 +88,15 @@ export function CompanyTile({
         </div>
 
         {/* Company name */}
-        <h4 className="font-medium text-base text-foreground truncate mb-3">{name}</h4>
+        <h4 className="font-medium text-base text-foreground truncate mb-2">{name}</h4>
+
+        {/* Next step */}
+        {nextTask && (
+          <div className="flex items-center gap-1.5 text-sm text-primary mb-2 bg-primary/5 rounded-md px-2 py-1.5">
+            <ArrowRight className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="truncate font-medium">Next: {nextTask}</span>
+          </div>
+        )}
 
         {/* Bottom row: Last touch and tasks */}
         <div className="space-y-1.5 text-sm text-muted-foreground">

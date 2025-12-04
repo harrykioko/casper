@@ -10,6 +10,7 @@ export interface DashboardPortfolioCompany {
   status: 'active' | 'watching' | 'exited' | 'archived';
   last_interaction_at: string | null;
   open_task_count: number;
+  next_task: string | null;
 }
 
 export function useDashboardPortfolioCompanies() {
@@ -45,21 +46,28 @@ export function useDashboardPortfolioCompanies() {
         return;
       }
 
-      // Fetch task counts for each company
+      // Fetch tasks for each company (including content for next_task)
       const companyIds = companiesData.map(c => c.id);
       const { data: tasksData, error: tasksError } = await supabase
         .from('tasks')
-        .select('company_id')
+        .select('company_id, content, scheduled_for')
         .in('company_id', companyIds)
-        .eq('completed', false);
+        .eq('completed', false)
+        .order('scheduled_for', { ascending: true, nullsFirst: false });
 
       if (tasksError) throw tasksError;
 
-      // Count tasks per company
+      // Count tasks and get earliest task per company
       const taskCounts: Record<string, number> = {};
+      const nextTasks: Record<string, string> = {};
+      
       tasksData?.forEach(task => {
         if (task.company_id) {
           taskCounts[task.company_id] = (taskCounts[task.company_id] || 0) + 1;
+          // Get the first (earliest) task as next_task
+          if (!nextTasks[task.company_id]) {
+            nextTasks[task.company_id] = task.content;
+          }
         }
       });
 
@@ -72,6 +80,7 @@ export function useDashboardPortfolioCompanies() {
         status: company.status as 'active' | 'watching' | 'exited' | 'archived',
         last_interaction_at: company.last_interaction_at,
         open_task_count: taskCounts[company.id] || 0,
+        next_task: nextTasks[company.id] || null,
       }));
 
       setCompanies(enrichedCompanies);
