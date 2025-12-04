@@ -49,6 +49,8 @@ serve(async (req) => {
     const expiresAt = new Date(connection.token_expires_at);
     
     if (now >= expiresAt) {
+      console.log('Token expired, attempting refresh...');
+      
       // Refresh token
       const refreshResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
         method: 'POST',
@@ -64,11 +66,21 @@ serve(async (req) => {
       });
 
       if (!refreshResponse.ok) {
-        throw new Error('Failed to refresh token');
+        const errorData = await refreshResponse.text();
+        console.error('Token refresh failed:', refreshResponse.status, errorData);
+        
+        // Mark connection as inactive since refresh failed
+        await supabaseClient
+          .from('outlook_connections')
+          .update({ is_active: false })
+          .eq('id', connection.id);
+        
+        throw new Error('RECONNECT_REQUIRED: Your Outlook connection has expired. Please reconnect your account in Settings.');
       }
 
       const refreshData = await refreshResponse.json();
       accessToken = refreshData.access_token;
+      console.log('Token refreshed successfully');
       
       // Update stored tokens
       const newExpiresAt = new Date(Date.now() + (refreshData.expires_in * 1000));
