@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Plus, Trash2, Star } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Star, Loader2, Globe } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CompanyStatus, FounderInput } from '@/types/portfolio';
+import { fetchLinkMetadata } from '@/services/linkMetadataService';
+import { toast } from 'sonner';
 
 interface AddCompanyModalProps {
   open: boolean;
@@ -53,6 +55,41 @@ export function AddCompanyModal({
     initialData?.founders || [{ name: '', email: '', role: '', is_primary: true }]
   );
   const [loading, setLoading] = useState(false);
+  const [fetchingLogo, setFetchingLogo] = useState(false);
+  const lastFetchedUrl = useRef<string>('');
+
+  // Auto-fetch logo when website URL changes
+  useEffect(() => {
+    if (!websiteUrl.trim() || websiteUrl === lastFetchedUrl.current) return;
+    
+    // Validate URL format
+    try {
+      new URL(websiteUrl);
+    } catch {
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      setFetchingLogo(true);
+      try {
+        const metadata = await fetchLinkMetadata(websiteUrl);
+        lastFetchedUrl.current = websiteUrl;
+        
+        // Prefer image (usually higher quality) over favicon
+        const logo = metadata.image || metadata.favicon;
+        if (logo) {
+          setLogoUrl(logo);
+          toast.success('Logo fetched from website');
+        }
+      } catch (error) {
+        console.error('Failed to fetch logo:', error);
+      } finally {
+        setFetchingLogo(false);
+      }
+    }, 800);
+
+    return () => clearTimeout(timeoutId);
+  }, [websiteUrl]);
 
   const handleAddFounder = () => {
     setFounders([...founders, { name: '', email: '', role: '', is_primary: false }]);
@@ -101,9 +138,37 @@ export function AddCompanyModal({
         setLogoUrl('');
         setStatus('active');
         setFounders([{ name: '', email: '', role: '', is_primary: true }]);
+        lastFetchedUrl.current = '';
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleManualFetch = async () => {
+    if (!websiteUrl.trim()) return;
+    try {
+      new URL(websiteUrl);
+    } catch {
+      toast.error('Invalid URL');
+      return;
+    }
+
+    setFetchingLogo(true);
+    try {
+      const metadata = await fetchLinkMetadata(websiteUrl);
+      lastFetchedUrl.current = websiteUrl;
+      const logo = metadata.image || metadata.favicon;
+      if (logo) {
+        setLogoUrl(logo);
+        toast.success('Logo fetched from website');
+      } else {
+        toast.error('No logo found on website');
+      }
+    } catch (error) {
+      toast.error('Failed to fetch logo');
+    } finally {
+      setFetchingLogo(false);
     }
   };
 
@@ -139,18 +204,56 @@ export function AddCompanyModal({
               onChange={(e) => setWebsiteUrl(e.target.value)}
               placeholder="https://example.com"
             />
+            <p className="text-xs text-muted-foreground">
+              Logo will be auto-fetched from website
+            </p>
           </div>
 
-          {/* Logo URL */}
+          {/* Logo URL with Preview */}
           <div className="space-y-2">
             <Label htmlFor="logo">Logo URL</Label>
-            <Input
-              id="logo"
-              type="url"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              placeholder="https://example.com/logo.png"
-            />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  id="logo"
+                  type="url"
+                  value={logoUrl}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                  placeholder="Auto-fetched or enter manually"
+                  className="pr-10"
+                />
+                {fetchingLogo && (
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={handleManualFetch}
+                disabled={fetchingLogo || !websiteUrl.trim()}
+                title="Fetch logo from website"
+              >
+                <Globe className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {/* Logo Preview */}
+            {logoUrl && (
+              <div className="flex items-center gap-3 p-2 rounded-md bg-muted/50">
+                <img
+                  src={logoUrl}
+                  alt="Logo preview"
+                  className="h-10 w-10 object-contain rounded"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+                <span className="text-xs text-muted-foreground truncate flex-1">
+                  {logoUrl}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Status */}
