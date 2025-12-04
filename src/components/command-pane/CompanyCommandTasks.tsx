@@ -3,13 +3,22 @@ import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { CompanyTask } from '@/hooks/useCompanyTasks';
+
+// Common task shape that works for both portfolio and pipeline
+interface BaseTask {
+  id: string;
+  content: string;
+  completed: boolean;
+  completed_at?: string | null;
+  priority?: string | null;
+}
 
 interface CompanyCommandTasksProps {
-  tasks: CompanyTask[];
+  tasks: BaseTask[];
   companyId: string;
   onCreateTask: (content: string) => Promise<unknown>;
   onToggleComplete: (taskId: string) => Promise<unknown>;
+  entityType?: 'portfolio' | 'pipeline';
 }
 
 export function CompanyCommandTasks({ tasks, companyId, onCreateTask, onToggleComplete }: CompanyCommandTasksProps) {

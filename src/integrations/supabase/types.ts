@@ -363,6 +363,8 @@ export type Database = {
           current_round: Database["public"]["Enums"]["round_enum"]
           id: string
           is_top_of_mind: boolean
+          last_interaction_at: string | null
+          logo_url: string | null
           next_steps: string | null
           raise_amount_usd: number | null
           sector: Database["public"]["Enums"]["sector_enum"] | null
@@ -378,6 +380,8 @@ export type Database = {
           current_round: Database["public"]["Enums"]["round_enum"]
           id?: string
           is_top_of_mind?: boolean
+          last_interaction_at?: string | null
+          logo_url?: string | null
           next_steps?: string | null
           raise_amount_usd?: number | null
           sector?: Database["public"]["Enums"]["sector_enum"] | null
@@ -393,6 +397,8 @@ export type Database = {
           current_round?: Database["public"]["Enums"]["round_enum"]
           id?: string
           is_top_of_mind?: boolean
+          last_interaction_at?: string | null
+          logo_url?: string | null
           next_steps?: string | null
           raise_amount_usd?: number | null
           sector?: Database["public"]["Enums"]["sector_enum"] | null
@@ -401,6 +407,98 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
+      }
+      pipeline_contacts: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          email: string | null
+          id: string
+          is_founder: boolean
+          is_primary: boolean
+          name: string
+          pipeline_company_id: string
+          role: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          email?: string | null
+          id?: string
+          is_founder?: boolean
+          is_primary?: boolean
+          name: string
+          pipeline_company_id: string
+          role?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          email?: string | null
+          id?: string
+          is_founder?: boolean
+          is_primary?: boolean
+          name?: string
+          pipeline_company_id?: string
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_contacts_pipeline_company_id_fkey"
+            columns: ["pipeline_company_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_interactions: {
+        Row: {
+          contact_id: string | null
+          content: string
+          created_at: string | null
+          created_by: string
+          id: string
+          interaction_type: Database["public"]["Enums"]["interaction_type"]
+          occurred_at: string
+          pipeline_company_id: string
+        }
+        Insert: {
+          contact_id?: string | null
+          content: string
+          created_at?: string | null
+          created_by: string
+          id?: string
+          interaction_type?: Database["public"]["Enums"]["interaction_type"]
+          occurred_at?: string
+          pipeline_company_id: string
+        }
+        Update: {
+          contact_id?: string | null
+          content?: string
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          interaction_type?: Database["public"]["Enums"]["interaction_type"]
+          occurred_at?: string
+          pipeline_company_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_interactions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_interactions_pipeline_company_id_fkey"
+            columns: ["pipeline_company_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pipeline_notes: {
         Row: {
@@ -597,6 +695,7 @@ export type Database = {
           created_by: string | null
           id: string
           is_quick_task: boolean | null
+          pipeline_company_id: string | null
           priority: string | null
           project_id: string | null
           scheduled_for: string | null
@@ -613,6 +712,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_quick_task?: boolean | null
+          pipeline_company_id?: string | null
           priority?: string | null
           project_id?: string | null
           scheduled_for?: string | null
@@ -629,6 +729,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_quick_task?: boolean | null
+          pipeline_company_id?: string | null
           priority?: string | null
           project_id?: string | null
           scheduled_for?: string | null
@@ -655,6 +756,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_pipeline_company_id_fkey"
+            columns: ["pipeline_company_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_companies"
             referencedColumns: ["id"]
           },
           {

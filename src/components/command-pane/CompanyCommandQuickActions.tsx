@@ -6,6 +6,7 @@ interface CompanyCommandQuickActionsProps {
   primaryFounderEmail?: string | null;
   onAddTask: () => void;
   onAddNote: () => void;
+  entityType?: 'portfolio' | 'pipeline';
 }
 
 export function CompanyCommandQuickActions({ 

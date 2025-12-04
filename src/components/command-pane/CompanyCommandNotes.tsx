@@ -3,17 +3,26 @@ import { Send, MessageSquare, Phone, Users, Mail, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CompanyInteraction, InteractionType } from '@/types/portfolio';
+import { InteractionType } from '@/types/portfolio';
 import { formatDistanceToNow } from 'date-fns';
 
+// Common interaction shape that works for both portfolio and pipeline
+interface BaseInteraction {
+  id: string;
+  interaction_type: InteractionType;
+  content: string;
+  occurred_at: string;
+}
+
 interface CompanyCommandNotesProps {
-  interactions: CompanyInteraction[];
+  interactions: BaseInteraction[];
   companyId: string;
   onCreateInteraction: (data: {
     interaction_type: InteractionType;
     content: string;
     occurred_at?: string;
   }) => Promise<unknown>;
+  entityType?: 'portfolio' | 'pipeline';
 }
 
 const interactionIcons: Record<InteractionType, typeof MessageSquare> = {
