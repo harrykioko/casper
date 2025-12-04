@@ -1,11 +1,20 @@
 import { Mail, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { CompanyContact } from '@/types/portfolio';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+// Common contact shape that works for both portfolio and pipeline
+interface BaseContact {
+  id: string;
+  name: string;
+  email?: string | null;
+  role?: string | null;
+  is_founder: boolean;
+  is_primary: boolean;
+}
+
 interface CompanyCommandContactsProps {
-  contacts: CompanyContact[];
+  contacts: BaseContact[];
 }
 
 export function CompanyCommandContacts({ contacts }: CompanyCommandContactsProps) {
