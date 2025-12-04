@@ -30,15 +30,15 @@ export function PortfolioCompanyCard({ company, onClick }: PortfolioCompanyCardP
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
           {/* Logo */}
-          <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+          <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-white dark:bg-zinc-800 border flex items-center justify-center overflow-hidden p-1.5">
             {company.logo_url ? (
               <img 
                 src={company.logo_url} 
                 alt={company.name}
-                className="w-full h-full object-cover"
+                className="max-w-full max-h-full object-contain"
               />
             ) : (
-              <span className="text-lg font-semibold text-muted-foreground">
+              <span className="text-xl font-semibold text-muted-foreground">
                 {company.name.charAt(0).toUpperCase()}
               </span>
             )}
