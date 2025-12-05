@@ -255,6 +255,69 @@ export type Database = {
           },
         ]
       }
+      inbox_items: {
+        Row: {
+          created_at: string
+          created_by: string
+          from_email: string
+          from_name: string | null
+          html_body: string | null
+          id: string
+          is_deleted: boolean
+          is_read: boolean
+          is_resolved: boolean
+          received_at: string
+          related_company_id: string | null
+          related_company_name: string | null
+          snippet: string | null
+          snoozed_until: string | null
+          subject: string
+          text_body: string | null
+          to_email: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          from_email: string
+          from_name?: string | null
+          html_body?: string | null
+          id?: string
+          is_deleted?: boolean
+          is_read?: boolean
+          is_resolved?: boolean
+          received_at?: string
+          related_company_id?: string | null
+          related_company_name?: string | null
+          snippet?: string | null
+          snoozed_until?: string | null
+          subject: string
+          text_body?: string | null
+          to_email?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          from_email?: string
+          from_name?: string | null
+          html_body?: string | null
+          id?: string
+          is_deleted?: boolean
+          is_read?: boolean
+          is_resolved?: boolean
+          received_at?: string
+          related_company_id?: string | null
+          related_company_name?: string | null
+          snippet?: string | null
+          snoozed_until?: string | null
+          subject?: string
+          text_body?: string | null
+          to_email?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       nonnegotiables: {
         Row: {
           created_at: string

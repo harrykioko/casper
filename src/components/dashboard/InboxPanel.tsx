@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Inbox, ListTodo, Check, Archive, Mail, ExternalLink } from "lucide-react";
+import { Inbox, ListTodo, Check, Archive, Mail, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ActionPanel,
@@ -12,51 +11,16 @@ import {
 } from "@/components/ui/action-panel";
 import { InboxItem, TaskPrefillOptions } from "@/types/inbox";
 import { InboxDetailDrawer } from "./InboxDetailDrawer";
-import { toast } from "sonner";
+import { useInboxItems } from "@/hooks/useInboxItems";
 import { cn } from "@/lib/utils";
-
-// Mock data for inbox items
-const mockInboxItems: InboxItem[] = [
-  {
-    id: "1",
-    senderName: "Sarah Chen",
-    senderEmail: "sarah@techstartup.io",
-    subject: "Q4 Metrics Update",
-    preview: "Hi! Wanted to share our latest metrics for the quarter...",
-    body: "Hi!\n\nWanted to share our latest metrics for Q4. We hit $500k MRR this month, up 23% from last quarter. Customer acquisition cost is down to $120, and churn is holding steady at 2.1%.\n\nWould love to schedule a call to walk through the numbers in detail and discuss our Series A timeline.\n\nBest,\nSarah",
-    receivedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    isRead: false,
-    relatedCompanyName: "TechStartup",
-  },
-  {
-    id: "2",
-    senderName: "Marcus Johnson",
-    senderEmail: "marcus@financeapp.com",
-    subject: "Intro: Potential Series B candidate",
-    preview: "Hey, I wanted to make an introduction to a company I think...",
-    body: "Hey,\n\nI wanted to make an introduction to a company I think would be a great fit for your portfolio. FinanceApp has been growing rapidly in the SMB space and is looking to raise their Series B.\n\nThey're doing $2M ARR with 150% NRR. Happy to make the intro if you're interested.\n\nCheers,\nMarcus",
-    receivedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-    isRead: false,
-  },
-  {
-    id: "3",
-    senderName: "Emily Watson",
-    senderEmail: "emily@acmecorp.com",
-    subject: "Follow up on our meeting",
-    preview: "Thank you for taking the time to meet with us yesterday...",
-    body: "Thank you for taking the time to meet with us yesterday. I've attached the updated deck with the financial projections we discussed.\n\nPlease let me know if you have any questions or if there's additional information you'd like to see.\n\nBest regards,\nEmily",
-    receivedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    isRead: true,
-    relatedCompanyName: "Acme Corp",
-  },
-];
+import { useState } from "react";
 
 interface InboxPanelProps {
   onOpenTaskCreate: (options: TaskPrefillOptions) => void;
 }
 
 export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
-  const [inboxItems, setInboxItems] = useState<InboxItem[]>(mockInboxItems);
+  const { inboxItems, isLoading, markAsRead, markComplete, archive } = useInboxItems();
   const [selectedItem, setSelectedItem] = useState<InboxItem | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
@@ -65,9 +29,7 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
     setIsDetailOpen(true);
     // Mark as read when opening
     if (!item.isRead) {
-      setInboxItems((prev) =>
-        prev.map((i) => (i.id === item.id ? { ...i, isRead: true } : i))
-      );
+      markAsRead(item.id);
     }
   };
 
@@ -77,21 +39,17 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
   };
 
   const handleMarkComplete = (id: string) => {
-    // TODO: Wire to backend when inbox API is available
-    setInboxItems((prev) => prev.filter((item) => item.id !== id));
-    toast.success("Marked as complete");
+    markComplete(id);
   };
 
   const handleArchive = (id: string) => {
-    // TODO: Wire to backend archive endpoint
-    setInboxItems((prev) => prev.filter((item) => item.id !== id));
-    toast.success("Archived");
+    archive(id);
   };
 
   const handleCreateTaskFromEmail = (item: InboxItem) => {
     onOpenTaskCreate({
       content: item.subject,
-      description: item.preview,
+      description: item.preview || undefined,
       companyName: item.relatedCompanyName,
     });
     closeDetail();
@@ -110,7 +68,14 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
           accentColor="sky"
         />
 
-        {inboxItems.length === 0 ? (
+        {isLoading ? (
+          <ActionPanelListArea accentColor="sky" className="flex items-center justify-center">
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Loader2 className="w-6 h-6 text-sky-500 animate-spin mb-2" />
+              <p className="text-xs text-slate-400 dark:text-slate-500">Loading inbox...</p>
+            </div>
+          </ActionPanelListArea>
+        ) : inboxItems.length === 0 ? (
           <ActionPanelListArea accentColor="sky" className="flex items-center justify-center">
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <div className="w-12 h-12 rounded-full bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center mb-3">
