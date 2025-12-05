@@ -1,13 +1,18 @@
 import { useState } from "react";
 import { Task } from "@/hooks/useTasks";
 import { ReadingItem } from "@/types/readingItem";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { TodayTasksSection } from "@/components/dashboard/TodayTasksSection";
-import { ReadingListSection } from "@/components/dashboard/ReadingListSection";
-import { TaskInput } from "@/components/dashboard/TaskInput";
-import { DashboardPortfolioSection } from "@/components/dashboard/DashboardPortfolioSection";
-import { DashboardPipelineFocusSection } from "@/components/dashboard/DashboardPipelineFocusSection";
-import { DashboardPrioritySection } from "@/components/dashboard/DashboardPrioritySection";
+
+// Tiles
+import { DashboardTopBar } from "./tiles/DashboardTopBar";
+import { PriorityItemsTile } from "./tiles/PriorityItemsTile";
+import { InboxTile } from "./tiles/InboxTile";
+import { TodoListTile } from "./tiles/TodoListTile";
+import { PortfolioGridTile } from "./tiles/PortfolioGridTile";
+import { PipelineGridTile } from "./tiles/PipelineGridTile";
+import { ReadingListTile } from "./tiles/ReadingListTile";
+import { RecentNotesTile } from "./tiles/RecentNotesTile";
+
+// Modals & Panes
 import { CompanyCommandPane } from "@/components/command-pane/CompanyCommandPane";
 import { EnhancedCommandModal } from "@/components/modals/EnhancedCommandModal";
 import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
@@ -99,38 +104,28 @@ export function DashboardMainContent({
   };
 
   return (
-    <div className="flex-1 p-8">
-      <div className="max-w-5xl mx-auto space-y-10">
-        {/* Header with Command Button */}
-        <DashboardHeader openCommandModal={openCommandModal} />
+    <div className="flex-1 h-screen overflow-y-auto">
+      <div className="px-8 lg:px-16 xl:px-20 py-8">
+        {/* Top Bar */}
+        <DashboardTopBar onCommandClick={openCommandModal} />
 
-        {/* Task Input Bar */}
-        <TaskInput onAddTask={onAddTask} />
+        {/* 12-Column Grid Layout */}
+        <div className="grid grid-cols-12 gap-6">
+          {/* Row 1: Primary Work Zone */}
+          <PriorityItemsTile onCompanyClick={openCommandPaneByEntityType} />
+          <InboxTile />
+          <TodoListTile onTaskClick={handleTaskClick} />
 
-        {/* Priority Items Section - Command Center Centerpiece */}
-        <DashboardPrioritySection onCompanyClick={openCommandPaneByEntityType} />
+          {/* Row 2: Portfolio Grid */}
+          <PortfolioGridTile onCompanyClick={openPortfolioCommandPane} />
 
-        {/* Portfolio Section */}
-        <DashboardPortfolioSection onCompanyClick={openPortfolioCommandPane} />
+          {/* Row 3: Pipeline Grid */}
+          <PipelineGridTile onCompanyClick={openPipelineCommandPane} />
 
-        {/* Pipeline Focus Section */}
-        <DashboardPipelineFocusSection onCompanyClick={openPipelineCommandPane} />
-
-        {/* Today's Tasks Section */}
-        <TodayTasksSection
-          tasks={tasks}
-          onTaskComplete={onTaskComplete}
-          onTaskDelete={onTaskDelete}
-          onTaskClick={handleTaskClick}
-        />
-
-        {/* Reading List Section */}
-        <ReadingListSection
-          readingItems={readingItems}
-          onMarkRead={onMarkRead}
-          onDeleteReadingItem={onDeleteReadingItem}
-          onAddReadingItem={onAddReadingItem}
-        />
+          {/* Row 4: Utility Zone */}
+          <ReadingListTile onAddClick={() => setShowAddLink(true)} />
+          <RecentNotesTile onCompanyClick={openCommandPaneByEntityType} />
+        </div>
       </div>
 
       {/* Company Command Pane */}
