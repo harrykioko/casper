@@ -34,8 +34,8 @@ export function DashboardHeroBand({
       {/* Background gradient */}
       <div className="absolute inset-0 hero-gradient" />
       
-      {/* Glass overlay */}
-      <div className="absolute inset-0 bg-white/30 dark:bg-black/20 backdrop-blur-sm" />
+      {/* Subtle glass overlay - reduced opacity to let gradient shine */}
+      <div className="absolute inset-0 bg-white/15 dark:bg-black/10 backdrop-blur-[2px]" />
       
       {/* Content - 3 column grid */}
       <div className="relative px-8 py-8 grid grid-cols-[auto_1fr_auto] items-center gap-8">
