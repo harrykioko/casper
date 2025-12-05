@@ -5,9 +5,27 @@ import { format } from "date-fns";
 interface DashboardHeroBandProps {
   userName?: string;
   onCommandClick: () => void;
+  priorityCount: number;
+  inboxCount: number;
+  todoCount: number;
 }
 
-export function DashboardHeroBand({ userName, onCommandClick }: DashboardHeroBandProps) {
+function StatBadge({ count, label }: { count: number; label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-lg font-semibold text-foreground min-w-[1.5rem]">{count}</span>
+      <span className="text-muted-foreground text-xs uppercase tracking-wide">{label}</span>
+    </div>
+  );
+}
+
+export function DashboardHeroBand({ 
+  userName, 
+  onCommandClick,
+  priorityCount,
+  inboxCount,
+  todoCount 
+}: DashboardHeroBandProps) {
   const firstName = userName?.split(' ')[0] || userName?.split('@')[0] || 'there';
   const today = new Date();
   
@@ -19,9 +37,17 @@ export function DashboardHeroBand({ userName, onCommandClick }: DashboardHeroBan
       {/* Glass overlay */}
       <div className="absolute inset-0 bg-white/30 dark:bg-black/20 backdrop-blur-sm" />
       
-      {/* Content */}
-      <div className="relative px-8 py-10 flex items-center justify-between">
-        <div className="space-y-1">
+      {/* Content - 3 column grid */}
+      <div className="relative px-8 py-8 grid grid-cols-[auto_1fr_auto] items-center gap-8">
+        {/* LEFT: Vertically Stacked Stats */}
+        <div className="flex flex-col gap-1.5">
+          <StatBadge count={priorityCount} label="Priority" />
+          <StatBadge count={inboxCount} label="Inbox" />
+          <StatBadge count={todoCount} label="To-Dos" />
+        </div>
+        
+        {/* CENTER: Greeting (centered) */}
+        <div className="text-center">
           <h1 className="text-3xl font-heading font-bold text-foreground">
             Hello, {firstName}
           </h1>
@@ -30,6 +56,7 @@ export function DashboardHeroBand({ userName, onCommandClick }: DashboardHeroBan
           </p>
         </div>
         
+        {/* RIGHT: Command Buttons */}
         <div className="flex items-center gap-3">
           {/* Search Button */}
           <Button
