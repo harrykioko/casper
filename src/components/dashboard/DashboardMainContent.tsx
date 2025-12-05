@@ -20,6 +20,7 @@ import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
 import { GlassPanel, GlassPanelHeader } from "@/components/ui/glass-panel";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePriorityItems } from "@/hooks/usePriorityItems";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { cn } from "@/lib/utils";
 
 interface DashboardMainContentProps {
@@ -58,6 +59,7 @@ export function DashboardMainContent({
   onNavigate
 }: DashboardMainContentProps) {
   const { user } = useAuth();
+  const { profile } = useUserProfile();
   const { totalCount: priorityCount } = usePriorityItems();
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showCreatePrompt, setShowCreatePrompt] = useState(false);
@@ -108,7 +110,7 @@ export function DashboardMainContent({
     setSelectedEntity(null);
   };
 
-  const userName = user?.user_metadata?.full_name || user?.email;
+  const userName = profile?.full_name || user?.email;
   
   // Calculate counts for hero band
   const todoCount = tasks.filter(t => !t.completed).length;
