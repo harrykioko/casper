@@ -3,6 +3,7 @@ import { ArrowRight, Briefcase } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CompanyTile } from './CompanyTile';
+import { GlassPanel, GlassPanelHeader } from '@/components/ui/glass-panel';
 import { useDashboardPortfolioCompanies } from '@/hooks/useDashboardPortfolioCompanies';
 
 interface DashboardPortfolioSectionProps {
@@ -14,52 +15,52 @@ export function DashboardPortfolioSection({ onCompanyClick }: DashboardPortfolio
 
   if (loading) {
     return (
-      <section className="bg-muted/30 rounded-2xl p-6 border border-border/30">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-foreground">Portfolio</h3>
-        </div>
-        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-muted">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="min-w-[220px] h-[160px] rounded-xl flex-shrink-0" />
+      <GlassPanel>
+        <GlassPanelHeader title="Portfolio" />
+        <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="min-w-[220px] h-[180px] rounded-2xl flex-shrink-0" />
           ))}
         </div>
-      </section>
+      </GlassPanel>
     );
   }
 
   if (companies.length === 0) {
     return (
-      <section className="bg-muted/30 rounded-2xl p-6 border border-border/30">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-foreground">Portfolio</h3>
-        </div>
-        <div className="flex flex-col items-center justify-center py-10 px-4 rounded-xl border border-dashed border-border/50 bg-card/40">
-          <Briefcase className="w-10 h-10 text-muted-foreground/50 mb-3" />
+      <GlassPanel>
+        <GlassPanelHeader title="Portfolio" />
+        <div className="flex flex-col items-center justify-center py-12 px-4 rounded-2xl border border-dashed border-border/30 bg-white/30 dark:bg-white/[0.02]">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+            <Briefcase className="w-7 h-7 text-primary" />
+          </div>
           <p className="text-sm text-muted-foreground mb-4">No portfolio companies yet.</p>
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" className="rounded-full" asChild>
             <Link to="/portfolio">Go to Portfolio</Link>
           </Button>
         </div>
-      </section>
+      </GlassPanel>
     );
   }
 
   return (
-    <section className="bg-muted/30 rounded-2xl p-6 border border-border/30">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-foreground">Portfolio</h3>
-        <Link
-          to="/portfolio"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-        >
-          View all <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
-      </div>
-      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-muted snap-x snap-mandatory">
+    <GlassPanel>
+      <GlassPanelHeader 
+        title="Portfolio" 
+        action={
+          <Link
+            to="/portfolio"
+            className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
+          >
+            View all <ArrowRight className="w-3 h-3" />
+          </Link>
+        }
+      />
+      <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory -mx-2 px-2">
         {companies.map((company, index) => (
           <div 
             key={company.id} 
-            className="snap-start animate-in fade-in slide-in-from-bottom-2"
+            className="snap-start animate-fade-in"
             style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'backwards' }}
           >
             <CompanyTile
@@ -75,6 +76,6 @@ export function DashboardPortfolioSection({ onCompanyClick }: DashboardPortfolio
           </div>
         ))}
       </div>
-    </section>
+    </GlassPanel>
   );
 }

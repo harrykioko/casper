@@ -1,27 +1,31 @@
 import { AlertTriangle, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { usePriorityItems, PriorityType } from '@/hooks/usePriorityItems';
+import { GlassPanel, GlassPanelHeader, GlassSubcard } from '@/components/ui/glass-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface DashboardPrioritySectionProps {
   onCompanyClick: (companyId: string, entityType: 'portfolio' | 'pipeline') => void;
 }
 
-const priorityConfig: Record<PriorityType, { icon: typeof AlertTriangle; color: string; bgColor: string }> = {
+const priorityConfig: Record<PriorityType, { icon: typeof AlertTriangle; color: string; bgColor: string; label: string }> = {
   overdue: {
     icon: AlertTriangle,
-    color: 'text-red-500',
-    bgColor: 'bg-red-500/10',
+    color: 'text-status-danger',
+    bgColor: 'bg-status-danger/10',
+    label: 'Overdue',
   },
   due_today: {
     icon: Clock,
-    color: 'text-amber-500',
-    bgColor: 'bg-amber-500/10',
+    color: 'text-status-warning',
+    bgColor: 'bg-status-warning/10',
+    label: 'Due Today',
   },
   stale: {
     icon: AlertCircle,
-    color: 'text-orange-500',
-    bgColor: 'bg-orange-500/10',
+    color: 'text-status-warning',
+    bgColor: 'bg-status-warning/10',
+    label: 'Needs Attention',
   },
 };
 
@@ -30,80 +34,85 @@ export function DashboardPrioritySection({ onCompanyClick }: DashboardPrioritySe
 
   if (loading) {
     return (
-      <section className="bg-muted/40 rounded-xl border border-border/40 p-5">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Priority Items</h3>
+      <GlassPanel className="h-full">
+        <GlassPanelHeader title="Priority Items" />
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-lg" />
+            <Skeleton key={i} className="h-16 w-full rounded-xl" />
           ))}
         </div>
-      </section>
+      </GlassPanel>
     );
   }
 
   if (priorityItems.length === 0) {
     return (
-      <section className="bg-muted/40 rounded-xl border border-border/40 p-5">
-        <h3 className="text-lg font-semibold text-foreground mb-4">Priority Items</h3>
-        <div className="flex items-center justify-center py-8 text-muted-foreground">
-          <CheckCircle2 className="w-5 h-5 mr-2" />
-          <span className="text-sm">All caught up! No priority items.</span>
+      <GlassPanel className="h-full">
+        <GlassPanelHeader title="Priority Items" />
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="w-12 h-12 rounded-full bg-status-active/10 flex items-center justify-center mb-3">
+            <CheckCircle2 className="w-6 h-6 text-status-active" />
+          </div>
+          <p className="text-sm text-muted-foreground">All caught up!</p>
+          <p className="text-xs text-muted-foreground/70 mt-1">No priority items right now.</p>
         </div>
-      </section>
+      </GlassPanel>
     );
   }
 
   return (
-    <section className="bg-muted/40 rounded-xl border border-border/40 p-5">
-      <h3 className="text-lg font-semibold text-foreground mb-4">Priority Items</h3>
-      <div className="space-y-2">
+    <GlassPanel className="h-full">
+      <GlassPanelHeader title="Priority Items" />
+      <div className="space-y-3">
         {priorityItems.map((item) => {
           const config = priorityConfig[item.type];
           const Icon = config.icon;
           
           return (
-            <button
+            <GlassSubcard
               key={item.id}
               onClick={() => onCompanyClick(item.companyId, item.entityType)}
-              className="w-full flex items-center gap-4 p-3 rounded-lg bg-card/60 border border-border/30 hover:bg-card/80 hover:border-border/50 transition-all duration-150 text-left group"
+              className="group"
             >
-              {/* Icon */}
-              <div className={`w-9 h-9 rounded-lg ${config.bgColor} flex items-center justify-center flex-shrink-0`}>
-                <Icon className={`w-4.5 h-4.5 ${config.color}`} />
-              </div>
-              
-              {/* Company logo */}
-              <div className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 border flex items-center justify-center overflow-hidden flex-shrink-0">
-                {item.companyLogo ? (
-                  <img src={item.companyLogo} alt={item.companyName} className="max-w-full max-h-full object-contain p-1" />
-                ) : (
-                  <span className="text-sm font-medium text-muted-foreground">
-                    {item.companyName.charAt(0).toUpperCase()}
+              <div className="flex items-center gap-3">
+                {/* Status icon */}
+                <div className={`w-9 h-9 rounded-xl ${config.bgColor} flex items-center justify-center flex-shrink-0`}>
+                  <Icon className={`w-4 h-4 ${config.color}`} />
+                </div>
+                
+                {/* Company logo */}
+                <div className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 border border-border/50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {item.companyLogo ? (
+                    <img src={item.companyLogo} alt={item.companyName} className="max-w-full max-h-full object-contain p-1" />
+                  ) : (
+                    <span className="text-sm font-medium text-muted-foreground">
+                      {item.companyName.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="font-medium text-sm text-foreground truncate">{item.companyName}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${config.bgColor} ${config.color} font-medium`}>
+                      {config.label}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+                </div>
+                
+                {/* Timestamp */}
+                {item.timestamp && (
+                  <span className="text-xs text-muted-foreground/70 flex-shrink-0 hidden sm:block">
+                    {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
                   </span>
                 )}
               </div>
-              
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-sm text-foreground">{item.companyName}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded ${config.bgColor} ${config.color}`}>
-                    {item.title}
-                  </span>
-                </div>
-                <p className="text-sm text-muted-foreground truncate">{item.description}</p>
-              </div>
-              
-              {/* Timestamp */}
-              {item.timestamp && (
-                <span className="text-xs text-muted-foreground flex-shrink-0">
-                  {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
-                </span>
-              )}
-            </button>
+            </GlassSubcard>
           );
         })}
       </div>
-    </section>
+    </GlassPanel>
   );
 }

@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { Task } from "@/hooks/useTasks";
 import { ReadingItem } from "@/types/readingItem";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { DashboardHeroBand } from "@/components/dashboard/DashboardHeroBand";
 import { TodayTasksSection } from "@/components/dashboard/TodayTasksSection";
 import { ReadingListSection } from "@/components/dashboard/ReadingListSection";
 import { TaskInput } from "@/components/dashboard/TaskInput";
 import { DashboardPortfolioSection } from "@/components/dashboard/DashboardPortfolioSection";
 import { DashboardPipelineFocusSection } from "@/components/dashboard/DashboardPipelineFocusSection";
 import { DashboardPrioritySection } from "@/components/dashboard/DashboardPrioritySection";
+import { InboxPlaceholder } from "@/components/dashboard/InboxPlaceholder";
+import { RecentNotesSection } from "@/components/dashboard/RecentNotesSection";
 import { CompanyCommandPane } from "@/components/command-pane/CompanyCommandPane";
 import { EnhancedCommandModal } from "@/components/modals/EnhancedCommandModal";
 import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
@@ -15,6 +17,8 @@ import { CreatePromptModal } from "@/components/modals/CreatePromptModal";
 import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
 import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
 import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
+import { GlassPanel, GlassPanelHeader } from "@/components/ui/glass-panel";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DashboardMainContentProps {
   tasks: Task[];
@@ -49,6 +53,7 @@ export function DashboardMainContent({
   closeCommandModal,
   onNavigate
 }: DashboardMainContentProps) {
+  const { user } = useAuth();
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showCreatePrompt, setShowCreatePrompt] = useState(false);
   const [showAddLink, setShowAddLink] = useState(false);
@@ -98,39 +103,78 @@ export function DashboardMainContent({
     setSelectedEntity(null);
   };
 
+  const userName = user?.user_metadata?.full_name || user?.email;
+
   return (
-    <div className="flex-1 p-8">
-      <div className="max-w-5xl mx-auto space-y-10">
-        {/* Header with Command Button */}
-        <DashboardHeader openCommandModal={openCommandModal} />
+    <div className="flex-1 overflow-auto">
+      {/* Hero Header Band */}
+      <DashboardHeroBand 
+        userName={userName} 
+        onCommandClick={openCommandModal} 
+      />
 
-        {/* Task Input Bar */}
-        <TaskInput onAddTask={onAddTask} />
+      {/* Main Grid Content */}
+      <div className="px-8 lg:px-12 xl:px-16 pb-8">
+        <div className="max-w-7xl mx-auto">
+          
+          {/* Row 1: Priority Items, Inbox, To-Do */}
+          <div className="grid grid-cols-12 gap-6 mb-8">
+            {/* Priority Items - 4 columns */}
+            <div className="col-span-12 lg:col-span-4">
+              <DashboardPrioritySection onCompanyClick={openCommandPaneByEntityType} />
+            </div>
+            
+            {/* Inbox Placeholder - 4 columns */}
+            <div className="col-span-12 lg:col-span-4">
+              <InboxPlaceholder />
+            </div>
+            
+            {/* To-Do List - 4 columns */}
+            <div className="col-span-12 lg:col-span-4">
+              <GlassPanel className="h-full">
+                <GlassPanelHeader title="To-Do" />
+                <TaskInput onAddTask={onAddTask} variant="glass" />
+                <div className="mt-4 max-h-[280px] overflow-auto scrollbar-none">
+                  <TodayTasksSection
+                    tasks={tasks}
+                    onTaskComplete={onTaskComplete}
+                    onTaskDelete={onTaskDelete}
+                    onTaskClick={handleTaskClick}
+                    compact
+                  />
+                </div>
+              </GlassPanel>
+            </div>
+          </div>
 
-        {/* Priority Items Section - Command Center Centerpiece */}
-        <DashboardPrioritySection onCompanyClick={openCommandPaneByEntityType} />
+          {/* Row 2: Portfolio Grid */}
+          <div className="mb-8">
+            <DashboardPortfolioSection onCompanyClick={openPortfolioCommandPane} />
+          </div>
 
-        {/* Portfolio Section */}
-        <DashboardPortfolioSection onCompanyClick={openPortfolioCommandPane} />
+          {/* Row 3: Pipeline Focus */}
+          <div className="mb-8">
+            <DashboardPipelineFocusSection onCompanyClick={openPipelineCommandPane} />
+          </div>
 
-        {/* Pipeline Focus Section */}
-        <DashboardPipelineFocusSection onCompanyClick={openPipelineCommandPane} />
-
-        {/* Today's Tasks Section */}
-        <TodayTasksSection
-          tasks={tasks}
-          onTaskComplete={onTaskComplete}
-          onTaskDelete={onTaskDelete}
-          onTaskClick={handleTaskClick}
-        />
-
-        {/* Reading List Section */}
-        <ReadingListSection
-          readingItems={readingItems}
-          onMarkRead={onMarkRead}
-          onDeleteReadingItem={onDeleteReadingItem}
-          onAddReadingItem={onAddReadingItem}
-        />
+          {/* Row 4: Reading List & Recent Notes */}
+          <div className="grid grid-cols-12 gap-6">
+            {/* Reading List - 6 columns */}
+            <div className="col-span-12 lg:col-span-6">
+              <ReadingListSection
+                readingItems={readingItems}
+                onMarkRead={onMarkRead}
+                onDeleteReadingItem={onDeleteReadingItem}
+                onAddReadingItem={onAddReadingItem}
+              />
+            </div>
+            
+            {/* Recent Notes - 6 columns */}
+            <div className="col-span-12 lg:col-span-6">
+              <RecentNotesSection />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Company Command Pane */}
