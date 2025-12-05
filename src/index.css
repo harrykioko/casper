@@ -179,6 +179,45 @@
     background: var(--hero-gradient);
   }
 
+  /* Hero container with radial highlight */
+  .hero-container-gradient {
+    background: 
+      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255,255,255,0.9) 0%, transparent 60%),
+      linear-gradient(180deg, hsl(220 30% 97%) 0%, hsl(225 28% 95%) 100%);
+  }
+  
+  .dark .hero-container-gradient {
+    background: 
+      radial-gradient(ellipse 80% 50% at 50% 0%, rgba(100,100,140,0.12) 0%, transparent 60%),
+      linear-gradient(180deg, hsl(230 18% 11%) 0%, hsl(235 20% 8%) 100%);
+  }
+
+  /* Ambient glow under hero */
+  .ambient-glow {
+    background: radial-gradient(ellipse 70% 40% at 50% 0%, hsl(210 100% 72% / 0.06) 0%, transparent 70%);
+  }
+  
+  .dark .ambient-glow {
+    background: radial-gradient(ellipse 70% 40% at 50% 0%, hsl(210 100% 72% / 0.04) 0%, transparent 70%);
+  }
+
+  /* Glass chip styling */
+  .glass-chip {
+    @apply inline-flex items-center gap-2 px-3 py-1.5 rounded-full backdrop-blur-md;
+    @apply bg-white/60 dark:bg-white/[0.08];
+    @apply border border-white/60 dark:border-white/[0.12];
+    @apply shadow-sm;
+  }
+
+  /* Glass control button */
+  .glass-control {
+    @apply rounded-full backdrop-blur-md transition-all;
+    @apply bg-white/60 dark:bg-white/[0.08];
+    @apply border border-white/60 dark:border-white/[0.12];
+    @apply shadow-sm;
+    @apply hover:bg-white/80 dark:hover:bg-white/[0.15];
+  }
+
   /* Custom scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
