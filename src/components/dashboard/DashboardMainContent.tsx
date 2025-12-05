@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, CheckCircle2 } from "lucide-react";
 import { Task } from "@/hooks/useTasks";
 import { ReadingItem } from "@/types/readingItem";
 import { TaskPrefillOptions } from "@/types/inbox";
@@ -19,7 +19,12 @@ import { CreatePromptModal } from "@/components/modals/CreatePromptModal";
 import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
 import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
 import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
-import { GlassPanel, GlassPanelHeader } from "@/components/ui/glass-panel";
+import {
+  ActionPanel,
+  ActionPanelHeader,
+  ActionPanelListArea,
+  ActionPanelFooter,
+} from "@/components/ui/action-panel";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePriorityItems } from "@/hooks/usePriorityItems";
@@ -130,7 +135,9 @@ export function DashboardMainContent({
 
   const userName = profile?.full_name || user?.email;
   
-  // Calculate counts for hero band
+  // Calculate counts for hero band and To-Do panel
+  const completedToday = tasks.filter(t => t.completed).length;
+  const totalTasks = tasks.length;
   const todoCount = tasks.filter(t => !t.completed).length;
   const inboxCount = 3; // Mock inbox count
 
@@ -155,32 +162,49 @@ export function DashboardMainContent({
             onOpenTaskCreate={handleOpenTaskCreate}
           />
           <InboxPanel onOpenTaskCreate={handleOpenTaskCreate} />
-          <GlassPanel className="h-full flex flex-col">
-            <GlassPanelHeader 
-              title="To-Do" 
-              action={
+          
+          {/* To-Do Panel with ActionPanel */}
+          <ActionPanel accentColor="emerald" className="h-full">
+            <ActionPanelHeader
+              icon={<CheckCircle2 className="h-4 w-4" />}
+              title="To-Do"
+              subtitle={`${completedToday}/${totalTasks} done today`}
+              badge={
                 <Button
-                  variant="secondary"
+                  variant="ghost"
                   size="sm"
-                  className="rounded-full px-4 h-8 text-xs font-medium"
+                  className="rounded-full px-4 h-7 text-[11px] font-medium bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
                   onClick={() => handleOpenTaskCreate()}
                 >
                   <Plus className="mr-1 h-3 w-3" /> New task
                 </Button>
               }
+              accentColor="emerald"
             />
-            <TaskInput onAddTask={onAddTask} variant="glass" />
-            <div className="mt-4 max-h-[280px] overflow-auto scrollbar-none flex-1">
-              <TodayTasksSection
-                tasks={tasks}
-                onTaskComplete={onTaskComplete}
-                onTaskDelete={onTaskDelete}
-                onTaskClick={handleTaskClick}
-                onUpdateTask={onUpdateTask}
-                compact
-              />
-            </div>
-          </GlassPanel>
+            
+            <ActionPanelListArea accentColor="emerald" className="overflow-y-auto max-h-[280px]">
+              <TaskInput onAddTask={onAddTask} variant="glass" />
+              <div className="mt-2">
+                <TodayTasksSection
+                  tasks={tasks}
+                  onTaskComplete={onTaskComplete}
+                  onTaskDelete={onTaskDelete}
+                  onTaskClick={handleTaskClick}
+                  onUpdateTask={onUpdateTask}
+                  compact
+                />
+              </div>
+            </ActionPanelListArea>
+
+            <ActionPanelFooter className="justify-end">
+              <button 
+                onClick={() => onNavigate('/tasks')}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+              >
+                View all tasks
+              </button>
+            </ActionPanelFooter>
+          </ActionPanel>
         </div>
 
           {/* Row 2: Portfolio Grid */}
