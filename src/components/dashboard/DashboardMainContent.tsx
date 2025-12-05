@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import { Task } from "@/hooks/useTasks";
 import { ReadingItem } from "@/types/readingItem";
+import { TaskPrefillOptions } from "@/types/inbox";
 import { DashboardHeroBand } from "@/components/dashboard/DashboardHeroBand";
 import { TodayTasksSection } from "@/components/dashboard/TodayTasksSection";
 import { ReadingListSection } from "@/components/dashboard/ReadingListSection";
@@ -8,7 +10,7 @@ import { TaskInput } from "@/components/dashboard/TaskInput";
 import { DashboardPortfolioSection } from "@/components/dashboard/DashboardPortfolioSection";
 import { DashboardPipelineFocusSection } from "@/components/dashboard/DashboardPipelineFocusSection";
 import { DashboardPrioritySection } from "@/components/dashboard/DashboardPrioritySection";
-import { InboxPlaceholder } from "@/components/dashboard/InboxPlaceholder";
+import { InboxPanel } from "@/components/dashboard/InboxPanel";
 import { RecentNotesSection } from "@/components/dashboard/RecentNotesSection";
 import { CompanyCommandPane } from "@/components/command-pane/CompanyCommandPane";
 import { EnhancedCommandModal } from "@/components/modals/EnhancedCommandModal";
@@ -18,6 +20,7 @@ import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
 import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
 import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
 import { GlassPanel, GlassPanelHeader } from "@/components/ui/glass-panel";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePriorityItems } from "@/hooks/usePriorityItems";
 import { useUserProfile } from "@/hooks/useUserProfile";
@@ -65,6 +68,7 @@ export function DashboardMainContent({
   const [showCreatePrompt, setShowCreatePrompt] = useState(false);
   const [showAddLink, setShowAddLink] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
+  const [taskPrefill, setTaskPrefill] = useState<TaskPrefillOptions | undefined>(undefined);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
   
@@ -110,11 +114,25 @@ export function DashboardMainContent({
     setSelectedEntity(null);
   };
 
+  // Handler for opening task creation with prefill
+  const handleOpenTaskCreate = (options?: TaskPrefillOptions) => {
+    setTaskPrefill(options);
+    setShowAddTask(true);
+  };
+
+  // Reset prefill when dialog closes
+  const handleAddTaskOpenChange = (open: boolean) => {
+    setShowAddTask(open);
+    if (!open) {
+      setTaskPrefill(undefined);
+    }
+  };
+
   const userName = profile?.full_name || user?.email;
   
   // Calculate counts for hero band
   const todoCount = tasks.filter(t => !t.completed).length;
-  const inboxCount = 0; // Placeholder for now
+  const inboxCount = 3; // Mock inbox count
 
   return (
     <div className={cn("min-w-0", className)}>
@@ -132,17 +150,33 @@ export function DashboardMainContent({
           
         {/* Row 1: Priority Items, Inbox, To-Do */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-          <DashboardPrioritySection onCompanyClick={openCommandPaneByEntityType} />
-          <InboxPlaceholder />
-          <GlassPanel className="h-full">
-            <GlassPanelHeader title="To-Do" />
+          <DashboardPrioritySection 
+            onCompanyClick={openCommandPaneByEntityType}
+            onOpenTaskCreate={handleOpenTaskCreate}
+          />
+          <InboxPanel onOpenTaskCreate={handleOpenTaskCreate} />
+          <GlassPanel className="h-full flex flex-col">
+            <GlassPanelHeader 
+              title="To-Do" 
+              action={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="rounded-full px-4 h-8 text-xs font-medium"
+                  onClick={() => handleOpenTaskCreate()}
+                >
+                  <Plus className="mr-1 h-3 w-3" /> New task
+                </Button>
+              }
+            />
             <TaskInput onAddTask={onAddTask} variant="glass" />
-            <div className="mt-4 max-h-[280px] overflow-auto scrollbar-none">
+            <div className="mt-4 max-h-[280px] overflow-auto scrollbar-none flex-1">
               <TodayTasksSection
                 tasks={tasks}
                 onTaskComplete={onTaskComplete}
                 onTaskDelete={onTaskDelete}
                 onTaskClick={handleTaskClick}
+                onUpdateTask={onUpdateTask}
                 compact
               />
             </div>
@@ -184,7 +218,7 @@ export function DashboardMainContent({
         isOpen={isCommandModalOpen}
         onClose={closeCommandModal}
         onNavigate={onNavigate}
-        onAddTask={() => setShowAddTask(true)}
+        onAddTask={() => handleOpenTaskCreate()}
         onAddProject={() => setShowCreateProject(true)}
         onAddPrompt={() => setShowCreatePrompt(true)}
         onAddLink={() => setShowAddLink(true)}
@@ -210,8 +244,9 @@ export function DashboardMainContent({
       
       <AddTaskDialog 
         open={showAddTask} 
-        onOpenChange={setShowAddTask}
+        onOpenChange={handleAddTaskOpenChange}
         onAddTask={onAddTask}
+        prefill={taskPrefill}
       />
 
       {/* Task Details Modal */}
