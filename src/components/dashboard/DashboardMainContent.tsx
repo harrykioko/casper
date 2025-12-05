@@ -19,6 +19,7 @@ import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
 import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
 import { GlassPanel, GlassPanelHeader } from "@/components/ui/glass-panel";
 import { useAuth } from "@/contexts/AuthContext";
+import { usePriorityItems } from "@/hooks/usePriorityItems";
 import { cn } from "@/lib/utils";
 
 interface DashboardMainContentProps {
@@ -57,6 +58,7 @@ export function DashboardMainContent({
   onNavigate
 }: DashboardMainContentProps) {
   const { user } = useAuth();
+  const { totalCount: priorityCount } = usePriorityItems();
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showCreatePrompt, setShowCreatePrompt] = useState(false);
   const [showAddLink, setShowAddLink] = useState(false);
@@ -107,13 +109,20 @@ export function DashboardMainContent({
   };
 
   const userName = user?.user_metadata?.full_name || user?.email;
+  
+  // Calculate counts for hero band
+  const todoCount = tasks.filter(t => !t.completed).length;
+  const inboxCount = 0; // Placeholder for now
 
   return (
     <div className={cn("min-w-0", className)}>
       {/* Hero Header Band */}
       <DashboardHeroBand 
         userName={userName} 
-        onCommandClick={openCommandModal} 
+        onCommandClick={openCommandModal}
+        priorityCount={priorityCount}
+        inboxCount={inboxCount}
+        todoCount={todoCount}
       />
 
       {/* Main Grid Content */}

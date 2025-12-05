@@ -201,12 +201,15 @@ export function usePriorityItems() {
       stale: 2,
     };
 
-    return items
-      .sort((a, b) => priorityOrder[a.type] - priorityOrder[b.type])
-      .slice(0, 4);
+    const sortedItems = items.sort((a, b) => priorityOrder[a.type] - priorityOrder[b.type]);
+    
+    return {
+      items: sortedItems.slice(0, 4),
+      totalCount: sortedItems.length,
+    };
   }, [tasks, portfolioCompanies, pipelineCompanies]);
 
   const loading = portfolioLoading || pipelineLoading;
 
-  return { priorityItems, loading };
+  return { priorityItems: priorityItems.items, totalCount: priorityItems.totalCount, loading };
 }
