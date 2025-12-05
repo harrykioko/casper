@@ -2,9 +2,16 @@ import { useState } from "react";
 import { AlertTriangle, Clock, AlertCircle, CheckCircle2, Plus, CheckCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { usePriorityItems, PriorityType, PriorityItem } from "@/hooks/usePriorityItems";
-import { GlassPanel, GlassPanelHeader, GlassSubcard } from "@/components/ui/glass-panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import {
+  ActionPanel,
+  ActionPanelHeader,
+  ActionPanelListArea,
+  ActionPanelRow,
+  ActionPanelFooter,
+  LiveBadge,
+} from "@/components/ui/action-panel";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TaskPrefillOptions } from "@/types/inbox";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface DashboardPrioritySectionProps {
   onCompanyClick: (companyId: string, entityType: "portfolio" | "pipeline") => void;
@@ -25,20 +33,20 @@ const priorityConfig: Record<
 > = {
   overdue: {
     icon: AlertTriangle,
-    color: "text-status-danger",
-    bgColor: "bg-status-danger/10",
+    color: "text-red-600 dark:text-red-400",
+    bgColor: "bg-red-100 dark:bg-red-900/30",
     label: "Overdue",
   },
   due_today: {
     icon: Clock,
-    color: "text-status-warning",
-    bgColor: "bg-status-warning/10",
+    color: "text-amber-600 dark:text-amber-400",
+    bgColor: "bg-amber-100 dark:bg-amber-900/30",
     label: "Due Today",
   },
   stale: {
     icon: AlertCircle,
-    color: "text-status-warning",
-    bgColor: "bg-status-warning/10",
+    color: "text-amber-600 dark:text-amber-400",
+    bgColor: "bg-amber-100 dark:bg-amber-900/30",
     label: "Needs Attention",
   },
 };
@@ -70,7 +78,6 @@ export function DashboardPrioritySection({
   const handleResolve = (e: React.MouseEvent, itemId: string) => {
     e.stopPropagation();
     // TODO: Wire to backend - mark underlying task as done or clear priority state
-    // For now, optimistically remove from local list
     setResolvedIds((prev) => new Set(prev).add(itemId));
     toast.success("Item resolved");
   };
@@ -93,56 +100,82 @@ export function DashboardPrioritySection({
 
   if (loading) {
     return (
-      <GlassPanel className="h-full">
-        <GlassPanelHeader title="Priority Items" />
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-xl" />
-          ))}
-        </div>
-      </GlassPanel>
+      <ActionPanel accentColor="amber" className="h-full">
+        <ActionPanelHeader
+          icon={<AlertTriangle className="h-4 w-4" />}
+          title="Priority Items"
+          subtitle="Loading..."
+          accentColor="amber"
+        />
+        <ActionPanelListArea accentColor="amber">
+          <div className="space-y-3 py-2">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-xl" />
+            ))}
+          </div>
+        </ActionPanelListArea>
+      </ActionPanel>
     );
   }
 
   if (visibleItems.length === 0) {
     return (
-      <GlassPanel className="h-full">
-        <GlassPanelHeader title="Priority Items" />
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="w-12 h-12 rounded-full bg-status-active/10 flex items-center justify-center mb-3">
-            <CheckCircle2 className="w-6 h-6 text-status-active" />
+      <ActionPanel accentColor="amber" className="h-full">
+        <ActionPanelHeader
+          icon={<AlertTriangle className="h-4 w-4" />}
+          title="Priority Items"
+          subtitle="0 requiring attention"
+          accentColor="amber"
+        />
+        <ActionPanelListArea accentColor="amber" className="flex items-center justify-center">
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center mb-3">
+              <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-300">All caught up!</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">No priority items right now.</p>
           </div>
-          <p className="text-sm text-muted-foreground">All caught up!</p>
-          <p className="text-xs text-muted-foreground/70 mt-1">No priority items right now.</p>
-        </div>
-      </GlassPanel>
+        </ActionPanelListArea>
+      </ActionPanel>
     );
   }
 
   return (
-    <GlassPanel className="h-full flex flex-col">
-      <GlassPanelHeader title="Priority Items" />
-      <div className="space-y-3 flex-1">
-        {visibleItems.slice(0, 4).map((item) => {
+    <ActionPanel accentColor="amber" className="h-full">
+      <ActionPanelHeader
+        icon={<AlertTriangle className="h-4 w-4" />}
+        title="Priority Items"
+        subtitle={`${visibleItems.length} requiring attention`}
+        badge={<LiveBadge accentColor="amber" />}
+        accentColor="amber"
+      />
+
+      <ActionPanelListArea accentColor="amber" className="overflow-y-auto max-h-[280px]">
+        {visibleItems.slice(0, 5).map((item, index) => {
           const config = priorityConfig[item.type];
           const Icon = config.icon;
+          const isLast = index === Math.min(visibleItems.length, 5) - 1;
 
           return (
-            <GlassSubcard
+            <ActionPanelRow
               key={item.id}
               onClick={() => onCompanyClick(item.companyId, item.entityType)}
-              className="group"
+              isLast={isLast}
             >
-              <div className="flex items-center gap-3">
+              {/* Left content */}
+              <div className="flex items-center gap-3 flex-1 min-w-0">
                 {/* Status icon */}
                 <div
-                  className={`w-9 h-9 rounded-xl ${config.bgColor} flex items-center justify-center flex-shrink-0`}
+                  className={cn(
+                    "w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0",
+                    config.bgColor
+                  )}
                 >
-                  <Icon className={`w-4 h-4 ${config.color}`} />
+                  <Icon className={cn("w-4 h-4", config.color)} />
                 </div>
 
                 {/* Company logo */}
-                <div className="w-8 h-8 rounded-lg bg-white dark:bg-zinc-800 border border-border/50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0">
                   {item.companyLogo ? (
                     <img
                       src={item.companyLogo}
@@ -150,7 +183,7 @@ export function DashboardPrioritySection({
                       className="max-w-full max-h-full object-contain p-1"
                     />
                   ) : (
-                    <span className="text-sm font-medium text-muted-foreground">
+                    <span className="text-sm font-medium text-slate-500">
                       {item.companyName.charAt(0).toUpperCase()}
                     </span>
                   )}
@@ -159,27 +192,34 @@ export function DashboardPrioritySection({
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="font-medium text-sm text-foreground truncate">
+                    <span className="font-medium text-sm text-slate-700 dark:text-slate-200 truncate">
                       {item.companyName}
                     </span>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full ${config.bgColor} ${config.color} font-medium`}
+                      className={cn(
+                        "text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0",
+                        config.bgColor,
+                        config.color
+                      )}
                     >
                       {config.label}
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{item.description}</p>
                 </div>
+              </div>
 
+              {/* Right side */}
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {/* Quick Actions (appear on hover) */}
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   {/* Snooze */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7"
+                        className="h-7 w-7 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
                         onClick={(e) => e.stopPropagation()}
                         title="Snooze"
                       >
@@ -206,7 +246,7 @@ export function DashboardPrioritySection({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
+                    className="h-7 w-7 text-slate-500 hover:text-emerald-600"
                     onClick={(e) => handleResolve(e, item.id)}
                     title="Resolve"
                   >
@@ -217,7 +257,7 @@ export function DashboardPrioritySection({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7"
+                    className="h-7 w-7 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
                     onClick={(e) => handleCreateTask(e, item)}
                     title="Create task"
                   >
@@ -227,25 +267,25 @@ export function DashboardPrioritySection({
 
                 {/* Timestamp (hidden on hover) */}
                 {item.timestamp && (
-                  <span className="text-xs text-muted-foreground/70 flex-shrink-0 group-hover:hidden">
+                  <span className="text-[10px] text-slate-400 group-hover:hidden">
                     {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
                   </span>
                 )}
               </div>
-            </GlassSubcard>
+            </ActionPanelRow>
           );
         })}
-      </div>
+      </ActionPanelListArea>
 
-      {/* Footer */}
-      <div className="mt-4 pt-3 border-t border-white/10 dark:border-white/5 flex items-center justify-between">
-        <button className="text-xs text-muted-foreground hover:text-primary transition-colors">
+      <ActionPanelFooter>
+        <button className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
           View all priority
         </button>
-        <button className="text-xs text-muted-foreground hover:text-primary transition-colors">
+        <button className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 bg-slate-900/5 dark:bg-slate-50/5 text-slate-500 dark:text-slate-300 hover:bg-slate-900/10 dark:hover:bg-slate-50/10 transition-colors">
+          <CheckCircle className="h-3 w-3" />
           Mark all as seen
         </button>
-      </div>
-    </GlassPanel>
+      </ActionPanelFooter>
+    </ActionPanel>
   );
 }
