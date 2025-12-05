@@ -1,5 +1,4 @@
 
-console.log('🚀 App.tsx loading...');
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,20 +8,13 @@ import { ThemeProvider } from "@/hooks/use-theme";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { AnimatePresence } from "framer-motion";
-import { lazy, Suspense, useEffect } from "react";
+import { useEffect } from "react";
 
 import { NavSidebar } from "@/components/layout/NavSidebar";
 import { SidebarStateProvider, useSidebarState } from "@/contexts/SidebarStateContext";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
-
-// Lazy load Dashboard with error catching
-const Dashboard = lazy(() => 
-  import("./pages/Dashboard").catch(err => {
-    console.error('❌ Failed to load Dashboard:', err);
-    return { default: () => <div className="p-8 text-destructive">Dashboard failed to load: {err.message}</div> };
-  })
-);
+import Dashboard from "./pages/Dashboard";
 import Tasks from "./pages/Tasks";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
@@ -105,7 +97,7 @@ const MainContent = () => {
     <div className={`flex-1 transition-all duration-300 ${expanded ? 'ml-64' : 'ml-16'}`}>
       <AnimatePresence mode="wait">
         <Routes>
-          <Route path="/dashboard" element={<Suspense fallback={<div className="p-8">Loading Dashboard...</div>}><Dashboard /></Suspense>} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/:id" element={<ProjectDetail />} />
