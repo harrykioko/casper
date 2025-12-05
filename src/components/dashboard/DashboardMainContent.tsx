@@ -19,8 +19,10 @@ import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
 import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
 import { GlassPanel, GlassPanelHeader } from "@/components/ui/glass-panel";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
 
 interface DashboardMainContentProps {
+  className?: string;
   tasks: Task[];
   readingItems: ReadingItem[];
   openCommandModal: () => void;
@@ -38,6 +40,7 @@ interface DashboardMainContentProps {
 }
 
 export function DashboardMainContent({
+  className,
   tasks,
   readingItems,
   openCommandModal,
@@ -106,7 +109,7 @@ export function DashboardMainContent({
   const userName = user?.user_metadata?.full_name || user?.email;
 
   return (
-    <div className="flex-1 overflow-auto">
+    <div className={cn("overflow-auto", className)}>
       {/* Hero Header Band */}
       <DashboardHeroBand 
         userName={userName} 
@@ -114,38 +117,26 @@ export function DashboardMainContent({
       />
 
       {/* Main Grid Content */}
-      <div className="px-8 lg:px-12 xl:px-16 pb-8">
-        <div className="max-w-7xl mx-auto">
+      <div className="px-4 sm:px-6 lg:px-8 pb-8">
           
-          {/* Row 1: Priority Items, Inbox, To-Do */}
-          <div className="grid grid-cols-12 gap-6 mb-8">
-            {/* Priority Items - 4 columns */}
-            <div className="col-span-12 lg:col-span-4">
-              <DashboardPrioritySection onCompanyClick={openCommandPaneByEntityType} />
+        {/* Row 1: Priority Items, Inbox, To-Do */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+          <DashboardPrioritySection onCompanyClick={openCommandPaneByEntityType} />
+          <InboxPlaceholder />
+          <GlassPanel className="h-full">
+            <GlassPanelHeader title="To-Do" />
+            <TaskInput onAddTask={onAddTask} variant="glass" />
+            <div className="mt-4 max-h-[280px] overflow-auto scrollbar-none">
+              <TodayTasksSection
+                tasks={tasks}
+                onTaskComplete={onTaskComplete}
+                onTaskDelete={onTaskDelete}
+                onTaskClick={handleTaskClick}
+                compact
+              />
             </div>
-            
-            {/* Inbox Placeholder - 4 columns */}
-            <div className="col-span-12 lg:col-span-4">
-              <InboxPlaceholder />
-            </div>
-            
-            {/* To-Do List - 4 columns */}
-            <div className="col-span-12 lg:col-span-4">
-              <GlassPanel className="h-full">
-                <GlassPanelHeader title="To-Do" />
-                <TaskInput onAddTask={onAddTask} variant="glass" />
-                <div className="mt-4 max-h-[280px] overflow-auto scrollbar-none">
-                  <TodayTasksSection
-                    tasks={tasks}
-                    onTaskComplete={onTaskComplete}
-                    onTaskDelete={onTaskDelete}
-                    onTaskClick={handleTaskClick}
-                    compact
-                  />
-                </div>
-              </GlassPanel>
-            </div>
-          </div>
+          </GlassPanel>
+        </div>
 
           {/* Row 2: Portfolio Grid */}
           <div className="mb-8">
@@ -157,23 +148,15 @@ export function DashboardMainContent({
             <DashboardPipelineFocusSection onCompanyClick={openPipelineCommandPane} />
           </div>
 
-          {/* Row 4: Reading List & Recent Notes */}
-          <div className="grid grid-cols-12 gap-6">
-            {/* Reading List - 6 columns */}
-            <div className="col-span-12 lg:col-span-6">
-              <ReadingListSection
-                readingItems={readingItems}
-                onMarkRead={onMarkRead}
-                onDeleteReadingItem={onDeleteReadingItem}
-                onAddReadingItem={onAddReadingItem}
-              />
-            </div>
-            
-            {/* Recent Notes - 6 columns */}
-            <div className="col-span-12 lg:col-span-6">
-              <RecentNotesSection />
-            </div>
-          </div>
+        {/* Row 4: Reading List & Recent Notes */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ReadingListSection
+            readingItems={readingItems}
+            onMarkRead={onMarkRead}
+            onDeleteReadingItem={onDeleteReadingItem}
+            onAddReadingItem={onAddReadingItem}
+          />
+          <RecentNotesSection />
         </div>
       </div>
 

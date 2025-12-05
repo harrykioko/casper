@@ -53,9 +53,10 @@ export default function Dashboard() {
   
   return (
     <div className="min-h-screen" tabIndex={0}>
-      <div className="flex">
+      <div className="flex min-h-screen">
         {/* Main Content Column */}
         <DashboardMainContent 
+          className="flex-1 min-w-0"
           tasks={tasks}
           readingItems={readingItems}
           openCommandModal={openCommandModal}
@@ -73,7 +74,11 @@ export default function Dashboard() {
         />
         
         {/* Right Sidebar - Calendar and Upcoming */}
-        <CalendarSidebar events={calendarEvents} nonnegotiables={transformedNonnegotiables} />
+        <CalendarSidebar 
+          className="w-80 shrink-0"
+          events={calendarEvents} 
+          nonnegotiables={transformedNonnegotiables} 
+        />
       </div>
 
       {/* Dialogs */}
