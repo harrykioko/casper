@@ -78,7 +78,7 @@ export function CalendarSidebar({ events, nonnegotiables }: CalendarSidebarProps
 
   return (
     <>
-      <div className="w-[300px] border-l border-zinc-200 dark:border-white/10 h-full glassmorphic flex flex-col">
+      <div className="w-[300px] border-l border-zinc-200 dark:border-white/10 h-screen sticky top-0 glassmorphic flex flex-col">
         {/* Header */}
         <div className="p-6 pb-4 flex-shrink-0">
           <div className="flex justify-between items-center">

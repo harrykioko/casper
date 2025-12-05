@@ -52,8 +52,8 @@ export default function Dashboard() {
   }));
   
   return (
-    <div className="h-screen flex flex-col" tabIndex={0}>
-      <div className="flex flex-1 min-h-0">
+    <div className="min-h-screen" tabIndex={0}>
+      <div className="flex">
         {/* Main Content Column */}
         <DashboardMainContent 
           tasks={tasks}
