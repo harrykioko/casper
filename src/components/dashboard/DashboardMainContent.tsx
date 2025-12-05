@@ -130,28 +130,23 @@ export function DashboardMainContent({
       {/* Main Grid Content */}
       <div className="px-4 sm:px-6 lg:px-8 pb-8">
           
-        {/* Row 1: Priority Items, Inbox, To-Do - with ambient glow */}
-        <div className="relative">
-          {/* Ambient glow layer connecting hero to tiles */}
-          <div className="absolute -top-6 left-0 right-0 h-28 ambient-glow pointer-events-none" />
-          
-          <div className="relative grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-            <DashboardPrioritySection onCompanyClick={openCommandPaneByEntityType} />
-            <InboxPlaceholder />
-            <GlassPanel className="h-full">
-              <GlassPanelHeader title="To-Do" />
-              <TaskInput onAddTask={onAddTask} variant="glass" />
-              <div className="mt-4 max-h-[280px] overflow-auto scrollbar-none">
-                <TodayTasksSection
-                  tasks={tasks}
-                  onTaskComplete={onTaskComplete}
-                  onTaskDelete={onTaskDelete}
-                  onTaskClick={handleTaskClick}
-                  compact
-                />
-              </div>
-            </GlassPanel>
-          </div>
+        {/* Row 1: Priority Items, Inbox, To-Do */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+          <DashboardPrioritySection onCompanyClick={openCommandPaneByEntityType} />
+          <InboxPlaceholder />
+          <GlassPanel className="h-full">
+            <GlassPanelHeader title="To-Do" />
+            <TaskInput onAddTask={onAddTask} variant="glass" />
+            <div className="mt-4 max-h-[280px] overflow-auto scrollbar-none">
+              <TodayTasksSection
+                tasks={tasks}
+                onTaskComplete={onTaskComplete}
+                onTaskDelete={onTaskDelete}
+                onTaskClick={handleTaskClick}
+                compact
+              />
+            </div>
+          </GlassPanel>
         </div>
 
           {/* Row 2: Portfolio Grid */}
