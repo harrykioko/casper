@@ -53,10 +53,11 @@ export default function Dashboard() {
   
   return (
     <div className="min-h-screen" tabIndex={0}>
-      <div className="flex min-h-screen">
+      {/* CSS Grid ensures calendar sidebar always has reserved space */}
+      <div className="grid grid-cols-[1fr_320px] min-h-screen">
         {/* Main Content Column */}
         <DashboardMainContent 
-          className="flex-1 min-w-0"
+          className="overflow-x-hidden overflow-y-auto"
           tasks={tasks}
           readingItems={readingItems}
           openCommandModal={openCommandModal}
@@ -73,9 +74,8 @@ export default function Dashboard() {
           onNavigate={navigate}
         />
         
-        {/* Right Sidebar - Calendar and Upcoming */}
+        {/* Right Sidebar - Calendar (grid reserves 320px) */}
         <CalendarSidebar 
-          className="w-80 shrink-0"
           events={calendarEvents} 
           nonnegotiables={transformedNonnegotiables} 
         />

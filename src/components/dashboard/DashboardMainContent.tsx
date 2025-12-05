@@ -109,7 +109,7 @@ export function DashboardMainContent({
   const userName = user?.user_metadata?.full_name || user?.email;
 
   return (
-    <div className={cn("overflow-auto", className)}>
+    <div className={cn("min-w-0", className)}>
       {/* Hero Header Band */}
       <DashboardHeroBand 
         userName={userName} 
