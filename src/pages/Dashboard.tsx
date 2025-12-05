@@ -1,4 +1,3 @@
-// Force recompile: 2025-12-05T12:00:00Z
 import { useNavigate } from "react-router-dom";
 import { CalendarSidebar } from "@/components/dashboard/CalendarSidebar";
 import { DashboardMainContent } from "@/components/dashboard/DashboardMainContent";
