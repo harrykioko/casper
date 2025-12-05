@@ -53,8 +53,15 @@
     --glass-shadow: 0px 6px 24px rgba(0, 0, 0, 0.08);
     --glass-shadow-hover: 0px 8px 32px rgba(0, 0, 0, 0.12);
     
-    /* Hero gradient - Light Mode */
-    --hero-gradient: linear-gradient(135deg, hsl(220 25% 96%) 0%, hsl(225 30% 94%) 50%, hsl(260 30% 96%) 100%);
+    /* Hero gradient - Light Mode (dramatic multi-stop) */
+    --hero-gradient: linear-gradient(
+      135deg, 
+      hsl(210 100% 94%) 0%,
+      hsl(230 95% 90%) 25%,
+      hsl(260 85% 90%) 50%,
+      hsl(280 80% 91%) 75%,
+      hsl(320 65% 92%) 100%
+    );
     
     /* Status colors */
     --status-active: 142 76% 36%;
@@ -114,8 +121,15 @@
     --glass-shadow: 0px 6px 28px rgba(0, 0, 0, 0.25);
     --glass-shadow-hover: 0px 10px 40px rgba(0, 0, 0, 0.35);
     
-    /* Hero gradient - Dark Mode */
-    --hero-gradient: linear-gradient(135deg, hsl(220 15% 8%) 0%, hsl(225 20% 10%) 50%, hsl(260 25% 12%) 100%);
+    /* Hero gradient - Dark Mode (dramatic multi-stop) */
+    --hero-gradient: linear-gradient(
+      135deg,
+      hsl(220 55% 12%) 0%,
+      hsl(240 50% 16%) 25%,
+      hsl(260 50% 18%) 50%,
+      hsl(280 45% 16%) 75%,
+      hsl(310 40% 14%) 100%
+    );
   }
 }
 
