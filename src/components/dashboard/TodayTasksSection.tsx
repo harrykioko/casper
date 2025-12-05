@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useCategories } from "@/hooks/useCategories";
@@ -6,123 +5,140 @@ import { filterTodayTasks } from "@/utils/dateFiltering";
 import { Task } from "@/hooks/useTasks";
 import { TaskCardContent } from "@/components/task-cards/TaskCardContent";
 import { TaskCardMetadata } from "@/components/task-cards/TaskCardMetadata";
+import { GlassSubcard } from "@/components/ui/glass-panel";
 import { cn } from "@/lib/utils";
+import { Check } from "lucide-react";
 
 interface TodayTasksSectionProps {
   tasks: Task[];
   onTaskComplete: (id: string) => void;
   onTaskDelete: (id: string) => void;
   onTaskClick: (task: Task) => void;
+  compact?: boolean;
 }
 
-export function TodayTasksSection({ tasks, onTaskComplete, onTaskDelete, onTaskClick }: TodayTasksSectionProps) {
+export function TodayTasksSection({ 
+  tasks, 
+  onTaskComplete, 
+  onTaskDelete, 
+  onTaskClick,
+  compact = false 
+}: TodayTasksSectionProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const { categories } = useCategories();
 
   const todayTasks = filterTodayTasks(tasks, selectedCategory);
 
-  return (
-    <div className="space-y-6">
-      {/* Section Title */}
-      <h2 className="text-2xl font-semibold text-foreground">Today</h2>
+  // In compact mode, show fewer tasks
+  const displayTasks = compact ? todayTasks.slice(0, 5) : todayTasks;
 
-      {/* Category Filter Pills */}
-      <div className="flex flex-wrap gap-2 overflow-x-auto pb-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setSelectedCategory('all')}
-          className={cn(
-            "rounded-full px-4 py-1 text-sm font-medium transition-all",
-            selectedCategory === 'all'
-              ? "bg-gradient-to-r from-[#FF6A79] to-[#415AFF] text-white hover:from-[#FF6A79] hover:to-[#415AFF]"
-              : "bg-muted/30 text-muted-foreground border border-muted/40 hover:bg-muted/40"
-          )}
-        >
-          All
-        </Button>
-        
-        {categories.map((category) => (
+  return (
+    <div className="space-y-4">
+      {/* Category Filter Pills - only show in non-compact mode */}
+      {!compact && (
+        <div className="flex flex-wrap gap-2 overflow-x-auto pb-2">
           <Button
-            key={category.id}
             variant="ghost"
             size="sm"
-            onClick={() => setSelectedCategory(category.name)}
+            onClick={() => setSelectedCategory('all')}
             className={cn(
-              "rounded-full px-4 py-1 text-sm font-medium transition-all",
-              selectedCategory === category.name
-                ? "bg-gradient-to-r from-[#FF6A79] to-[#415AFF] text-white hover:from-[#FF6A79] hover:to-[#415AFF]"
-                : "bg-muted/30 text-muted-foreground border border-muted/40 hover:bg-muted/40"
+              "rounded-full px-4 py-1 text-sm font-medium transition-all h-8",
+              selectedCategory === 'all'
+                ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                : "bg-white/50 dark:bg-white/5 text-muted-foreground border border-white/30 dark:border-white/10 hover:bg-white/70 dark:hover:bg-white/10"
             )}
           >
-            {category.name}
+            All
           </Button>
-        ))}
-      </div>
+          
+          {categories.map((category) => (
+            <Button
+              key={category.id}
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedCategory(category.name)}
+              className={cn(
+                "rounded-full px-4 py-1 text-sm font-medium transition-all h-8",
+                selectedCategory === category.name
+                  ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "bg-white/50 dark:bg-white/5 text-muted-foreground border border-white/30 dark:border-white/10 hover:bg-white/70 dark:hover:bg-white/10"
+              )}
+            >
+              {category.name}
+            </Button>
+          ))}
+        </div>
+      )}
 
-      {/* Today's Task List */}
-      <div className="space-y-3">
-        {todayTasks.length > 0 ? (
-          todayTasks.map((task) => (
-            <div
+      {/* Task List */}
+      <div className="space-y-2">
+        {displayTasks.length > 0 ? (
+          displayTasks.map((task) => (
+            <GlassSubcard
               key={task.id}
               onClick={() => onTaskClick(task)}
               className={cn(
-                "group p-4 rounded-xl bg-muted/20 backdrop-blur border border-muted/30 cursor-pointer transition-all hover:shadow-md hover:bg-muted/30",
+                "group",
                 task.completed && "opacity-60"
               )}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 space-y-2">
+              <div className="flex items-start gap-3">
+                {/* Completion checkbox */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTaskComplete(task.id);
+                  }}
+                  className={cn(
+                    "w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 mt-0.5 transition-all",
+                    task.completed 
+                      ? 'bg-primary border-primary' 
+                      : 'border-muted-foreground/40 hover:border-primary group-hover:border-primary/60'
+                  )}
+                >
+                  {task.completed && <Check className="w-3 h-3 text-primary-foreground" />}
+                </button>
+                
+                <div className="flex-1 min-w-0">
                   <TaskCardContent 
                     content={task.content} 
                     completed={task.completed}
-                    className="text-base"
+                    className={cn("text-sm", compact && "text-sm")}
                   />
                   
-                  <TaskCardMetadata
-                    priority={task.priority}
-                    project={task.project}
-                    scheduledFor={task.scheduledFor}
-                    layout="list"
-                  />
-                </div>
-                
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onTaskComplete(task.id);
-                    }}
-                    className="h-8 w-8 rounded-full"
-                  >
-                    <div className={cn(
-                      "w-4 h-4 rounded-full border-2",
-                      task.completed 
-                        ? 'bg-primary border-primary' 
-                        : 'border-muted-foreground hover:border-primary'
-                    )} />
-                  </Button>
+                  {!compact && (
+                    <TaskCardMetadata
+                      priority={task.priority}
+                      project={task.project}
+                      scheduledFor={task.scheduledFor}
+                      layout="list"
+                    />
+                  )}
                 </div>
               </div>
-            </div>
+            </GlassSubcard>
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-16 h-16 rounded-full bg-muted/20 flex items-center justify-center mb-4">
-              <span className="text-2xl">📭</span>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center mb-3">
+              <span className="text-xl">📭</span>
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {selectedCategory === 'all' 
                 ? "Nothing due today." 
-                : `Nothing due today in ${selectedCategory}.`
+                : `Nothing in ${selectedCategory}.`
               }
             </p>
           </div>
         )}
       </div>
+
+      {/* Show more indicator in compact mode */}
+      {compact && todayTasks.length > 5 && (
+        <p className="text-xs text-muted-foreground/70 text-center">
+          +{todayTasks.length - 5} more tasks
+        </p>
+      )}
     </div>
   );
 }

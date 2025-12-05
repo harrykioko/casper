@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,9 +7,10 @@ import { motion } from "framer-motion";
 
 interface TaskInputProps {
   onAddTask: (task: string, isQuickTask?: boolean) => void;
+  variant?: 'default' | 'glass';
 }
 
-export function TaskInput({ onAddTask }: TaskInputProps) {
+export function TaskInput({ onAddTask, variant = 'default' }: TaskInputProps) {
   const [task, setTask] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   
@@ -23,12 +23,20 @@ export function TaskInput({ onAddTask }: TaskInputProps) {
     }
   };
 
+  const isGlass = variant === 'glass';
+
   return (
     <form 
       onSubmit={handleSubmit} 
       className={cn(
-        "w-full flex items-center gap-2 p-3 rounded-xl transition-all duration-300 glassmorphic",
-        isFocused ? "ring-1 ring-zinc-300 dark:ring-white/20" : ""
+        "w-full flex items-center gap-2 transition-all duration-300",
+        isGlass 
+          ? "p-2 rounded-xl bg-white/40 dark:bg-white/[0.04] border border-white/30 dark:border-white/[0.06]"
+          : "p-3 rounded-xl glassmorphic",
+        isFocused && (isGlass 
+          ? "ring-1 ring-primary/30 bg-white/60 dark:bg-white/[0.08]"
+          : "ring-1 ring-zinc-300 dark:ring-white/20"
+        )
       )}
     >
       <motion.div whileTap={{ scale: 0.9 }} whileHover={{ scale: 1.05 }}>
