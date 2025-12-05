@@ -16,8 +16,6 @@ export interface DashboardPipelineCompany {
   updated_at: string;
   last_interaction_at: string | null;
   logo_url: string | null;
-  open_task_count: number;
-  next_task: string | null;
 }
 
 export function useDashboardPipelineFocus() {
@@ -46,37 +44,7 @@ export function useDashboardPipelineFocus() {
 
       if (fetchError) throw fetchError;
 
-      if (!data || data.length === 0) {
-        setCompanies([]);
-        setLoading(false);
-        return;
-      }
-
-      // Fetch tasks for each company
-      const companyIds = data.map(c => c.id);
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('tasks')
-        .select('pipeline_company_id, content, scheduled_for')
-        .in('pipeline_company_id', companyIds)
-        .eq('completed', false)
-        .order('scheduled_for', { ascending: true, nullsFirst: false });
-
-      if (tasksError) throw tasksError;
-
-      // Count tasks and get earliest task per company
-      const taskCounts: Record<string, number> = {};
-      const nextTasks: Record<string, string> = {};
-      
-      tasksData?.forEach(task => {
-        if (task.pipeline_company_id) {
-          taskCounts[task.pipeline_company_id] = (taskCounts[task.pipeline_company_id] || 0) + 1;
-          if (!nextTasks[task.pipeline_company_id]) {
-            nextTasks[task.pipeline_company_id] = task.content;
-          }
-        }
-      });
-
-      const mappedCompanies: DashboardPipelineCompany[] = data.map(company => ({
+      const mappedCompanies: DashboardPipelineCompany[] = (data || []).map(company => ({
         id: company.id,
         company_name: company.company_name,
         current_round: company.current_round as RoundEnum,
@@ -89,8 +57,6 @@ export function useDashboardPipelineFocus() {
         updated_at: company.updated_at || company.created_at || '',
         last_interaction_at: company.last_interaction_at,
         logo_url: company.logo_url,
-        open_task_count: taskCounts[company.id] || 0,
-        next_task: nextTasks[company.id] || null,
       }));
 
       setCompanies(mappedCompanies);
