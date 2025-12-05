@@ -7,6 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 interface CalendarEvent {
   id: string;
@@ -24,11 +25,12 @@ interface CalendarEvent {
 }
 
 interface CalendarSidebarProps {
+  className?: string;
   events: CalendarEvent[];
   nonnegotiables: Nonnegotiable[];
 }
 
-export function CalendarSidebar({ events, nonnegotiables }: CalendarSidebarProps) {
+export function CalendarSidebar({ className, events, nonnegotiables }: CalendarSidebarProps) {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -78,7 +80,10 @@ export function CalendarSidebar({ events, nonnegotiables }: CalendarSidebarProps
 
   return (
     <>
-      <div className="w-80 border-l border-zinc-200 dark:border-white/10 h-screen sticky top-0 glassmorphic flex flex-col">
+      <div className={cn(
+        "border-l border-zinc-200 dark:border-white/10 h-screen sticky top-0 glassmorphic flex flex-col",
+        className
+      )}>
         {/* Header */}
         <div className="p-6 pb-4 flex-shrink-0">
           <div className="flex justify-between items-center">
