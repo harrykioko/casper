@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { ListTodo, Check, Archive, X, Mail } from "lucide-react";
+import { ListTodo, Check, Archive, X } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { InboxItem } from "@/types/inbox";
@@ -22,6 +22,10 @@ export function InboxDetailDrawer({
   onArchive,
 }: InboxDetailDrawerProps) {
   if (!item) return null;
+
+  // Determine which body content to display
+  const bodyContent = item.body || item.preview || "";
+  const hasHtmlBody = !!item.htmlBody;
 
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -54,9 +58,18 @@ export function InboxDetailDrawer({
 
         {/* Body */}
         <div className="flex-1 p-4 overflow-y-auto">
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <p className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">{item.body}</p>
-          </div>
+          {hasHtmlBody ? (
+            <div 
+              className="prose prose-sm dark:prose-invert max-w-none"
+              dangerouslySetInnerHTML={{ __html: item.htmlBody || "" }}
+            />
+          ) : (
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <p className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
+                {bodyContent}
+              </p>
+            </div>
+          )}
           
           {item.relatedCompanyName && (
             <div className="mt-4 p-3 rounded-lg bg-muted/30 border border-border/50">
