@@ -27,16 +27,24 @@ export function CompanyAttentionGrid({
 
   return (
     <div className={cn(
-      "grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-4",
+      "grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-3 sm:gap-4",
       className
     )}>
-      {sorted.map(company => (
-        <AttentionTileHoverCard
+      {sorted.map((company, index) => (
+        <div
           key={`${company.entityType}-${company.companyId}`}
-          company={company}
-          onClick={onCompanyClick}
-          onCreateTask={onCreateTask}
-        />
+          className="animate-fade-in"
+          style={{ 
+            animationDelay: `${Math.min(index * 30, 300)}ms`,
+            animationFillMode: 'backwards'
+          }}
+        >
+          <AttentionTileHoverCard
+            company={company}
+            onClick={onCompanyClick}
+            onCreateTask={onCreateTask}
+          />
+        </div>
       ))}
     </div>
   );

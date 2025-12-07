@@ -17,14 +17,14 @@ interface AttentionTileHoverCardProps {
 
 const statusLabels: Record<string, string> = {
   red: 'Needs attention',
-  yellow: 'Monitor',
-  green: 'On track',
+  yellow: 'On watch',
+  green: 'Healthy',
 };
 
 const statusColors: Record<string, string> = {
-  red: 'text-red-500',
-  yellow: 'text-amber-500',
-  green: 'text-emerald-500',
+  red: 'text-rose-400',
+  yellow: 'text-amber-400',
+  green: 'text-emerald-400',
 };
 
 export function AttentionTileHoverCard({ company, onClick, onCreateTask }: AttentionTileHoverCardProps) {
@@ -40,20 +40,26 @@ export function AttentionTileHoverCard({ company, onClick, onCreateTask }: Atten
       <HoverCardContent 
         side="top" 
         align="center"
-        className="w-64 p-3 backdrop-blur-xl bg-popover/95 border-border/50"
+        className={cn(
+          "w-64 p-3",
+          "bg-slate-900/90 dark:bg-slate-900/95",
+          "text-slate-50",
+          "border border-white/10 rounded-2xl",
+          "shadow-xl backdrop-blur-md"
+        )}
       >
         <div className="space-y-3">
           {/* Header */}
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h4 className="font-semibold text-sm text-foreground truncate">
+              <h4 className="font-bold text-sm text-slate-50 truncate">
                 {company.name}
               </h4>
               <p className={cn("text-xs font-medium", statusColors[company.status])}>
                 {statusLabels[company.status]}
               </p>
             </div>
-            <span className="text-xs text-muted-foreground whitespace-nowrap">
+            <span className="text-[11px] text-slate-400 whitespace-nowrap">
               Score: {company.score.toFixed(1)}
             </span>
           </div>
@@ -62,7 +68,7 @@ export function AttentionTileHoverCard({ company, onClick, onCreateTask }: Atten
           {topSignals.length > 0 && (
             <div className="space-y-1">
               {topSignals.map((signal, i) => (
-                <p key={i} className="text-xs text-muted-foreground leading-relaxed">
+                <p key={i} className="text-[11px] text-slate-400 leading-relaxed">
                   • {signal.description}
                 </p>
               ))}
@@ -74,7 +80,11 @@ export function AttentionTileHoverCard({ company, onClick, onCreateTask }: Atten
             <Button
               variant="secondary"
               size="sm"
-              className="flex-1 h-7 text-xs"
+              className={cn(
+                "flex-1 h-7 text-xs",
+                "bg-white/10 text-slate-50 border-0",
+                "hover:bg-white/20"
+              )}
               onClick={(e) => {
                 e.stopPropagation();
                 onClick(company);
@@ -87,7 +97,11 @@ export function AttentionTileHoverCard({ company, onClick, onCreateTask }: Atten
               <Button
                 variant="secondary"
                 size="sm"
-                className="flex-1 h-7 text-xs"
+                className={cn(
+                  "flex-1 h-7 text-xs",
+                  "bg-white/10 text-slate-50 border-0",
+                  "hover:bg-white/20"
+                )}
                 onClick={(e) => {
                   e.stopPropagation();
                   onCreateTask(company);
@@ -100,7 +114,11 @@ export function AttentionTileHoverCard({ company, onClick, onCreateTask }: Atten
             <Button
               variant="secondary"
               size="sm"
-              className="h-7 px-2"
+              className={cn(
+                "h-7 px-2",
+                "bg-white/10 text-slate-50 border-0",
+                "hover:bg-white/20"
+              )}
               onClick={(e) => {
                 e.stopPropagation();
                 onClick(company);
