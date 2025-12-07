@@ -7,11 +7,9 @@ import { DashboardHeroBand } from "@/components/dashboard/DashboardHeroBand";
 import { TodayTasksSection } from "@/components/dashboard/TodayTasksSection";
 import { ReadingListSection } from "@/components/dashboard/ReadingListSection";
 import { TaskInput } from "@/components/dashboard/TaskInput";
-import { DashboardPortfolioSection } from "@/components/dashboard/DashboardPortfolioSection";
-import { DashboardPipelineFocusSection } from "@/components/dashboard/DashboardPipelineFocusSection";
 import { DashboardPrioritySection } from "@/components/dashboard/DashboardPrioritySection";
 import { InboxPanel } from "@/components/dashboard/InboxPanel";
-import { RecentNotesSection } from "@/components/dashboard/RecentNotesSection";
+import { CompaniesCommandPane } from "@/components/dashboard/CompaniesCommandPane";
 import { CompanyCommandPane } from "@/components/command-pane/CompanyCommandPane";
 import { EnhancedCommandModal } from "@/components/modals/EnhancedCommandModal";
 import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
@@ -77,8 +75,8 @@ export function DashboardMainContent({
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
   
-  // Command pane state
-  const [commandPaneOpen, setCommandPaneOpen] = useState(false);
+  // Command pane state (for company slide-over)
+  const [companyCommandPaneOpen, setCompanyCommandPaneOpen] = useState(false);
   const [selectedEntity, setSelectedEntity] = useState<{
     type: 'portfolio' | 'pipeline';
     id: string;
@@ -99,23 +97,13 @@ export function DashboardMainContent({
     setSelectedTask(null);
   };
 
-  const openPortfolioCommandPane = (companyId: string) => {
-    setSelectedEntity({ type: 'portfolio', id: companyId });
-    setCommandPaneOpen(true);
-  };
-
-  const openPipelineCommandPane = (companyId: string) => {
-    setSelectedEntity({ type: 'pipeline', id: companyId });
-    setCommandPaneOpen(true);
-  };
-
   const openCommandPaneByEntityType = (companyId: string, entityType: 'portfolio' | 'pipeline') => {
     setSelectedEntity({ type: entityType, id: companyId });
-    setCommandPaneOpen(true);
+    setCompanyCommandPaneOpen(true);
   };
 
-  const closeCommandPane = () => {
-    setCommandPaneOpen(false);
+  const closeCompanyCommandPane = () => {
+    setCompanyCommandPaneOpen(false);
     setSelectedEntity(null);
   };
 
@@ -152,87 +140,89 @@ export function DashboardMainContent({
         todoCount={todoCount}
       />
 
-      {/* Main Grid Content */}
+      {/* Main 12-Column Grid Content */}
       <div className="px-4 sm:px-6 lg:px-8 pb-8">
+        <div className="grid grid-cols-12 gap-6">
           
-        {/* Row 1: Priority Items, Inbox, To-Do */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-          <DashboardPrioritySection 
-            onCompanyClick={openCommandPaneByEntityType}
-            onOpenTaskCreate={handleOpenTaskCreate}
-          />
-          <InboxPanel onOpenTaskCreate={handleOpenTaskCreate} />
-          
-          {/* To-Do Panel with ActionPanel */}
-          <ActionPanel accentColor="emerald" className="h-full">
-            <ActionPanelHeader
-              icon={<CheckCircle2 className="h-4 w-4" />}
-              title="To-Do"
-              subtitle={`${completedToday}/${totalTasks} done today`}
-              badge={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full px-4 h-7 text-[11px] font-medium bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
-                  onClick={() => handleOpenTaskCreate()}
-                >
-                  <Plus className="mr-1 h-3 w-3" /> New task
-                </Button>
-              }
-              accentColor="emerald"
+          {/* Row 1: Triage Cockpit - Priority Items, Inbox, To-Do */}
+          <div className="col-span-12 lg:col-span-4">
+            <DashboardPrioritySection 
+              onCompanyClick={openCommandPaneByEntityType}
+              onOpenTaskCreate={handleOpenTaskCreate}
             />
-            
-            <ActionPanelListArea accentColor="emerald" className="overflow-y-auto max-h-[280px]">
-              <TaskInput onAddTask={onAddTask} variant="glass" />
-              <div className="mt-2">
-                <TodayTasksSection
-                  tasks={tasks}
-                  onTaskComplete={onTaskComplete}
-                  onTaskDelete={onTaskDelete}
-                  onTaskClick={handleTaskClick}
-                  onUpdateTask={onUpdateTask}
-                  compact
-                />
-              </div>
-            </ActionPanelListArea>
+          </div>
+          
+          <div className="col-span-12 lg:col-span-4">
+            <InboxPanel onOpenTaskCreate={handleOpenTaskCreate} />
+          </div>
+          
+          <div className="col-span-12 lg:col-span-4">
+            {/* To-Do Panel */}
+            <ActionPanel accentColor="emerald" className="h-full">
+              <ActionPanelHeader
+                icon={<CheckCircle2 className="h-4 w-4" />}
+                title="To-Do"
+                subtitle={`${completedToday}/${totalTasks} done today`}
+                badge={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full px-4 h-7 text-[11px] font-medium bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
+                    onClick={() => handleOpenTaskCreate()}
+                  >
+                    <Plus className="mr-1 h-3 w-3" /> New task
+                  </Button>
+                }
+                accentColor="emerald"
+              />
+              
+              <ActionPanelListArea accentColor="emerald" className="overflow-y-auto max-h-[280px]">
+                <TaskInput onAddTask={onAddTask} variant="glass" />
+                <div className="mt-2">
+                  <TodayTasksSection
+                    tasks={tasks}
+                    onTaskComplete={onTaskComplete}
+                    onTaskDelete={onTaskDelete}
+                    onTaskClick={handleTaskClick}
+                    onUpdateTask={onUpdateTask}
+                    compact
+                  />
+                </div>
+              </ActionPanelListArea>
 
-            <ActionPanelFooter className="justify-end">
-              <button 
-                onClick={() => onNavigate('/tasks')}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-              >
-                View all tasks
-              </button>
-            </ActionPanelFooter>
-          </ActionPanel>
-        </div>
-
-          {/* Row 2: Portfolio Grid */}
-          <div className="mb-8">
-            <DashboardPortfolioSection onCompanyClick={openPortfolioCommandPane} />
+              <ActionPanelFooter className="justify-end">
+                <button 
+                  onClick={() => onNavigate('/tasks')}
+                  className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                >
+                  View all tasks
+                </button>
+              </ActionPanelFooter>
+            </ActionPanel>
           </div>
 
-          {/* Row 3: Pipeline Focus */}
-          <div className="mb-8">
-            <DashboardPipelineFocusSection onCompanyClick={openPipelineCommandPane} />
+          {/* Rows 2-3: Companies Command Pane (cols 1-8) + Reading List (cols 9-12) */}
+          <div className="col-span-12 lg:col-span-8">
+            <CompaniesCommandPane onCompanyClick={openCommandPaneByEntityType} />
           </div>
-
-        {/* Row 4: Reading List & Recent Notes */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ReadingListSection
-            readingItems={readingItems}
-            onMarkRead={onMarkRead}
-            onDeleteReadingItem={onDeleteReadingItem}
-            onAddReadingItem={onAddReadingItem}
-          />
-          <RecentNotesSection />
+          
+          <div className="col-span-12 lg:col-span-4">
+            <ReadingListSection
+              readingItems={readingItems}
+              onMarkRead={onMarkRead}
+              onDeleteReadingItem={onDeleteReadingItem}
+              onAddReadingItem={onAddReadingItem}
+              className="h-full min-h-[400px]"
+            />
+          </div>
+          
         </div>
       </div>
 
-      {/* Company Command Pane */}
+      {/* Company Command Pane (Slide-over) */}
       <CompanyCommandPane
-        open={commandPaneOpen}
-        onClose={closeCommandPane}
+        open={companyCommandPaneOpen}
+        onClose={closeCompanyCommandPane}
         entityType={selectedEntity?.type || 'portfolio'}
         entityId={selectedEntity?.id || null}
       />
