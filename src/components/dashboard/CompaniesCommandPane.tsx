@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Building2 } from 'lucide-react';
-import { GlassPanel, GlassPanelHeader } from '@/components/ui/glass-panel';
+import { GlassPanel } from '@/components/ui/glass-panel';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCompanyAttention } from '@/hooks/useCompanyAttention';
 import { CompanyAttentionGrid } from './CompanyAttentionGrid';
@@ -23,25 +23,30 @@ interface FilterChipProps {
   statusColor?: AttentionStatus;
 }
 
-function FilterChip({ label, active, onClick, variant = 'entity', statusColor }: FilterChipProps) {
-  const statusDotColors: Record<AttentionStatus, string> = {
-    red: 'bg-red-500',
-    yellow: 'bg-amber-400',
-    green: 'bg-emerald-500',
-  };
+const statusDotColors: Record<AttentionStatus, string> = {
+  red: 'bg-rose-400',
+  yellow: 'bg-amber-300',
+  green: 'bg-emerald-400',
+};
 
+function FilterChip({ label, active, onClick, variant = 'entity', statusColor }: FilterChipProps) {
   return (
     <button
       onClick={onClick}
       className={cn(
-        "text-xs px-3 py-1 rounded-full font-medium transition-colors flex items-center gap-1.5",
+        "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
+        "transition-all duration-150",
+        "border",
         active
-          ? "bg-primary/10 text-primary"
-          : "bg-muted/50 text-muted-foreground hover:bg-muted/70"
+          ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 border-transparent"
+          : "bg-white/5 text-slate-500 dark:text-slate-400 border-white/10 hover:bg-white/10 hover:text-slate-700 dark:hover:text-slate-300"
       )}
     >
       {variant === 'status' && statusColor && (
-        <span className={cn("w-2 h-2 rounded-full", statusDotColors[statusColor])} />
+        <span className={cn(
+          "w-2 h-2 rounded-full mr-1.5",
+          statusDotColors[statusColor]
+        )} />
       )}
       {label}
     </button>
@@ -75,69 +80,76 @@ export function CompaniesCommandPane({ onCompanyClick, onCreateTask }: Companies
 
   return (
     <GlassPanel className="h-full min-h-[400px]">
-      <GlassPanelHeader 
-        title="Companies"
-        action={
-          <span className="text-xs text-muted-foreground">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+        {/* Left: Title + subtitle */}
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
+            Companies
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             At a glance: what needs your attention
-          </span>
-        }
-      />
-      
-      {/* Filter chips */}
-      <div className="flex flex-wrap gap-2 mb-4 px-1">
-        {/* Entity filters */}
-        <FilterChip 
-          label="All" 
-          active={entityFilter === 'all'} 
-          onClick={() => setEntityFilter('all')} 
-        />
-        <FilterChip 
-          label="Portfolio" 
-          active={entityFilter === 'portfolio'} 
-          onClick={() => setEntityFilter('portfolio')} 
-        />
-        <FilterChip 
-          label="Pipeline" 
-          active={entityFilter === 'pipeline'} 
-          onClick={() => setEntityFilter('pipeline')} 
-        />
-        
-        <div className="w-px h-5 bg-border/50 mx-1 self-center" />
-        
-        {/* Status filters */}
-        <FilterChip 
-          label={`Red (${statusCounts.red})`}
-          active={statusFilter === 'red'} 
-          onClick={() => setStatusFilter(statusFilter === 'red' ? 'all' : 'red')}
-          variant="status"
-          statusColor="red"
-        />
-        <FilterChip 
-          label={`Yellow (${statusCounts.yellow})`}
-          active={statusFilter === 'yellow'} 
-          onClick={() => setStatusFilter(statusFilter === 'yellow' ? 'all' : 'yellow')}
-          variant="status"
-          statusColor="yellow"
-        />
-        <FilterChip 
-          label={`Green (${statusCounts.green})`}
-          active={statusFilter === 'green'} 
-          onClick={() => setStatusFilter(statusFilter === 'green' ? 'all' : 'green')}
-          variant="status"
-          statusColor="green"
-        />
+          </p>
+        </div>
+
+        {/* Right: Filter chips */}
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          {/* Entity filters */}
+          <FilterChip 
+            label="All" 
+            active={entityFilter === 'all'} 
+            onClick={() => setEntityFilter('all')} 
+          />
+          <FilterChip 
+            label="Portfolio" 
+            active={entityFilter === 'portfolio'} 
+            onClick={() => setEntityFilter('portfolio')} 
+          />
+          <FilterChip 
+            label="Pipeline" 
+            active={entityFilter === 'pipeline'} 
+            onClick={() => setEntityFilter('pipeline')} 
+          />
+          
+          <div className="w-px h-4 bg-white/10 mx-1" />
+          
+          {/* Status filters */}
+          <FilterChip 
+            label={`${statusCounts.red}`}
+            active={statusFilter === 'red'} 
+            onClick={() => setStatusFilter(statusFilter === 'red' ? 'all' : 'red')}
+            variant="status"
+            statusColor="red"
+          />
+          <FilterChip 
+            label={`${statusCounts.yellow}`}
+            active={statusFilter === 'yellow'} 
+            onClick={() => setStatusFilter(statusFilter === 'yellow' ? 'all' : 'yellow')}
+            variant="status"
+            statusColor="yellow"
+          />
+          <FilterChip 
+            label={`${statusCounts.green}`}
+            active={statusFilter === 'green'} 
+            onClick={() => setStatusFilter(statusFilter === 'green' ? 'all' : 'green')}
+            variant="status"
+            statusColor="green"
+          />
+        </div>
       </div>
+
+      {/* Divider */}
+      <div className="border-b border-white/10 mb-4" />
       
       {/* Content */}
       {isLoading ? (
-        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-4 p-1">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="w-20 h-20 rounded-2xl" />
+        <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 gap-3 sm:gap-4 pt-3 pb-4 sm:pt-4 sm:pb-6">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <Skeleton key={i} className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/5" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex items-center justify-center py-16 text-muted-foreground">
+        <div className="flex items-center justify-center py-16 text-slate-500 dark:text-slate-400">
           <div className="text-center">
             <Building2 className="w-12 h-12 mx-auto mb-4 opacity-30" />
             <p className="text-sm font-medium mb-1">
@@ -145,7 +157,7 @@ export function CompaniesCommandPane({ onCompanyClick, onCreateTask }: Companies
                 ? 'No companies yet' 
                 : 'No companies match filters'}
             </p>
-            <p className="text-xs text-muted-foreground/70">
+            <p className="text-xs opacity-70">
               {companies.length === 0
                 ? 'Add portfolio or pipeline companies to see them here'
                 : 'Try adjusting your filters'}
@@ -157,7 +169,7 @@ export function CompaniesCommandPane({ onCompanyClick, onCreateTask }: Companies
           companies={filtered}
           onCompanyClick={handleCompanyClick}
           onCreateTask={onCreateTask ? handleCreateTask : undefined}
-          className="p-1"
+          className="pt-3 pb-4 sm:pt-4 sm:pb-6"
         />
       )}
     </GlassPanel>
