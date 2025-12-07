@@ -30,7 +30,7 @@ export function CompanyAttentionTile({ company, onClick }: CompanyAttentionTileP
     <button
       onClick={() => onClick(company)}
       className={cn(
-        "relative w-20 h-20 rounded-2xl overflow-hidden",
+        "relative w-20 h-20 rounded-2xl",
         "ring-4 ring-offset-2 ring-offset-background",
         statusRingColors[company.status],
         "transition-all duration-200 ease-out",
@@ -39,47 +39,55 @@ export function CompanyAttentionTile({ company, onClick }: CompanyAttentionTileP
         "group"
       )}
     >
-      {/* Background */}
+      {/* Inner container that clips content */}
       <div className={cn(
-        "absolute inset-0",
-        statusBgColors[company.status],
-        "bg-muted/50"
-      )} />
-      
-      {/* Logo or initials */}
-      {company.logoUrl ? (
-        <img
-          src={company.logoUrl}
-          alt={company.name}
-          className="absolute inset-0 w-full h-full object-cover"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-            e.currentTarget.nextElementSibling?.classList.remove('hidden');
-          }}
-        />
-      ) : null}
-      
-      {/* Initials fallback */}
-      <div className={cn(
-        "absolute inset-0 flex items-center justify-center",
-        "text-lg font-semibold text-foreground/80",
-        company.logoUrl && "hidden"
+        "absolute inset-0 rounded-2xl overflow-hidden",
+        "bg-white dark:bg-zinc-800"
       )}>
-        {initials}
+        {/* Status tint background */}
+        <div className={cn(
+          "absolute inset-0",
+          statusBgColors[company.status]
+        )} />
+        
+        {/* Logo container with padding */}
+        {company.logoUrl ? (
+          <div className="absolute inset-2 flex items-center justify-center">
+            <img
+              src={company.logoUrl}
+              alt={company.name}
+              className="max-w-full max-h-full object-contain"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const fallback = e.currentTarget.parentElement?.nextElementSibling;
+                if (fallback) fallback.classList.remove('hidden');
+              }}
+            />
+          </div>
+        ) : null}
+        
+        {/* Initials fallback */}
+        <div className={cn(
+          "absolute inset-0 flex items-center justify-center",
+          "text-lg font-semibold text-foreground/80",
+          company.logoUrl && "hidden"
+        )}>
+          {initials}
+        </div>
+
+        {/* Hover overlay */}
+        <div className={cn(
+          "absolute inset-0 bg-foreground/0 group-hover:bg-foreground/5",
+          "transition-colors duration-200"
+        )} />
       </div>
 
-      {/* Pipeline badge */}
+      {/* Pipeline badge - outside clipped area */}
       {company.entityType === 'pipeline' && (
-        <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded text-[9px] font-medium bg-primary/80 text-primary-foreground">
+        <div className="absolute -bottom-1 -right-1 z-10 px-1.5 py-0.5 rounded text-[9px] font-medium bg-primary text-primary-foreground shadow-sm">
           P
         </div>
       )}
-      
-      {/* Hover overlay */}
-      <div className={cn(
-        "absolute inset-0 bg-foreground/0 group-hover:bg-foreground/5",
-        "transition-colors duration-200"
-      )} />
     </button>
   );
 }
