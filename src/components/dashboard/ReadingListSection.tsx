@@ -12,13 +12,15 @@ interface ReadingListSectionProps {
   onMarkRead: (id: string) => void;
   onDeleteReadingItem: (id: string) => void;
   onAddReadingItem: (item: Omit<ReadingItem, 'id'>) => void;
+  className?: string;
 }
 
 export function ReadingListSection({ 
   readingItems, 
   onMarkRead, 
   onDeleteReadingItem,
-  onAddReadingItem
+  onAddReadingItem,
+  className
 }: ReadingListSectionProps) {
   const [addLinkDialogOpen, setAddLinkDialogOpen] = useState(false);
   
@@ -26,7 +28,7 @@ export function ReadingListSection({
   const displayItems = readingItems.filter(item => !item.isRead).slice(0, 3);
 
   return (
-    <GlassPanel className="h-full">
+    <GlassPanel className={cn("h-full", className)}>
       <GlassPanelHeader 
         title="Reading List" 
         action={
