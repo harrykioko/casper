@@ -9,7 +9,7 @@ import { PipelineCompany, RoundEnum, SectorEnum, PipelineStatus } from '@/types/
 import { usePipeline } from '@/hooks/usePipeline';
 import { useToast } from '@/hooks/use-toast';
 import { Trash2, Globe, Upload, Check, X, Loader2 } from 'lucide-react';
-import { fetchLinkMetadata } from '@/services/linkMetadataService';
+import { fetchCompanyLogo } from '@/services/logoService';
 import { supabase } from '@/integrations/supabase/client';
 
 interface PipelineDetailModalProps {
@@ -54,10 +54,9 @@ export function PipelineDetailModal({ company, isOpen, onClose }: PipelineDetail
 
     setFetchingLogo(true);
     try {
-      const metadata = await fetchLinkMetadata(website);
-      const logoCandidate = metadata.image || metadata.favicon;
-      if (logoCandidate) {
-        setPendingLogo(logoCandidate);
+      const logoUrl = await fetchCompanyLogo(website);
+      if (logoUrl) {
+        setPendingLogo(logoUrl);
       } else {
         toast({ title: 'No logo found', description: 'Try uploading manually' });
       }
