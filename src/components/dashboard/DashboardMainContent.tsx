@@ -203,7 +203,15 @@ export function DashboardMainContent({
 
           {/* Rows 2-3: Companies Command Pane (cols 1-8) + Reading List (cols 9-12) */}
           <div className="col-span-12 lg:col-span-8">
-            <CompaniesCommandPane onCompanyClick={openCommandPaneByEntityType} />
+            <CompaniesCommandPane 
+              onCompanyClick={openCommandPaneByEntityType}
+              onCreateTask={(companyId, companyType) => {
+                handleOpenTaskCreate({
+                  companyId,
+                  companyType,
+                });
+              }}
+            />
           </div>
           
           <div className="col-span-12 lg:col-span-4">
