@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { CompanyStatus, FounderInput } from '@/types/portfolio';
-import { fetchLinkMetadata } from '@/services/linkMetadataService';
+import { fetchCompanyLogo } from '@/services/logoService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -101,12 +101,11 @@ export function AddCompanyModal({
     const timeoutId = setTimeout(async () => {
       setFetchingLogo(true);
       try {
-        const metadata = await fetchLinkMetadata(websiteUrl);
+        const logoUrl = await fetchCompanyLogo(websiteUrl);
         lastFetchedUrl.current = websiteUrl;
         
-        const logo = metadata.image || metadata.favicon;
-        if (logo) {
-          setPendingLogo(logo);
+        if (logoUrl) {
+          setPendingLogo(logoUrl);
         }
       } catch (error) {
         console.error('Failed to fetch logo:', error);
@@ -172,11 +171,10 @@ export function AddCompanyModal({
 
     setFetchingLogo(true);
     try {
-      const metadata = await fetchLinkMetadata(websiteUrl);
+      const logoUrl = await fetchCompanyLogo(websiteUrl);
       lastFetchedUrl.current = websiteUrl;
-      const logo = metadata.image || metadata.favicon;
-      if (logo) {
-        setPendingLogo(logo);
+      if (logoUrl) {
+        setPendingLogo(logoUrl);
         setLogoApproved(false);
       } else {
         toast.error('No logo found on website');
