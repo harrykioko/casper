@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PipelineCompany, RoundEnum, SectorEnum, PipelineStatus } from '@/types/pipeline';
 import { usePipeline } from '@/hooks/usePipeline';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Globe, Upload, Check, X, Loader2 } from 'lucide-react';
+import { fetchLinkMetadata } from '@/services/linkMetadataService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PipelineDetailModalProps {
   company: PipelineCompany | null;
@@ -29,12 +31,97 @@ export function PipelineDetailModal({ company, isOpen, onClose }: PipelineDetail
   const { updateCompany, deleteCompany } = usePipeline();
   const { toast } = useToast();
 
+  // Logo state
+  const [pendingLogo, setPendingLogo] = useState<string | null>(null);
+  const [fetchingLogo, setFetchingLogo] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Update form data when company changes
   useEffect(() => {
     if (company) {
       setFormData(company);
+      setPendingLogo(null);
     }
   }, [company]);
+
+  const handleFetchLogo = async () => {
+    const website = formData.website;
+    if (!website) {
+      toast({ title: 'Enter a website URL first', variant: 'destructive' });
+      return;
+    }
+
+    setFetchingLogo(true);
+    try {
+      const metadata = await fetchLinkMetadata(website);
+      const logoCandidate = metadata.image || metadata.favicon;
+      if (logoCandidate) {
+        setPendingLogo(logoCandidate);
+      } else {
+        toast({ title: 'No logo found', description: 'Try uploading manually' });
+      }
+    } catch (error) {
+      toast({ title: 'Failed to fetch logo', variant: 'destructive' });
+    } finally {
+      setFetchingLogo(false);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Please select an image file', variant: 'destructive' });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'Image must be under 5MB', variant: 'destructive' });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${crypto.randomUUID()}.${fileExt}`;
+      const filePath = `pipeline/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('company-logos')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('company-logos')
+        .getPublicUrl(filePath);
+
+      setFormData(prev => ({ ...prev, logo_url: publicUrl }));
+      setPendingLogo(null);
+      toast({ title: 'Logo uploaded' });
+    } catch (error) {
+      toast({ title: 'Failed to upload logo', variant: 'destructive' });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const approvePendingLogo = () => {
+    if (pendingLogo) {
+      setFormData(prev => ({ ...prev, logo_url: pendingLogo }));
+      setPendingLogo(null);
+    }
+  };
+
+  const clearPendingLogo = () => setPendingLogo(null);
+
+  const clearLogo = () => {
+    setFormData(prev => ({ ...prev, logo_url: undefined }));
+    setPendingLogo(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -214,6 +301,92 @@ export function PipelineDetailModal({ company, isOpen, onClose }: PipelineDetail
               value={formData.website || ''}
               onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
             />
+          </div>
+
+          {/* Logo Section */}
+          <div className="space-y-3">
+            <Label>Company Logo</Label>
+            <div className="flex items-center gap-4 p-3 rounded-lg border border-border bg-muted/30">
+              {/* Logo Preview */}
+              <div className="w-14 h-14 rounded-lg bg-background border border-border flex items-center justify-center overflow-hidden shrink-0">
+                {pendingLogo ? (
+                  <img src={pendingLogo} alt="Pending logo" className="w-full h-full object-contain" />
+                ) : formData.logo_url ? (
+                  <img src={formData.logo_url} alt="Company logo" className="w-full h-full object-contain" />
+                ) : (
+                  <span className="text-lg font-semibold text-muted-foreground">
+                    {formData.company_name?.charAt(0) || '?'}
+                  </span>
+                )}
+              </div>
+
+              {/* Status & Actions */}
+              <div className="flex-1 min-w-0">
+                {pendingLogo ? (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Approve this logo?</p>
+                    <div className="flex gap-2">
+                      <Button type="button" size="sm" onClick={approvePendingLogo}>
+                        <Check className="h-3 w-3 mr-1" /> Use
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={clearPendingLogo}>
+                        <X className="h-3 w-3 mr-1" /> Reject
+                      </Button>
+                    </div>
+                  </div>
+                ) : formData.logo_url ? (
+                  <div className="space-y-1">
+                    <p className="text-sm text-foreground">Logo set</p>
+                    <Button type="button" size="sm" variant="ghost" onClick={clearLogo} className="text-rose-500 hover:text-rose-600 h-7 px-2">
+                      Remove
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No logo yet</p>
+                )}
+              </div>
+            </div>
+
+            {/* Fetch / Upload Buttons */}
+            {!pendingLogo && (
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleFetchLogo}
+                  disabled={fetchingLogo || !formData.website}
+                >
+                  {fetchingLogo ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <Globe className="h-3 w-3 mr-1" />
+                  )}
+                  Fetch from website
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <Upload className="h-3 w-3 mr-1" />
+                  )}
+                  Upload
+                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
