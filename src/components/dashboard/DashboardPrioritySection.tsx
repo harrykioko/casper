@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   AlertTriangle, 
   Clock, 
@@ -139,6 +140,7 @@ export function DashboardPrioritySection({
   onOpenInboxDetail,
   onOpenEventDetail,
 }: DashboardPrioritySectionProps) {
+  const navigate = useNavigate();
   const { items: priorityItems, loading, totalCount } = useUnifiedPriorityV1();
   const { updateTask } = useTasks();
   const { markComplete: markInboxComplete } = useInboxItems();
@@ -429,7 +431,10 @@ export function DashboardPrioritySection({
       </ActionPanelListArea>
 
       <ActionPanelFooter>
-        <button className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+        <button 
+          onClick={() => navigate('/priority')}
+          className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+        >
           View all priority
         </button>
         <button className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 bg-slate-900/5 dark:bg-slate-50/5 text-slate-500 dark:text-slate-300 hover:bg-slate-900/10 dark:hover:bg-slate-50/10 transition-colors">
