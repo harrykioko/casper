@@ -188,11 +188,11 @@ export default function Inbox() {
 
   // Determine grid columns based on desktop and selected item
   const gridClasses = cn(
-    "grid gap-6",
+    "grid gap-5",
     isDesktop && selectedItem
-      ? "grid-cols-[300px_minmax(0,1fr)_minmax(0,380px)]"
+      ? "grid-cols-[280px_minmax(280px,1.1fr)_minmax(400px,1.6fr)]"
       : isDesktop
-        ? "grid-cols-[300px_minmax(0,1fr)]"
+        ? "grid-cols-[280px_minmax(0,1fr)]"
         : "grid-cols-1"
   );
 
@@ -275,7 +275,7 @@ export default function Inbox() {
       </div>
 
       {/* Content - 3 column layout on desktop with selected item */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 lg:px-6 py-4">
         <div className={gridClasses}>
           {/* Left: Summary Panel (sticky) */}
           <div className="hidden lg:block sticky top-24 self-start">
@@ -291,7 +291,7 @@ export default function Inbox() {
           </div>
 
           {/* Middle: Message List (scrollable) */}
-          <div className="lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto">
+          <div className="lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto pr-1">
             {isLoadingAny ? (
               <div className="space-y-3">
                 {[1, 2, 3, 4, 5].map((i) => (
@@ -333,7 +333,7 @@ export default function Inbox() {
 
           {/* Right: Email Detail (embedded on desktop) */}
           {isDesktop && selectedItem && (
-            <div className="sticky top-24 self-start h-[calc(100vh-12rem)]">
+            <div className="sticky top-24 self-start h-[calc(100vh-10rem)]">
               <InboxDetailDrawer
                 mode="embedded"
                 open={true}
