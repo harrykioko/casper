@@ -43,6 +43,7 @@ export function usePipelineCompanyDetail(companyId: string | undefined) {
           logo_url: data.logo_url,
           is_top_of_mind: data.is_top_of_mind ?? false,
           last_interaction_at: data.last_interaction_at,
+          primary_domain: (data as any).primary_domain ?? null,
           created_by: data.created_by,
           created_at: data.created_at || '',
           updated_at: data.updated_at || '',

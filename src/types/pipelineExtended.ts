@@ -48,6 +48,7 @@ export interface PipelineCompanyDetail {
   logo_url?: string | null;
   is_top_of_mind: boolean;
   last_interaction_at?: string | null;
+  primary_domain?: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;

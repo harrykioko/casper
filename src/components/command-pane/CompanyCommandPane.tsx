@@ -6,6 +6,7 @@ import { CompanyCommandTasks } from './CompanyCommandTasks';
 import { CompanyCommandNotes } from './CompanyCommandNotes';
 import { CompanyCommandTimeline } from './CompanyCommandTimeline';
 import { CompanyCommandQuickActions } from './CompanyCommandQuickActions';
+import { CompanyCommandCommunications } from './CompanyCommandCommunications';
 import { PipelineCommandHeader } from './PipelineCommandHeader';
 import { PipelineCommandSummary } from './PipelineCommandSummary';
 import { useCompany } from '@/hooks/useCompany';
@@ -18,6 +19,7 @@ import { usePipelineContacts } from '@/hooks/usePipelineContacts';
 import { usePipelineInteractions } from '@/hooks/usePipelineInteractions';
 import { usePipelineTasks } from '@/hooks/usePipelineTasks';
 import { usePipelineTimeline } from '@/hooks/usePipelineTimeline';
+import { useCompanyLinkedCommunications } from '@/hooks/useCompanyLinkedCommunications';
 import { Skeleton } from '@/components/ui/skeleton';
 import { differenceInDays, parseISO } from 'date-fns';
 
@@ -66,6 +68,17 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
     entityType === 'pipeline' ? entityId ?? undefined : undefined
   );
   const pipelineTimeline = usePipelineTimeline(pipelineInteractions, pipelineTasks);
+
+  // Linked communications for both entity types
+  const portfolioPrimaryDomain = entityType === 'portfolio' ? portfolioCompany?.primary_domain : undefined;
+  const pipelinePrimaryDomain = entityType === 'pipeline' ? pipelineCompany?.primary_domain : undefined;
+  
+  const { linkedCommunications: portfolioComms, loading: portfolioCommsLoading } = useCompanyLinkedCommunications(
+    portfolioPrimaryDomain
+  );
+  const { linkedCommunications: pipelineComms, loading: pipelineCommsLoading } = useCompanyLinkedCommunications(
+    pipelinePrimaryDomain
+  );
 
   const isLoading = entityType === 'portfolio' ? portfolioLoading : pipelineLoading;
   
@@ -141,6 +154,11 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
                 onCreateInteraction={createPortfolioInteraction}
               />
 
+              <CompanyCommandCommunications
+                linkedCommunications={portfolioComms}
+                loading={portfolioCommsLoading}
+              />
+
               <CompanyCommandTimeline events={portfolioTimeline.slice(0, 8)} />
             </div>
           </>
@@ -194,6 +212,11 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
                 companyId={pipelineCompany.id}
                 onCreateInteraction={createPipelineInteraction}
                 entityType="pipeline"
+              />
+
+              <CompanyCommandCommunications
+                linkedCommunications={pipelineComms}
+                loading={pipelineCommsLoading}
               />
 
               <CompanyCommandTimeline events={pipelineTimeline.slice(0, 8)} />
