@@ -51,15 +51,14 @@ export function ReadingListSection({
           <Button 
             size="sm" 
             variant="ghost" 
-            className="h-7 px-2 text-xs rounded-full bg-white/50 dark:bg-white/5 hover:bg-white/70 dark:hover:bg-white/10"
+            className="rounded-full px-4 h-7 text-[11px] font-medium bg-rose-50 text-rose-600 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:bg-rose-500/20"
             onClick={() => setAddLinkDialogOpen(true)}
           >
-            <Plus className="w-3 h-3 mr-1" />
-            Add
+            <Plus className="mr-1 h-3 w-3" /> Add
           </Button>
           <Link
             to="/reading-list"
-            className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
+            className="text-[11px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1 transition-colors"
           >
             View All <ArrowRight className="w-3 h-3" />
           </Link>
