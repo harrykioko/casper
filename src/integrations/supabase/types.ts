@@ -133,6 +133,7 @@ export type Database = {
           last_interaction_at: string | null
           logo_url: string | null
           name: string
+          primary_domain: string | null
           status: Database["public"]["Enums"]["company_status"]
           updated_at: string | null
           website_url: string | null
@@ -145,6 +146,7 @@ export type Database = {
           last_interaction_at?: string | null
           logo_url?: string | null
           name: string
+          primary_domain?: string | null
           status?: Database["public"]["Enums"]["company_status"]
           updated_at?: string | null
           website_url?: string | null
@@ -157,6 +159,7 @@ export type Database = {
           last_interaction_at?: string | null
           logo_url?: string | null
           name?: string
+          primary_domain?: string | null
           status?: Database["public"]["Enums"]["company_status"]
           updated_at?: string | null
           website_url?: string | null
@@ -429,6 +432,7 @@ export type Database = {
           last_interaction_at: string | null
           logo_url: string | null
           next_steps: string | null
+          primary_domain: string | null
           raise_amount_usd: number | null
           sector: Database["public"]["Enums"]["sector_enum"] | null
           status: string
@@ -446,6 +450,7 @@ export type Database = {
           last_interaction_at?: string | null
           logo_url?: string | null
           next_steps?: string | null
+          primary_domain?: string | null
           raise_amount_usd?: number | null
           sector?: Database["public"]["Enums"]["sector_enum"] | null
           status: string
@@ -463,6 +468,7 @@ export type Database = {
           last_interaction_at?: string | null
           logo_url?: string | null
           next_steps?: string | null
+          primary_domain?: string | null
           raise_amount_usd?: number | null
           sector?: Database["public"]["Enums"]["sector_enum"] | null
           status?: string
