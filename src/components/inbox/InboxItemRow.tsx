@@ -25,15 +25,16 @@ export function InboxItemRow({
     <div
       onClick={onClick}
       className={cn(
-        "group relative flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all",
-        "bg-card hover:bg-accent/50 border border-border hover:border-sky-200 dark:hover:border-sky-800",
+        "group relative flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all",
+        "bg-card border border-border",
+        "hover:bg-white dark:hover:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm",
         !item.isRead && "bg-sky-50/50 dark:bg-sky-950/20",
         isSelected && "ring-2 ring-sky-500 border-sky-500"
       )}
     >
       {/* Avatar */}
-      <div className="w-11 h-11 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center flex-shrink-0">
-        <span className="text-base font-semibold text-sky-600 dark:text-sky-400">
+      <div className="w-10 h-10 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center flex-shrink-0">
+        <span className="text-sm font-semibold text-sky-600 dark:text-sky-400">
           {item.senderName.charAt(0).toUpperCase()}
         </span>
       </div>
@@ -54,7 +55,7 @@ export function InboxItemRow({
           {!item.isRead && (
             <div className="w-2 h-2 rounded-full bg-sky-500 flex-shrink-0" />
           )}
-          <span className="text-xs text-muted-foreground ml-auto flex-shrink-0 group-hover:hidden">
+          <span className="text-[11px] text-muted-foreground ml-auto flex-shrink-0 w-20 text-right group-hover:hidden">
             {formatDistanceToNow(new Date(item.receivedAt), { addSuffix: true })}
           </span>
         </div>

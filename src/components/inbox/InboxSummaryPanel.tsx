@@ -72,10 +72,10 @@ function ProposedActionRow({
   onCreateTask: () => void;
 }) {
   return (
-    <div className="p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
-      <div className="flex items-start gap-3">
-        <div className="w-8 h-8 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-          <span className="text-xs font-semibold text-sky-600 dark:text-sky-400">
+    <div className="p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
+      <div className="flex items-start gap-2.5">
+        <div className="w-7 h-7 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center flex-shrink-0">
+          <span className="text-[10px] font-semibold text-sky-600 dark:text-sky-400">
             {action.item.senderName.charAt(0).toUpperCase()}
           </span>
         </div>
@@ -86,26 +86,26 @@ function ProposedActionRow({
           <p className="text-xs text-muted-foreground truncate">
             {action.item.subject}
           </p>
-          <p className="text-xs text-sky-600 dark:text-sky-400 mt-1">
+          <p className="text-[11px] text-sky-600 dark:text-sky-400 mt-0.5">
             {action.reason}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-2 mt-2">
+      <div className="flex items-center gap-1.5 mt-2">
         <Button 
           size="sm" 
           variant="ghost"
           onClick={onOpen}
-          className="h-7 text-xs flex-1"
+          className="h-6 text-[11px] flex-1 px-2"
         >
           Open
-          <ChevronRight className="h-3 w-3 ml-1" />
+          <ChevronRight className="h-3 w-3 ml-0.5" />
         </Button>
         <Button 
           size="sm" 
           variant="outline"
           onClick={onCreateTask}
-          className="h-7 text-xs"
+          className="h-6 text-[11px] px-2"
         >
           <ListTodo className="h-3 w-3 mr-1" />
           Task
@@ -206,11 +206,11 @@ export function InboxSummaryPanel({
 
         {/* Proposed Actions */}
         {proposedActions.length > 0 && !showArchived && (
-          <div className="mb-5">
-            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+          <div className="mb-4">
+            <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
               Suggested Actions
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {proposedActions.map((action) => (
                 <ProposedActionRow
                   key={action.item.id}

@@ -26,66 +26,99 @@ function InboxDetailContent({
 
   return (
     <>
-      {/* Header */}
-      <div className="p-4 border-b border-border/50">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-10 bg-background border-b border-border/50 px-5 py-4">
         <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <span className="text-sm font-semibold text-primary">
+          {/* Left: Sender info */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center flex-shrink-0">
+              <span className="text-sm font-semibold text-sky-600 dark:text-sky-400">
                 {item.senderName.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="min-w-0">
-              <p className="font-medium text-foreground">{item.senderName}</p>
-              <p className="text-sm text-muted-foreground truncate">{item.senderEmail}</p>
+              <p className="text-sm font-medium text-foreground truncate">
+                {item.senderName}
+              </p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {item.senderEmail}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
+
+          {/* Right: Date + Close button */}
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <span className="text-[11px] text-muted-foreground">
               {format(new Date(item.receivedAt), "MMM d, h:mm a")}
             </span>
             {showCloseButton && (
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>
                 <X className="h-4 w-4" />
               </Button>
             )}
           </div>
         </div>
-        <h2 className="text-lg font-semibold mt-3 text-left">{item.subject}</h2>
+
+        {/* Subject line - prominent title */}
+        <h2 className="text-sm font-semibold text-foreground mt-3 line-clamp-2 text-left">
+          {item.subject}
+        </h2>
       </div>
 
-      {/* Body */}
-      <div className="flex-1 p-4 overflow-y-auto">
+      {/* Scrollable Body */}
+      <div className="flex-1 px-5 py-4 overflow-y-auto">
+        {/* Related company info card (if present) - at top */}
+        {item.relatedCompanyName && (
+          <div className="mb-4 p-3 rounded-lg bg-sky-50/50 dark:bg-sky-900/20 border border-sky-100 dark:border-sky-800/30">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded bg-white dark:bg-slate-800 border border-border/50 flex items-center justify-center flex-shrink-0">
+                <span className="text-xs font-semibold text-sky-600 dark:text-sky-400">
+                  {item.relatedCompanyName.charAt(0)}
+                </span>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted-foreground">Related Company</p>
+                <p className="text-sm font-medium text-foreground">{item.relatedCompanyName}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Email body */}
         {hasHtmlBody ? (
           <div 
-            className="prose prose-sm dark:prose-invert max-w-none"
+            className="prose prose-sm dark:prose-invert max-w-none text-[13px] leading-relaxed"
             dangerouslySetInnerHTML={{ __html: item.htmlBody || "" }}
           />
         ) : (
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <p className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
-              {bodyContent}
-            </p>
-          </div>
-        )}
-        
-        {item.relatedCompanyName && (
-          <div className="mt-4 p-3 rounded-lg bg-muted/30 border border-border/50">
-            <p className="text-xs text-muted-foreground mb-1">Related Company</p>
-            <p className="text-sm font-medium text-foreground">{item.relatedCompanyName}</p>
-          </div>
+          <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">
+            {bodyContent}
+          </p>
         )}
       </div>
 
-      {/* Footer Actions */}
-      <div className="p-4 border-t border-border/50 flex gap-2 bg-muted/20">
-        <Button onClick={() => onCreateTask(item)} className="flex-1">
+      {/* Sticky Footer Actions */}
+      <div className="sticky bottom-0 px-5 py-3 border-t border-border/50 bg-background/95 backdrop-blur-sm flex items-center gap-2">
+        <Button 
+          size="sm" 
+          onClick={() => onCreateTask(item)} 
+          className="bg-sky-600 hover:bg-sky-700 text-white"
+        >
           <ListTodo className="mr-2 h-4 w-4" /> Create Task
         </Button>
-        <Button variant="secondary" onClick={() => { onMarkComplete(item.id); onClose(); }}>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => { onMarkComplete(item.id); onClose(); }}
+        >
           <Check className="mr-2 h-4 w-4" /> Complete
         </Button>
-        <Button variant="ghost" onClick={() => { onArchive(item.id); onClose(); }}>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => { onArchive(item.id); onClose(); }}
+          className="ml-auto"
+        >
           <Archive className="h-4 w-4" />
         </Button>
       </div>
