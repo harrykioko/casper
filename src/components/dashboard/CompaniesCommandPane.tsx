@@ -82,14 +82,19 @@ export function CompaniesCommandPane({ onCompanyClick, onCreateTask }: Companies
     <GlassPanel className="h-full min-h-[400px]">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
-        {/* Left: Title + subtitle */}
-        <div>
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-50">
-            Companies
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            At a glance: what needs your attention
-          </p>
+        {/* Left: Icon chip + Title + subtitle */}
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-2xl flex items-center justify-center bg-indigo-50 text-indigo-500 dark:bg-indigo-500/10 dark:text-indigo-300">
+            <Building2 className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-xs font-semibold tracking-[0.14em] uppercase text-slate-500 dark:text-slate-400">
+              Companies
+            </div>
+            <div className="text-[11px] text-slate-400 dark:text-slate-500">
+              {companies.length} at a glance
+            </div>
+          </div>
         </div>
 
         {/* Right: Filter chips */}

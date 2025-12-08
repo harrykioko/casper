@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Plus, Globe, Check, Trash2 } from "lucide-react";
+import { ArrowRight, Plus, Globe, Check, Trash2, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AddLinkDialog } from "@/components/modals/AddLinkDialog";
-import { GlassPanel, GlassPanelHeader, GlassSubcard } from "@/components/ui/glass-panel";
+import { GlassPanel, GlassSubcard } from "@/components/ui/glass-panel";
 import { ReadingItem } from "@/types/readingItem";
 import { cn } from "@/lib/utils";
 
@@ -29,28 +29,42 @@ export function ReadingListSection({
 
   return (
     <GlassPanel className={cn("h-full", className)}>
-      <GlassPanelHeader 
-        title="Reading List" 
-        action={
-          <div className="flex items-center gap-2">
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              className="h-7 px-2 text-xs rounded-full bg-white/50 dark:bg-white/5 hover:bg-white/70 dark:hover:bg-white/10"
-              onClick={() => setAddLinkDialogOpen(true)}
-            >
-              <Plus className="w-3 h-3 mr-1" />
-              Add
-            </Button>
-            <Link
-              to="/reading-list"
-              className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
-            >
-              View All <ArrowRight className="w-3 h-3" />
-            </Link>
+      {/* Header */}
+      <div className="flex items-center justify-between gap-3 mb-4">
+        {/* Left: Icon chip + Title + subtitle */}
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-2xl flex items-center justify-center bg-rose-50 text-rose-500 dark:bg-rose-500/10 dark:text-rose-300">
+            <BookOpen className="w-4 h-4" />
           </div>
-        }
-      />
+          <div>
+            <div className="text-xs font-semibold tracking-[0.14em] uppercase text-slate-500 dark:text-slate-400">
+              Reading List
+            </div>
+            <div className="text-[11px] text-slate-400 dark:text-slate-500">
+              {displayItems.length} unread
+            </div>
+          </div>
+        </div>
+        
+        {/* Right: Add + View All */}
+        <div className="flex items-center gap-2">
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            className="h-7 px-2 text-xs rounded-full bg-white/50 dark:bg-white/5 hover:bg-white/70 dark:hover:bg-white/10"
+            onClick={() => setAddLinkDialogOpen(true)}
+          >
+            <Plus className="w-3 h-3 mr-1" />
+            Add
+          </Button>
+          <Link
+            to="/reading-list"
+            className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
+          >
+            View All <ArrowRight className="w-3 h-3" />
+          </Link>
+        </div>
+      </div>
       
       <div className="space-y-3">
         {displayItems.length > 0 ? (
