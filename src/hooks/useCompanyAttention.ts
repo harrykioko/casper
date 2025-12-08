@@ -1,3 +1,22 @@
+/**
+ * useCompanyAttention Hook - Company Attention Scoring System
+ *
+ * This is the current company attention system (Phase 0).
+ * It calculates attention status and signals for portfolio and pipeline companies
+ * shown in the "Companies" grid on the dashboard.
+ *
+ * TODO: Integrate into unified priority model in Phase 2/3
+ * See docs/priority_system/01_current_state.md for analysis of current system
+ * See docs/priority_system/02_proposed_model.md for unified priority design
+ * See src/types/priority.ts for new PriorityItem interface
+ *
+ * Current scoring algorithm:
+ * - Signal weights: no interaction (0.9), stale 14-30d (0.5), no next step + tasks (0.8), no next step (0.3)
+ * - Status mapping: red (≥1.2), yellow (≥0.4), green (<0.4)
+ * - Displayed in Companies grid, not Priority Items tile
+ *
+ * Future: Will be integrated as one data source in useUnifiedPriority()
+ */
 import { useMemo } from 'react';
 import { useDashboardPortfolioCompanies } from './useDashboardPortfolioCompanies';
 import { useDashboardPipelineFocus } from './useDashboardPipelineFocus';

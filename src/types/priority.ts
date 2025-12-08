@@ -169,7 +169,7 @@ export interface PriorityConfig {
 }
 
 /**
- * Default priority configuration
+ * Default priority configuration (Full v2+ model)
  * See docs/priority_system/02_proposed_model.md for weight rationale
  */
 export const DEFAULT_PRIORITY_CONFIG: PriorityConfig = {
@@ -187,6 +187,40 @@ export const DEFAULT_PRIORITY_CONFIG: PriorityConfig = {
   taskStaleThreshold: 7,
   calendarUpcomingWindow: 48,
   inboxUrgentWindow: 4,
+};
+
+/**
+ * V1 Priority Configuration (Lightweight, Production-Ready)
+ *
+ * This is the simplified v1 configuration focusing on:
+ * - 3 data sources only (tasks, inbox, calendar)
+ * - 2-dimensional scoring (urgency 60%, importance 40%)
+ * - No recency, commitment, or effort weighting
+ * - No diversity rules or score thresholds
+ * - Simple top-8 selection
+ *
+ * Rationale:
+ * - Urgency (60%): Time pressure is the primary driver of "what needs attention now"
+ * - Importance (40%): Explicit priority (high/medium/low) and unread status matter
+ * - Recency/Commitment: Computed for debugging but NOT weighted in v1
+ *
+ * See docs/priority_system/03_v1_tuning_guide.md for tuning instructions
+ */
+export const V1_PRIORITY_CONFIG: PriorityConfig = {
+  weights: {
+    urgency: 0.60,      // 60% - Time sensitivity (deadlines, event proximity, email age)
+    importance: 0.40,   // 40% - Explicit priority and flags (high/medium/low, unread)
+    recency: 0.00,      // 0%  - NOT USED in v1 (computed for debugging only)
+    commitment: 0.00,   // 0%  - NOT USED in v1 (deferred to v2)
+    effort: 0.00,       // 0%  - NOT USED in v1 (deferred to v2)
+  },
+  maxItems: 8,              // v1: Show top 8 items
+  minScore: 0.0,            // v1: NO score threshold (all items eligible)
+  maxItemsPerSource: 999,   // v1: NO diversity rules (deferred to v2)
+  companyStaleThreshold: 14,
+  taskStaleThreshold: 7,
+  calendarUpcomingWindow: 48,  // Only show events in next 48 hours
+  inboxUrgentWindow: 4,         // Inbox items <4 hours old are "urgent"
 };
 
 /**

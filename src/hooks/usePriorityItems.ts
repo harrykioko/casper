@@ -1,3 +1,27 @@
+/**
+ * usePriorityItems Hook - Current Priority System
+ *
+ * This is the current priority system implementation (Phase 0).
+ * It only surfaces priority items that are linked to companies (portfolio or pipeline).
+ *
+ * TODO: Replace with unified priority model in Phase 2/3
+ * See docs/priority_system/01_current_state.md for analysis of current system
+ * See docs/priority_system/02_proposed_model.md for unified priority design
+ * See src/types/priority.ts for new PriorityItem interface
+ *
+ * Key limitations of current system:
+ * - Only shows company-linked tasks (standalone tasks invisible)
+ * - No inbox integration
+ * - No calendar integration
+ * - No reading list integration
+ * - No nonnegotiables integration
+ * - Simple 3-level priority (overdue > due_today > stale)
+ * - Hard-coded 14-day staleness threshold
+ * - Limited to 4 items
+ * - No explainability (why is this prioritized?)
+ *
+ * Future: Will be replaced by useUnifiedPriority() hook
+ */
 import { useMemo } from 'react';
 import { useTasks, Task } from '@/hooks/useTasks';
 import { useDashboardPortfolioCompanies, DashboardPortfolioCompany } from '@/hooks/useDashboardPortfolioCompanies';
