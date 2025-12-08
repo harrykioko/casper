@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
+  AlertTriangle,
   List,
   FolderKanban, 
   MessageSquareText, 
@@ -30,6 +31,12 @@ export function NavSidebar() {
       path: "/dashboard", 
       label: "Dashboard",
       active: location.pathname === "/dashboard" 
+    },
+    { 
+      icon: AlertTriangle, 
+      path: "/priority", 
+      label: "Priority",
+      active: location.pathname.startsWith("/priority") 
     },
     { 
       icon: List, 
