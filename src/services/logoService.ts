@@ -1,7 +1,9 @@
 /**
- * Logo fetching service using Logo.dev as primary source
- * with Google Favicon as fallback
+ * Logo fetching service using Supabase Edge Function
+ * Primary: Logo.dev (authenticated) with Google Favicon fallback
  */
+
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Extracts domain from a URL, stripping www. prefix
@@ -16,45 +18,39 @@ function extractDomain(url: string): string {
 }
 
 /**
- * Tests if an image URL is accessible
- */
-async function testImageUrl(url: string): Promise<boolean> {
-  try {
-    const response = await fetch(url, { method: 'HEAD' });
-    const contentType = response.headers.get('content-type');
-    return response.ok && (contentType?.startsWith('image/') ?? false);
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Fetches a company logo URL from the website
+ * Fetches a company logo URL from the website using the edge function
  * 
  * Strategy:
- * 1. Primary: Logo.dev CDN (high quality company logos)
+ * 1. Primary: Logo.dev CDN (authenticated, high quality)
  * 2. Fallback: Google Favicon service (always works)
  * 
  * @param websiteUrl - The company website URL
  * @returns Logo URL or null if not found
  */
 export async function fetchCompanyLogo(websiteUrl: string): Promise<string | null> {
-  const domain = extractDomain(websiteUrl);
+  try {
+    const { data, error } = await supabase.functions.invoke('fetch-company-logo', {
+      body: { websiteUrl }
+    });
 
-  // Primary: Logo.dev (no token needed for basic usage via CDN)
-  // Their CDN serves logos at: https://img.logo.dev/{domain}
-  const logoDevUrl = `https://img.logo.dev/${domain}?token=pk_X-1ZWAKgTmqR8FQOHbMBTw`;
-  
-  // Test if Logo.dev has the logo
-  const logoDevWorks = await testImageUrl(logoDevUrl);
-  if (logoDevWorks) {
-    return logoDevUrl;
+    if (error) {
+      console.error('Edge function error:', error);
+      // Fall back to Google Favicon on error
+      const domain = extractDomain(websiteUrl);
+      return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+    }
+
+    return data?.logoUrl || null;
+  } catch (error) {
+    console.error('Failed to fetch company logo:', error);
+    // Ultimate fallback
+    try {
+      const domain = extractDomain(websiteUrl);
+      return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+    } catch {
+      return null;
+    }
   }
-
-  // Fallback: Google Favicon service (128px, always available)
-  const googleFaviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
-  
-  return googleFaviconUrl;
 }
 
 /**
