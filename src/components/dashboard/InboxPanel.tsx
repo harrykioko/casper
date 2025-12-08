@@ -1,4 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
+import { useNavigate } from "react-router-dom";
 import { Inbox, ListTodo, Check, Archive, Mail, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +21,7 @@ interface InboxPanelProps {
 }
 
 export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
+  const navigate = useNavigate();
   const { inboxItems, isLoading, markAsRead, markComplete, archive } = useInboxItems();
   const [selectedItem, setSelectedItem] = useState<InboxItem | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -182,10 +184,16 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
 
         {inboxItems.length > 0 && (
           <ActionPanelFooter>
-            <button className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors">
+            <button 
+              onClick={() => navigate('/inbox')}
+              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+            >
               View all messages
             </button>
-            <button className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 bg-slate-900/5 dark:bg-slate-50/5 text-slate-500 dark:text-slate-300 hover:bg-slate-900/10 dark:hover:bg-slate-50/10 transition-colors">
+            <button 
+              onClick={() => navigate('/inbox')}
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 bg-slate-900/5 dark:bg-slate-50/5 text-slate-500 dark:text-slate-300 hover:bg-slate-900/10 dark:hover:bg-slate-50/10 transition-colors"
+            >
               <ExternalLink className="h-3 w-3" />
               Open Inbox
             </button>

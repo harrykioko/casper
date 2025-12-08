@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
   AlertTriangle,
+  Inbox,
   List,
   FolderKanban, 
   MessageSquareText, 
@@ -37,6 +38,12 @@ export function NavSidebar() {
       path: "/priority", 
       label: "Priority",
       active: location.pathname.startsWith("/priority") 
+    },
+    { 
+      icon: Inbox, 
+      path: "/inbox", 
+      label: "Inbox",
+      active: location.pathname.startsWith("/inbox") 
     },
     { 
       icon: List, 
