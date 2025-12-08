@@ -25,6 +25,7 @@ import Portfolio from "./pages/Portfolio";
 import PortfolioCompanyDetail from "./pages/PortfolioCompanyDetail";
 import PromptBuilder from "./pages/PromptBuilder";
 import Priority from "./pages/Priority";
+import Inbox from "./pages/Inbox";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import OAuthCallback from "./pages/OAuthCallback";
@@ -109,6 +110,7 @@ const MainContent = () => {
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/portfolio/:companyId" element={<PortfolioCompanyDetail />} />
           <Route path="/priority" element={<Priority />} />
+          <Route path="/inbox" element={<Inbox />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
