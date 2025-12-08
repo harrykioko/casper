@@ -28,6 +28,7 @@ export interface Task {
   company_id?: string;
   pipeline_company_id?: string;
   inbox?: boolean;
+  snoozed_until?: string | null;
 }
 
 // Transform database row to frontend Task type
@@ -48,7 +49,8 @@ const transformTask = (row: TaskRow & { project?: any; category?: any }): Task =
     category_id: row.category_id || undefined,
     company_id: row.company_id || undefined,
     pipeline_company_id: row.pipeline_company_id || undefined,
-    inbox: row.is_quick_task || false // Map is_quick_task to inbox for now
+    inbox: row.is_quick_task || false,
+    snoozed_until: row.snoozed_until || null,
   };
 };
 
@@ -183,6 +185,25 @@ export function useTasks() {
     setTasks(prev => prev.filter(t => t.id !== id));
   };
 
+  const snoozeTask = async (id: string, until: Date) => {
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ snoozed_until: until.toISOString() })
+      .eq('id', id)
+      .select(`
+        *,
+        project:projects(id, name, color),
+        category:categories(id, name)
+      `)
+      .single();
+
+    if (error) throw error;
+
+    const transformedTask = transformTask(data);
+    setTasks(prev => prev.map(t => t.id === id ? transformedTask : t));
+    return transformedTask;
+  };
+
   return { 
     tasks, 
     loading, 
@@ -190,6 +211,7 @@ export function useTasks() {
     createTask, 
     updateTask, 
     deleteTask,
+    snoozeTask,
     getInboxTasks,
     getNonInboxTasks 
   };

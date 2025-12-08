@@ -27,6 +27,7 @@ interface PriorityItemRowProps {
   item: PriorityItem;
   onClick: () => void;
   onResolve: () => void;
+  onSnooze: (duration: "later_today" | "tomorrow" | "next_week") => void;
 }
 
 const iconConfig: Record<
@@ -112,14 +113,12 @@ function getSourceIcon(sourceType: PrioritySourceType) {
   }
 }
 
-export function PriorityItemRow({ item, onClick, onResolve }: PriorityItemRowProps) {
+export function PriorityItemRow({ item, onClick, onResolve, onSnooze }: PriorityItemRowProps) {
   const config = item.iconType ? iconConfig[item.iconType] : defaultIconConfig;
   const Icon = config?.icon || defaultIconConfig.icon;
   const SourceIcon = getSourceIcon(item.sourceType);
 
-  const handleSnooze = (duration: string) => {
-    toast.info(`Snoozed until ${duration}`);
-  };
+  const canSnooze = item.sourceType === "task" || item.sourceType === "inbox";
 
   return (
     <div
@@ -218,32 +217,34 @@ export function PriorityItemRow({ item, onClick, onResolve }: PriorityItemRowPro
           <CheckCircle className="h-4 w-4" />
         </Button>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleSnooze("later today")}>
-              <Clock className="h-4 w-4 mr-2" />
-              Snooze until later today
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleSnooze("tomorrow")}>
-              <Clock className="h-4 w-4 mr-2" />
-              Snooze until tomorrow
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleSnooze("next week")}>
-              <Clock className="h-4 w-4 mr-2" />
-              Snooze until next week
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {canSnooze && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSnooze("later_today"); }}>
+                <Clock className="h-4 w-4 mr-2" />
+                Snooze until later today
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSnooze("tomorrow"); }}>
+                <Clock className="h-4 w-4 mr-2" />
+                Snooze until tomorrow
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSnooze("next_week"); }}>
+                <Clock className="h-4 w-4 mr-2" />
+                Snooze until next week
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
   );
