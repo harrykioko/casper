@@ -6,6 +6,7 @@ import type { InboxItem } from "@/types/inbox";
 
 interface InboxItemRowProps {
   item: InboxItem;
+  isSelected?: boolean;
   onClick: () => void;
   onCreateTask: () => void;
   onMarkComplete: () => void;
@@ -14,6 +15,7 @@ interface InboxItemRowProps {
 
 export function InboxItemRow({
   item,
+  isSelected,
   onClick,
   onCreateTask,
   onMarkComplete,
@@ -25,7 +27,8 @@ export function InboxItemRow({
       className={cn(
         "group relative flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all",
         "bg-card hover:bg-accent/50 border border-border hover:border-sky-200 dark:hover:border-sky-800",
-        !item.isRead && "bg-sky-50/50 dark:bg-sky-950/20"
+        !item.isRead && "bg-sky-50/50 dark:bg-sky-950/20",
+        isSelected && "ring-2 ring-sky-500 border-sky-500"
       )}
     >
       {/* Avatar */}

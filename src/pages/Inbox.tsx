@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useInboxItems } from "@/hooks/useInboxItems";
 import { useTasks } from "@/hooks/useTasks";
+import { useIsDesktop } from "@/hooks/use-mobile";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,6 +22,7 @@ import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
 import { isActionRequired, isWaitingOn } from "@/components/inbox/inboxHelpers";
 import type { InboxItem, TaskPrefillOptions, InboxViewFilter } from "@/types/inbox";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type StatusFilter = "all" | "unread" | "read";
 type DateFilter = "all" | "today" | "week" | "month";
@@ -28,6 +30,7 @@ type SortOption = "newest" | "oldest" | "unread";
 
 export default function Inbox() {
   const navigate = useNavigate();
+  const isDesktop = useIsDesktop();
   const { inboxItems, isLoading, markAsRead, markComplete, archive } = useInboxItems();
   const { inboxItems: archivedItems, isLoading: isLoadingArchived } = useInboxItems({ onlyArchived: true });
   const { createTask } = useTasks();
@@ -183,11 +186,21 @@ export default function Inbox() {
 
   const isLoadingAny = isLoading || isLoadingArchived;
 
+  // Determine grid columns based on desktop and selected item
+  const gridClasses = cn(
+    "grid gap-6",
+    isDesktop && selectedItem
+      ? "grid-cols-[300px_minmax(0,1fr)_minmax(0,380px)]"
+      : isDesktop
+        ? "grid-cols-[300px_minmax(0,1fr)]"
+        : "grid-cols-1"
+  );
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border">
-        <div className="max-w-6xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Button
@@ -261,11 +274,11 @@ export default function Inbox() {
         </div>
       </div>
 
-      {/* Content - 2 column layout */}
-      <div className="max-w-6xl mx-auto px-6 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-6">
-          {/* Left: Summary Panel */}
-          <div className="hidden lg:block">
+      {/* Content - 3 column layout on desktop with selected item */}
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className={gridClasses}>
+          {/* Left: Summary Panel (sticky) */}
+          <div className="hidden lg:block sticky top-24 self-start">
             <InboxSummaryPanel
               items={inboxItems}
               archivedItems={archivedItems}
@@ -277,8 +290,8 @@ export default function Inbox() {
             />
           </div>
 
-          {/* Right: Message List */}
-          <div>
+          {/* Middle: Message List (scrollable) */}
+          <div className="lg:max-h-[calc(100vh-12rem)] lg:overflow-y-auto">
             {isLoadingAny ? (
               <div className="space-y-3">
                 {[1, 2, 3, 4, 5].map((i) => (
@@ -306,6 +319,7 @@ export default function Inbox() {
                   >
                     <InboxItemRow
                       item={item}
+                      isSelected={selectedItem?.id === item.id}
                       onClick={() => openInboxDetail(item)}
                       onCreateTask={() => handleCreateTask(item)}
                       onMarkComplete={() => handleMarkComplete(item.id)}
@@ -316,18 +330,36 @@ export default function Inbox() {
               </div>
             )}
           </div>
+
+          {/* Right: Email Detail (embedded on desktop) */}
+          {isDesktop && selectedItem && (
+            <div className="sticky top-24 self-start h-[calc(100vh-12rem)]">
+              <InboxDetailDrawer
+                mode="embedded"
+                open={true}
+                onClose={closeDetail}
+                item={selectedItem}
+                onCreateTask={handleCreateTask}
+                onMarkComplete={handleMarkComplete}
+                onArchive={handleArchive}
+              />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Detail Drawer */}
-      <InboxDetailDrawer
-        open={isDetailOpen}
-        onClose={closeDetail}
-        item={selectedItem}
-        onCreateTask={handleCreateTask}
-        onMarkComplete={handleMarkComplete}
-        onArchive={handleArchive}
-      />
+      {/* Sheet mode for mobile only */}
+      {!isDesktop && (
+        <InboxDetailDrawer
+          mode="sheet"
+          open={isDetailOpen}
+          onClose={closeDetail}
+          item={selectedItem}
+          onCreateTask={handleCreateTask}
+          onMarkComplete={handleMarkComplete}
+          onArchive={handleArchive}
+        />
+      )}
 
       {/* Task Creation Dialog */}
       <AddTaskDialog
