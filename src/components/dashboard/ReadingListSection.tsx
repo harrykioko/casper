@@ -56,12 +56,6 @@ export function ReadingListSection({
           >
             <Plus className="mr-1 h-3 w-3" /> Add
           </Button>
-          <Link
-            to="/reading-list"
-            className="text-[11px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1 transition-colors"
-          >
-            View All <ArrowRight className="w-3 h-3" />
-          </Link>
         </div>
       </div>
       
@@ -133,7 +127,17 @@ export function ReadingListSection({
         )}
       </div>
 
-      <AddLinkDialog 
+      {/* Footer */}
+      <div className="flex items-center justify-end mt-4 pt-3 border-t border-slate-100/70 dark:border-slate-800/80">
+        <Link
+          to="/reading-list"
+          className="text-[11px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 flex items-center gap-1 transition-colors"
+        >
+          View all <ArrowRight className="w-3 h-3" />
+        </Link>
+      </div>
+
+      <AddLinkDialog
         open={addLinkDialogOpen} 
         onOpenChange={setAddLinkDialogOpen} 
         onAddLink={onAddReadingItem}
