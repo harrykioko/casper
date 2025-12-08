@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader } from '@/components/ui/sheet';
 import { CompanyCommandHeader } from './CompanyCommandHeader';
 import { CompanyCommandSummary } from './CompanyCommandSummary';
@@ -9,6 +10,8 @@ import { CompanyCommandQuickActions } from './CompanyCommandQuickActions';
 import { CompanyCommandCommunications } from './CompanyCommandCommunications';
 import { PipelineCommandHeader } from './PipelineCommandHeader';
 import { PipelineCommandSummary } from './PipelineCommandSummary';
+import { EventDetailsModal } from '@/components/dashboard/EventDetailsModal';
+import { InboxDetailDrawer } from '@/components/dashboard/InboxDetailDrawer';
 import { useCompany } from '@/hooks/useCompany';
 import { useCompanyContacts } from '@/hooks/useCompanyContacts';
 import { useCompanyInteractions } from '@/hooks/useCompanyInteractions';
@@ -20,8 +23,11 @@ import { usePipelineInteractions } from '@/hooks/usePipelineInteractions';
 import { usePipelineTasks } from '@/hooks/usePipelineTasks';
 import { usePipelineTimeline } from '@/hooks/usePipelineTimeline';
 import { useCompanyLinkedCommunications } from '@/hooks/useCompanyLinkedCommunications';
+import { useInboxItems } from '@/hooks/useInboxItems';
 import { Skeleton } from '@/components/ui/skeleton';
 import { differenceInDays, parseISO } from 'date-fns';
+import { InboxItem } from '@/types/inbox';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CompanyCommandPaneProps {
   open: boolean;
@@ -39,6 +45,23 @@ function getHealthBorderColor(lastInteractionAt: string | null | undefined): str
 }
 
 export function CompanyCommandPane({ open, onClose, entityType, entityId }: CompanyCommandPaneProps) {
+  // Modal/drawer state for communications
+  const [selectedEvent, setSelectedEvent] = useState<{
+    id: string;
+    title: string;
+    startTime: string;
+    endTime?: string;
+    location?: string;
+    description?: string;
+    attendees?: Array<{ name: string; email?: string }>;
+  } | null>(null);
+  const [selectedInboxItem, setSelectedInboxItem] = useState<InboxItem | null>(null);
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [isInboxDrawerOpen, setIsInboxDrawerOpen] = useState(false);
+
+  // Inbox item actions
+  const { markAsRead, markComplete, archive } = useInboxItems();
+
   // Portfolio hooks
   const { company: portfolioCompany, loading: portfolioLoading } = useCompany(
     entityType === 'portfolio' ? entityId ?? undefined : undefined
@@ -79,6 +102,72 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
   const { linkedCommunications: pipelineComms, loading: pipelineCommsLoading } = useCompanyLinkedCommunications(
     pipelinePrimaryDomain
   );
+
+  // Handle event click - fetch full event data
+  const handleEventClick = async (eventId: string) => {
+    const { data: event } = await supabase
+      .from('calendar_events')
+      .select('id, title, start_time, end_time, location, description, attendees')
+      .eq('id', eventId)
+      .single();
+
+    if (event) {
+      const attendees = Array.isArray(event.attendees)
+        ? (event.attendees as Array<{ name?: string; email?: string }>).map(a => ({
+            name: a.name || a.email || 'Unknown',
+            email: a.email,
+          }))
+        : [];
+
+      setSelectedEvent({
+        id: event.id,
+        title: event.title,
+        startTime: event.start_time,
+        endTime: event.end_time || undefined,
+        location: event.location || undefined,
+        description: event.description || undefined,
+        attendees,
+      });
+      setIsEventModalOpen(true);
+    }
+  };
+
+  // Handle email click - fetch full inbox item data
+  const handleEmailClick = async (emailId: string) => {
+    const { data: email } = await supabase
+      .from('inbox_items')
+      .select('*')
+      .eq('id', emailId)
+      .single();
+
+    if (email) {
+      const inboxItem: InboxItem = {
+        id: email.id,
+        subject: email.subject,
+        senderName: email.from_name || email.from_email,
+        senderEmail: email.from_email,
+        toEmail: email.to_email,
+        preview: email.snippet,
+        body: email.text_body,
+        htmlBody: email.html_body,
+        receivedAt: email.received_at,
+        isRead: email.is_read,
+        isResolved: email.is_resolved,
+        isDeleted: email.is_deleted,
+        snoozedUntil: email.snoozed_until,
+        relatedCompanyId: email.related_company_id || undefined,
+        relatedCompanyName: email.related_company_name || undefined,
+        createdBy: email.created_by,
+      };
+      setSelectedInboxItem(inboxItem);
+      setIsInboxDrawerOpen(true);
+      
+      // Mark as read when opened
+      if (!email.is_read) {
+        markAsRead(email.id);
+      }
+    }
+  };
 
   const isLoading = entityType === 'portfolio' ? portfolioLoading : pipelineLoading;
   
@@ -157,6 +246,8 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
               <CompanyCommandCommunications
                 linkedCommunications={portfolioComms}
                 loading={portfolioCommsLoading}
+                onEventClick={handleEventClick}
+                onEmailClick={handleEmailClick}
               />
 
               <CompanyCommandTimeline events={portfolioTimeline.slice(0, 8)} />
@@ -217,6 +308,8 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
               <CompanyCommandCommunications
                 linkedCommunications={pipelineComms}
                 loading={pipelineCommsLoading}
+                onEventClick={handleEventClick}
+                onEmailClick={handleEmailClick}
               />
 
               <CompanyCommandTimeline events={pipelineTimeline.slice(0, 8)} />
@@ -228,6 +321,39 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
           </div>
         )}
       </SheetContent>
+
+      {/* Event Details Modal */}
+      <EventDetailsModal
+        event={selectedEvent}
+        isOpen={isEventModalOpen}
+        onClose={() => {
+          setIsEventModalOpen(false);
+          setSelectedEvent(null);
+        }}
+      />
+
+      {/* Inbox Detail Drawer */}
+      <InboxDetailDrawer
+        open={isInboxDrawerOpen}
+        onClose={() => {
+          setIsInboxDrawerOpen(false);
+          setSelectedInboxItem(null);
+        }}
+        item={selectedInboxItem}
+        onCreateTask={() => {
+          // TODO: Wire up task creation from inbox item
+        }}
+        onMarkComplete={(id) => {
+          markComplete(id);
+          setIsInboxDrawerOpen(false);
+          setSelectedInboxItem(null);
+        }}
+        onArchive={(id) => {
+          archive(id);
+          setIsInboxDrawerOpen(false);
+          setSelectedInboxItem(null);
+        }}
+      />
     </Sheet>
   );
 }
