@@ -762,6 +762,7 @@ export type Database = {
           priority: string | null
           project_id: string | null
           scheduled_for: string | null
+          snoozed_until: string | null
           status: string | null
           updated_at: string
         }
@@ -779,6 +780,7 @@ export type Database = {
           priority?: string | null
           project_id?: string | null
           scheduled_for?: string | null
+          snoozed_until?: string | null
           status?: string | null
           updated_at?: string
         }
@@ -796,6 +798,7 @@ export type Database = {
           priority?: string | null
           project_id?: string | null
           scheduled_for?: string | null
+          snoozed_until?: string | null
           status?: string | null
           updated_at?: string
         }

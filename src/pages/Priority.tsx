@@ -7,7 +7,9 @@ import {
   Search,
   SlidersHorizontal
 } from "lucide-react";
+import { addHours, addDays, startOfTomorrow, startOfDay, setHours, format } from "date-fns";
 import { useUnifiedPriorityV1 } from "@/hooks/useUnifiedPriorityV1";
+import { toast } from "sonner";
 import type { PriorityItem, PrioritySourceType, PriorityIconType } from "@/types/priority";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -31,8 +33,8 @@ type SortOption = "score" | "due" | "recency";
 export default function Priority() {
   const navigate = useNavigate();
   const { items, loading, debug, totalCount } = useUnifiedPriorityV1();
-  const { tasks, updateTask } = useTasks();
-  const { markComplete: markInboxComplete, inboxItems } = useInboxItems();
+  const { tasks, updateTask, snoozeTask } = useTasks();
+  const { markComplete: markInboxComplete, snooze: snoozeInbox, inboxItems } = useInboxItems();
   const { events } = useOutlookCalendar();
   
   // All items from debug, or fallback to the top 8 items
@@ -107,6 +109,38 @@ export default function Priority() {
         break;
     }
     setResolvedIds(prev => new Set(prev).add(item.id));
+  };
+
+  const handleSnooze = (item: PriorityItem, duration: "later_today" | "tomorrow" | "next_week") => {
+    const now = new Date();
+    let snoozeUntil: Date;
+    
+    switch (duration) {
+      case "later_today":
+        snoozeUntil = addHours(now, 4);
+        break;
+      case "tomorrow":
+        snoozeUntil = setHours(startOfTomorrow(), 9);
+        break;
+      case "next_week":
+        snoozeUntil = setHours(addDays(startOfDay(now), 7), 9);
+        break;
+    }
+    
+    switch (item.sourceType) {
+      case "task":
+        snoozeTask(item.sourceId, snoozeUntil);
+        break;
+      case "inbox":
+        snoozeInbox(item.sourceId, snoozeUntil);
+        break;
+      default:
+        toast.error("Cannot snooze this item type");
+        return;
+    }
+    
+    setResolvedIds(prev => new Set(prev).add(item.id));
+    toast.success(`Snoozed until ${format(snoozeUntil, "MMM d, h:mm a")}`);
   };
 
   const handleItemClick = (item: PriorityItem) => {
@@ -256,6 +290,7 @@ export default function Priority() {
                   item={item}
                   onClick={() => handleItemClick(item)}
                   onResolve={() => handleResolve(item)}
+                  onSnooze={(duration) => handleSnooze(item, duration)}
                 />
               </motion.div>
             ))}
