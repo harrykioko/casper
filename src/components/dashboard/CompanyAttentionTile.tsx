@@ -57,11 +57,10 @@ export function CompanyAttentionTile({ company, onClick }: CompanyAttentionTileP
       />
 
       {/* Logo container */}
-      <div className="absolute inset-0 flex items-center justify-center p-2">
+      <div className="absolute inset-0 flex items-center justify-center p-1.5">
         <div className={cn(
-          "w-8 h-8 sm:w-10 sm:h-10 rounded-xl",
+          "w-12 h-12 sm:w-14 sm:h-14 rounded-xl",
           "flex items-center justify-center",
-          "bg-black/5 dark:bg-white/5",
           "overflow-hidden"
         )}>
           {company.logoUrl ? (
@@ -81,7 +80,7 @@ export function CompanyAttentionTile({ company, onClick }: CompanyAttentionTileP
           <span
             data-initials
             className={cn(
-              "text-sm sm:text-base font-semibold",
+              "text-base sm:text-lg font-semibold",
               "text-slate-800 dark:text-slate-100",
               company.logoUrl ? "hidden" : "flex"
             )}
