@@ -66,7 +66,7 @@ export interface UnifiedPriorityV1Result {
 export function useUnifiedPriorityV1(): UnifiedPriorityV1Result {
   // Fetch data from all sources
   const { tasks, loading: tasksLoading } = useTasks();
-  const { inboxItems, loading: inboxLoading } = useInboxItems();
+  const { inboxItems, isLoading: inboxLoading } = useInboxItems();
   const { events, loading: calendarLoading } = useOutlookCalendar();
 
   const result = useMemo(() => {
