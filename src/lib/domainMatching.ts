@@ -3,6 +3,24 @@
  */
 
 /**
+ * Extracts primary domain from a website URL
+ * "https://www.openyield.com/about" → "openyield.com"
+ * "https://dots.dev/" → "dots.dev"
+ */
+export function extractDomainFromWebsite(websiteUrl: string | null | undefined): string | null {
+  if (!websiteUrl || typeof websiteUrl !== 'string') return null;
+  
+  const normalized = normalizeHostname(websiteUrl);
+  
+  // Validate: must contain a dot and no spaces
+  if (!normalized || !normalized.includes('.') || normalized.includes(' ')) {
+    return null;
+  }
+  
+  return normalized;
+}
+
+/**
  * Extracts domain from email address
  * "harry@openyield.com" → "openyield.com"
  */
