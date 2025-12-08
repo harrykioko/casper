@@ -16,8 +16,11 @@ import { InboxFilters } from "@/components/inbox/InboxFilters";
 import { InboxItemRow } from "@/components/inbox/InboxItemRow";
 import { InboxEmptyState } from "@/components/inbox/InboxEmptyState";
 import { InboxDetailDrawer } from "@/components/dashboard/InboxDetailDrawer";
+import { InboxSummaryPanel } from "@/components/inbox/InboxSummaryPanel";
 import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
-import type { InboxItem, TaskPrefillOptions } from "@/types/inbox";
+import { isActionRequired, isWaitingOn } from "@/components/inbox/inboxHelpers";
+import type { InboxItem, TaskPrefillOptions, InboxViewFilter } from "@/types/inbox";
+import { toast } from "sonner";
 
 type StatusFilter = "all" | "unread" | "read";
 type DateFilter = "all" | "today" | "week" | "month";
@@ -26,6 +29,7 @@ type SortOption = "newest" | "oldest" | "unread";
 export default function Inbox() {
   const navigate = useNavigate();
   const { inboxItems, isLoading, markAsRead, markComplete, archive } = useInboxItems();
+  const { inboxItems: archivedItems, isLoading: isLoadingArchived } = useInboxItems({ onlyArchived: true });
   const { createTask } = useTasks();
   
   // Filters and sorting state
@@ -35,6 +39,9 @@ export default function Inbox() {
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [showFilters, setShowFilters] = useState(false);
   
+  // View filter from summary panel
+  const [viewFilter, setViewFilter] = useState<InboxViewFilter>("all");
+  
   // Detail drawer state
   const [selectedItem, setSelectedItem] = useState<InboxItem | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -43,15 +50,34 @@ export default function Inbox() {
   const [taskPrefill, setTaskPrefill] = useState<TaskPrefillOptions | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
 
-  // Filtered and sorted items
-  const filteredItems = useMemo(() => {
+  // Get the base items based on view filter
+  const baseItems = useMemo(() => {
+    if (viewFilter === 'archived') {
+      return archivedItems;
+    }
+    
     let result = [...inboxItems];
     
-    // Filter by status
-    if (statusFilter === "unread") {
-      result = result.filter(item => !item.isRead);
-    } else if (statusFilter === "read") {
-      result = result.filter(item => item.isRead);
+    if (viewFilter === 'action') {
+      result = result.filter(isActionRequired);
+    } else if (viewFilter === 'waiting') {
+      result = result.filter(isWaitingOn);
+    }
+    
+    return result;
+  }, [inboxItems, archivedItems, viewFilter]);
+
+  // Filtered and sorted items
+  const filteredItems = useMemo(() => {
+    let result = [...baseItems];
+    
+    // Filter by status (only apply if not viewing archived)
+    if (viewFilter !== 'archived') {
+      if (statusFilter === "unread") {
+        result = result.filter(item => !item.isRead);
+      } else if (statusFilter === "read") {
+        result = result.filter(item => item.isRead);
+      }
     }
     
     // Filter by date
@@ -105,7 +131,7 @@ export default function Inbox() {
           return 0;
       }
     });
-  }, [inboxItems, statusFilter, dateFilter, search, sortBy]);
+  }, [baseItems, statusFilter, dateFilter, search, sortBy, viewFilter]);
 
   const openInboxDetail = (item: InboxItem) => {
     setSelectedItem(item);
@@ -138,14 +164,30 @@ export default function Inbox() {
     archive(id);
   };
 
+  const handleBulkArchive = (ids: string[]) => {
+    ids.forEach(id => archive(id));
+    toast.success(`Archived ${ids.length} messages`);
+  };
+
   const unreadCount = inboxItems.filter(item => !item.isRead).length;
   const hasFilters = statusFilter !== "all" || dateFilter !== "all" || search.trim() !== "";
+
+  const getViewFilterLabel = () => {
+    switch (viewFilter) {
+      case 'action': return 'Action Required';
+      case 'waiting': return 'Waiting On';
+      case 'archived': return 'Archived';
+      default: return null;
+    }
+  };
+
+  const isLoadingAny = isLoading || isLoadingArchived;
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border">
-        <div className="max-w-5xl mx-auto px-6 py-4">
+        <div className="max-w-6xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Button
@@ -161,7 +203,14 @@ export default function Inbox() {
                   <InboxIcon className="h-5 w-5 text-sky-600 dark:text-sky-400" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-semibold text-foreground">Inbox</h1>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl font-semibold text-foreground">Inbox</h1>
+                    {getViewFilterLabel() && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400">
+                        {getViewFilterLabel()}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     {inboxItems.length} messages • {unreadCount} unread
                   </p>
@@ -212,43 +261,62 @@ export default function Inbox() {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-5xl mx-auto px-6 py-6">
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Skeleton key={i} className="h-20 w-full rounded-xl" />
-            ))}
+      {/* Content - 2 column layout */}
+      <div className="max-w-6xl mx-auto px-6 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)] gap-6">
+          {/* Left: Summary Panel */}
+          <div className="hidden lg:block">
+            <InboxSummaryPanel
+              items={inboxItems}
+              archivedItems={archivedItems}
+              activeFilter={viewFilter}
+              onFilterChange={setViewFilter}
+              onItemClick={openInboxDetail}
+              onCreateTaskFromItem={handleCreateTask}
+              onBulkArchive={handleBulkArchive}
+            />
           </div>
-        ) : filteredItems.length === 0 ? (
-          <InboxEmptyState
-            hasFilters={hasFilters}
-            onClearFilters={() => {
-              setStatusFilter("all");
-              setDateFilter("all");
-              setSearch("");
-            }}
-          />
-        ) : (
-          <div className="space-y-2">
-            {filteredItems.map((item, index) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.03 }}
-              >
-                <InboxItemRow
-                  item={item}
-                  onClick={() => openInboxDetail(item)}
-                  onCreateTask={() => handleCreateTask(item)}
-                  onMarkComplete={() => handleMarkComplete(item.id)}
-                  onArchive={() => handleArchive(item.id)}
-                />
-              </motion.div>
-            ))}
+
+          {/* Right: Message List */}
+          <div>
+            {isLoadingAny ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : filteredItems.length === 0 ? (
+              <InboxEmptyState
+                hasFilters={hasFilters || viewFilter !== 'all'}
+                onClearFilters={() => {
+                  setStatusFilter("all");
+                  setDateFilter("all");
+                  setSearch("");
+                  setViewFilter("all");
+                }}
+              />
+            ) : (
+              <div className="space-y-2">
+                {filteredItems.map((item, index) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.03 }}
+                  >
+                    <InboxItemRow
+                      item={item}
+                      onClick={() => openInboxDetail(item)}
+                      onCreateTask={() => handleCreateTask(item)}
+                      onMarkComplete={() => handleMarkComplete(item.id)}
+                      onArchive={() => handleArchive(item.id)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {/* Detail Drawer */}
