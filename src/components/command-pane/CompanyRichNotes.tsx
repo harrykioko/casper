@@ -9,11 +9,10 @@ import type { Note, NoteTargetType } from '@/types/notes';
 
 interface CompanyRichNotesProps {
   companyId: string;
-  companyType: 'company' | 'pipeline';
   className?: string;
 }
 
-export function CompanyRichNotes({ companyId, companyType, className }: CompanyRichNotesProps) {
+export function CompanyRichNotes({ companyId, className }: CompanyRichNotesProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingNote, setEditingNote] = useState<Note | null>(null);
   const [showAll, setShowAll] = useState(false);

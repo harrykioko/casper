@@ -8,6 +8,7 @@ import { CompanyCommandNotes } from './CompanyCommandNotes';
 import { CompanyCommandTimeline } from './CompanyCommandTimeline';
 import { CompanyCommandQuickActions } from './CompanyCommandQuickActions';
 import { CompanyCommandCommunications } from './CompanyCommandCommunications';
+import { CompanyRichNotes } from './CompanyRichNotes';
 import { PipelineCommandHeader } from './PipelineCommandHeader';
 import { PipelineCommandSummary } from './PipelineCommandSummary';
 import { EventDetailsModal } from '@/components/dashboard/EventDetailsModal';
@@ -243,6 +244,8 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
                 onCreateInteraction={createPortfolioInteraction}
               />
 
+              <CompanyRichNotes companyId={portfolioCompany.id} />
+
               <CompanyCommandCommunications
                 linkedCommunications={portfolioComms}
                 loading={portfolioCommsLoading}
@@ -304,6 +307,8 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
                 onCreateInteraction={createPipelineInteraction}
                 entityType="pipeline"
               />
+
+              <CompanyRichNotes companyId={pipelineCompany.id} />
 
               <CompanyCommandCommunications
                 linkedCommunications={pipelineComms}

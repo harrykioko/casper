@@ -1,9 +1,10 @@
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCommandPalette } from '@/hooks/useCommandPalette';
 import { DesktopModal } from './command-palette/DesktopModal';
 import { MobileDrawer } from './command-palette/MobileDrawer';
+import { AddNoteModal } from './AddNoteModal';
 
 interface EnhancedCommandModalProps {
   isOpen: boolean;
@@ -17,12 +18,15 @@ interface EnhancedCommandModalProps {
 
 export function EnhancedCommandModal(props: EnhancedCommandModalProps) {
   const isMobile = useIsMobile();
+  const [addNoteOpen, setAddNoteOpen] = useState(false);
+  
   const commandPalette = useCommandPalette({
     onNavigate: props.onNavigate,
     onAddTask: props.onAddTask,
     onAddProject: props.onAddProject,
     onAddPrompt: props.onAddPrompt,
-    onAddLink: props.onAddLink
+    onAddLink: props.onAddLink,
+    onAddNote: () => setAddNoteOpen(true)
   });
 
   // Sync external control with internal state
@@ -52,9 +56,18 @@ export function EnhancedCommandModal(props: EnhancedCommandModalProps) {
     executeCommand: commandPalette.executeCommand
   };
 
-  return isMobile ? (
-    <MobileDrawer {...commonProps} />
-  ) : (
-    <DesktopModal {...commonProps} />
+  return (
+    <>
+      {isMobile ? (
+        <MobileDrawer {...commonProps} />
+      ) : (
+        <DesktopModal {...commonProps} />
+      )}
+      
+      <AddNoteModal
+        open={addNoteOpen}
+        onOpenChange={setAddNoteOpen}
+      />
+    </>
   );
 }
