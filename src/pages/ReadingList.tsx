@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Plus, Search, ExternalLink, Trash, Check, RefreshCw, Flag } from "lucide-react";
+import { BookOpen, Plus, Search, ExternalLink, Trash, Check, RefreshCw, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CommandModal } from "@/components/modals/CommandModal";
@@ -46,7 +46,14 @@ export default function ReadingList() {
     const item = readingItems.find(item => item.id === id);
     if (item) {
       try {
-        await updateReadingItem(id, { is_read: !item.isRead });
+        const updates: any = { is_read: !item.isRead };
+        
+        // Set read_at only when marking as read for the first time
+        if (!item.isRead && !item.readAt) {
+          updates.read_at = new Date().toISOString();
+        }
+        
+        await updateReadingItem(id, updates);
         toast.success(item.isRead ? 'Marked as unread' : 'Marked as read');
       } catch (error) {
         console.error('Failed to update reading item:', error);
@@ -55,16 +62,16 @@ export default function ReadingList() {
     }
   };
 
-  // Handle flagging item
-  const handleFlag = async (id: string) => {
+  // Handle favoriting item
+  const handleFavorite = async (id: string) => {
     const item = readingItems.find(item => item.id === id);
     if (item) {
       try {
         await updateReadingItem(id, { is_flagged: !item.isFlagged });
-        toast.success(item.isFlagged ? 'Removed flag' : 'Flagged for priority');
+        toast.success(item.isFlagged ? 'Removed from favorites' : 'Added to favorites');
       } catch (error) {
-        console.error('Failed to flag reading item:', error);
-        toast.error('Failed to flag item');
+        console.error('Failed to favorite reading item:', error);
+        toast.error('Failed to update item');
       }
     }
   };
@@ -130,7 +137,7 @@ export default function ReadingList() {
         await handleMarkRead(itemId);
         break;
       case 'flag':
-        await handleFlag(itemId);
+        await handleFavorite(itemId);
         break;
       case 'archive':
         await handleArchive(itemId);
@@ -316,7 +323,7 @@ export default function ReadingList() {
                             {item.hostname || new URL(item.url).hostname}
                           </p>
                           {item.isFlagged && (
-                            <Flag className="w-3 h-3 text-rose-500 flex-shrink-0" />
+                            <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />
                           )}
                         </div>
                         
@@ -327,14 +334,14 @@ export default function ReadingList() {
                             variant="ghost"
                             className={cn(
                               "h-6 w-6 rounded-full",
-                              item.isFlagged ? "text-rose-500" : "text-zinc-500 hover:text-rose-500"
+                              item.isFlagged ? "text-amber-500" : "text-zinc-500 hover:text-amber-500"
                             )}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleFlag(item.id);
+                              handleFavorite(item.id);
                             }}
                           >
-                            <Flag className="h-3 w-3" />
+                            <Star className={cn("h-3 w-3", item.isFlagged && "fill-current")} />
                           </Button>
                           <Button
                             size="icon"

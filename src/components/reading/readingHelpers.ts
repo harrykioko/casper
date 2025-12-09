@@ -5,8 +5,8 @@ export type ReadingPrimaryView =
   | 'queue' 
   | 'today' 
   | 'thisWeek' 
-  | 'flagged' 
-  | 'done' 
+  | 'favorites' 
+  | 'read' 
   | 'archived';
 
 export interface ReadingFilter {
@@ -18,8 +18,8 @@ export interface ReadingCounts {
   queue: number;
   today: number;
   thisWeek: number;
-  flagged: number;
-  done: number;
+  favorites: number;
+  read: number;
   archived: number;
 }
 
@@ -31,7 +31,6 @@ export interface ProposedReadingAction {
 // Calculate counts for each view
 export function getReadingCounts(items: ReadingItem[]): ReadingCounts {
   const now = new Date();
-  const todayStart = startOfDay(now);
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });
 
   return {
@@ -46,8 +45,8 @@ export function getReadingCounts(items: ReadingItem[]): ReadingCounts {
       const createdAt = i.created_at ? new Date(i.created_at) : null;
       return createdAt && createdAt >= weekStart;
     }).length,
-    flagged: items.filter(i => i.isFlagged && !i.isArchived).length,
-    done: items.filter(i => i.isRead && !i.isArchived).length,
+    favorites: items.filter(i => i.isFlagged && !i.isArchived).length,
+    read: items.filter(i => i.isRead && !i.isArchived).length,
     archived: items.filter(i => i.isArchived).length,
   };
 }
@@ -103,10 +102,11 @@ export function applyReadingFilter(
         return createdAt && createdAt >= weekStart;
       });
       break;
-    case 'flagged':
+    case 'favorites':
+      // Include ALL favorites (both read and unread), not archived
       result = result.filter(i => i.isFlagged && !i.isArchived);
       break;
-    case 'done':
+    case 'read':
       result = result.filter(i => i.isRead && !i.isArchived);
       break;
     case 'archived':
@@ -130,12 +130,35 @@ export function applyReadingFilter(
     );
   }
 
-  // Sort: flagged first, then by recency
+  // Apply view-specific sorting
   if (['queue', 'today', 'thisWeek'].includes(filter.primaryView)) {
+    // Sort: favorites first, then by recency
     result = [...result].sort((a, b) => {
       if (a.isFlagged !== b.isFlagged) return a.isFlagged ? -1 : 1;
       const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
       const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bDate - aDate;
+    });
+  } else if (filter.primaryView === 'favorites') {
+    // Sort: unread favorites first, then read favorites by readAt
+    result = [...result].sort((a, b) => {
+      if (a.isRead !== b.isRead) return a.isRead ? 1 : -1;
+      if (a.isRead && b.isRead) {
+        const aReadAt = a.readAt ? new Date(a.readAt).getTime() : 0;
+        const bReadAt = b.readAt ? new Date(b.readAt).getTime() : 0;
+        return bReadAt - aReadAt;
+      }
+      const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bDate - aDate;
+    });
+  } else if (filter.primaryView === 'read') {
+    // Sort by read_at descending, fallback to created_at
+    result = [...result].sort((a, b) => {
+      const aDate = a.readAt ? new Date(a.readAt).getTime() : 
+                    (a.created_at ? new Date(a.created_at).getTime() : 0);
+      const bDate = b.readAt ? new Date(b.readAt).getTime() : 
+                    (b.created_at ? new Date(b.created_at).getTime() : 0);
       return bDate - aDate;
     });
   }
