@@ -29,7 +29,6 @@ import Inbox from "./pages/Inbox";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import OAuthCallback from "./pages/OAuthCallback";
-import { AIWorkspacePage } from "./features/ai-workspace";
 
 const queryClient = new QueryClient();
 
@@ -58,7 +57,6 @@ const AppContent = () => {
   const isLandingPage = location.pathname === '/';
   const isAuthPage = location.pathname === '/auth';
   const isOAuthCallback = location.pathname === '/auth/callback/outlook';
-  const isAIWorkspace = location.pathname === '/ai-workspace';
 
   // Add class to body based on current route
   useEffect(() => {
@@ -68,15 +66,6 @@ const AppContent = () => {
       document.body.classList.remove('landing-page');
     }
   }, [isLandingPage]);
-
-  // AI Workspace - full screen overlay (protected)
-  if (isAIWorkspace) {
-    return (
-      <ProtectedRoute>
-        <AIWorkspacePage />
-      </ProtectedRoute>
-    );
-  }
 
   if (isLandingPage || isAuthPage || isOAuthCallback) {
     // Landing, Auth, and OAuth callback pages without sidebar
