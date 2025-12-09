@@ -1,16 +1,18 @@
 import { format } from "date-fns";
-import { Calendar, MapPin, Users, X, Clock } from "lucide-react";
+import { Calendar, MapPin, Users, X, Clock, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { CalendarEvent } from "@/types/outlook";
 
 interface PriorityEventDetailContentProps {
   event: CalendarEvent;
   onClose: () => void;
+  onDismiss?: () => void;
 }
 
 export function PriorityEventDetailContent({
   event,
   onClose,
+  onDismiss,
 }: PriorityEventDetailContentProps) {
   const startDate = new Date(event.startTime);
   const endDate = event.endTime ? new Date(event.endTime) : null;
@@ -41,6 +43,17 @@ export function PriorityEventDetailContent({
           </h2>
           
           <div className="flex items-center gap-1.5 flex-shrink-0">
+            {onDismiss && (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={onDismiss}
+                className="h-7 px-2.5 text-xs"
+                title="Remove from priority list (keeps in calendar)"
+              >
+                <CheckCircle className="mr-1 h-3 w-3" /> Dismiss
+              </Button>
+            )}
             <Button 
               variant="ghost" 
               size="icon" 

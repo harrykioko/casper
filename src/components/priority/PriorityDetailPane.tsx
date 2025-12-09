@@ -67,6 +67,7 @@ export function PriorityDetailPane({
         <PriorityEventDetailContent
           event={event}
           onClose={onClose}
+          onDismiss={onResolve}
         />
       );
 
