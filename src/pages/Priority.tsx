@@ -22,6 +22,7 @@ import { PriorityDetailPane } from "@/components/priority/PriorityDetailPane";
 import { useTasks, Task } from "@/hooks/useTasks";
 import { useInboxItems } from "@/hooks/useInboxItems";
 import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
+import { useDismissedPriorityItems } from "@/hooks/useDismissedPriorityItems";
 import { useIsDesktop } from "@/hooks/use-mobile";
 import { InboxDetailDrawer } from "@/components/dashboard/InboxDetailDrawer";
 import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
@@ -41,6 +42,7 @@ export default function Priority() {
   const { tasks, updateTask, snoozeTask } = useTasks();
   const { markComplete: markInboxComplete, snooze: snoozeInbox, archive: archiveInbox, inboxItems } = useInboxItems();
   const { events } = useOutlookCalendar();
+  const { dismissItem } = useDismissedPriorityItems();
   
   // All items from debug, or fallback to the top 8 items
   const allItems = debug.allItems.length > 0 ? debug.allItems : items;
@@ -123,12 +125,15 @@ export default function Priority() {
       case "inbox":
         markInboxComplete(item.sourceId);
         break;
+      case "calendar_event":
+        dismissItem("calendar_event", item.sourceId);
+        break;
     }
     setResolvedIds(prev => new Set(prev).add(item.id));
     if (selectedItem?.id === item.id) {
       setSelectedItem(null);
     }
-    toast.success("Item resolved");
+    toast.success(item.sourceType === "calendar_event" ? "Event dismissed from priority" : "Item resolved");
   };
 
   const handleSnooze = (item: PriorityItem, duration: "later_today" | "tomorrow" | "next_week") => {

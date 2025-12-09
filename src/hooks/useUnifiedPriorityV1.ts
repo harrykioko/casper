@@ -26,6 +26,7 @@ import { differenceInHours, parseISO } from 'date-fns';
 import { useTasks } from './useTasks';
 import { useInboxItems } from './useInboxItems';
 import { useOutlookCalendar } from './useOutlookCalendar';
+import { useDismissedPriorityItems } from './useDismissedPriorityItems';
 import type { PriorityItem } from '@/types/priority';
 import { V1_PRIORITY_CONFIG } from '@/types/priority';
 import {
@@ -68,6 +69,7 @@ export function useUnifiedPriorityV1(): UnifiedPriorityV1Result {
   const { tasks, loading: tasksLoading } = useTasks();
   const { inboxItems, isLoading: inboxLoading } = useInboxItems();
   const { events, loading: calendarLoading } = useOutlookCalendar();
+  const { dismissedSet, loading: dismissedLoading } = useDismissedPriorityItems();
 
   const result = useMemo(() => {
     const now = new Date();
@@ -138,6 +140,11 @@ export function useUnifiedPriorityV1(): UnifiedPriorityV1Result {
         continue;
       }
 
+      // Skip if dismissed
+      if (dismissedSet.has(`calendar_event-${event.id}`)) {
+        continue;
+      }
+
       try {
         const priorityItem = mapCalendarEventToPriorityItemV1(event);
 
@@ -189,10 +196,10 @@ export function useUnifiedPriorityV1(): UnifiedPriorityV1Result {
         maxScore,
       },
     };
-  }, [tasks, inboxItems, events]);
+  }, [tasks, inboxItems, events, dismissedSet]);
 
   // Loading state: return empty result if any source is still loading
-  if (tasksLoading || inboxLoading || calendarLoading) {
+  if (tasksLoading || inboxLoading || calendarLoading || dismissedLoading) {
     return {
       items: [],
       totalCount: 0,
