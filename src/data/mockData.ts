@@ -113,7 +113,9 @@ export const mockReadingItems: ReadingItem[] = [
     title: "shadcn/ui: Re-usable components built with Radix UI and Tailwind CSS",
     description: "Beautifully designed components that you can copy and paste into your apps.",
     favicon: "https://ui.shadcn.com/favicon.ico",
-    isRead: false
+    isRead: false,
+    isFlagged: false,
+    isArchived: false
   },
   {
     id: "r2",
@@ -121,7 +123,9 @@ export const mockReadingItems: ReadingItem[] = [
     title: "Tailwind CSS - Rapidly build modern websites without ever leaving your HTML",
     description: "A utility-first CSS framework packed with classes that can be composed to build any design, directly in your markup.",
     favicon: "https://tailwindcss.com/favicons/favicon.ico",
-    isRead: true
+    isRead: true,
+    isFlagged: false,
+    isArchived: false
   },
   {
     id: "r3",
@@ -129,6 +133,8 @@ export const mockReadingItems: ReadingItem[] = [
     title: "Framer Motion - Production-Ready Animation Library for React",
     description: "A simple and powerful React animation library that makes creating complex animations easy.",
     favicon: "https://framer.com/favicon.ico",
-    isRead: false
+    isRead: false,
+    isFlagged: true,
+    isArchived: false
   }
 ];

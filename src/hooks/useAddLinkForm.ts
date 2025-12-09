@@ -48,11 +48,13 @@ export function useAddLinkForm() {
       return {
         url: metadata.url,
         title: metadata.title,
-        description: metadata.description || null,
-        favicon: metadata.favicon || null,
-        image: metadata.image || null,
-        hostname: metadata.hostname || null,
-        isRead: false
+        description: metadata.description || undefined,
+        favicon: metadata.favicon || undefined,
+        image: metadata.image || undefined,
+        hostname: metadata.hostname || undefined,
+        isRead: false,
+        isFlagged: false,
+        isArchived: false
       };
     }
 
@@ -61,21 +63,25 @@ export function useAddLinkForm() {
       return {
         url,
         title: urlObj.hostname,
-        description: null,
-        favicon: null,
-        image: null,
+        description: undefined,
+        favicon: undefined,
+        image: undefined,
         hostname: urlObj.hostname,
-        isRead: false
+        isRead: false,
+        isFlagged: false,
+        isArchived: false
       };
     } catch {
       return {
         url,
         title: url,
-        description: null,
-        favicon: null,
-        image: null,
-        hostname: null,
-        isRead: false
+        description: undefined,
+        favicon: undefined,
+        image: undefined,
+        hostname: undefined,
+        isRead: false,
+        isFlagged: false,
+        isArchived: false
       };
     }
   };

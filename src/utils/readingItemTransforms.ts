@@ -1,4 +1,3 @@
-
 import { ReadingItem, ReadingItemRow } from '@/types/readingItem';
 
 // Transform database row to frontend ReadingItem type
@@ -12,6 +11,8 @@ export const transformReadingItem = (row: ReadingItemRow): ReadingItem => {
     image: row.image || undefined,
     hostname: row.hostname || undefined,
     isRead: row.is_read || false,
+    isFlagged: row.is_flagged || false,
+    isArchived: row.is_archived || false,
     created_at: row.created_at,
     updated_at: row.updated_at,
     created_by: row.created_by || undefined,
@@ -27,6 +28,14 @@ export const transformReadingItemForDatabase = (itemData: any): any => {
   if (itemData.isRead !== undefined) {
     dbData.is_read = itemData.isRead;
     delete dbData.isRead;
+  }
+  if (itemData.isFlagged !== undefined) {
+    dbData.is_flagged = itemData.isFlagged;
+    delete dbData.isFlagged;
+  }
+  if (itemData.isArchived !== undefined) {
+    dbData.is_archived = itemData.isArchived;
+    delete dbData.isArchived;
   }
   if (itemData.projectId !== undefined) {
     dbData.project_id = itemData.projectId;
