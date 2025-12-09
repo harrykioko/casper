@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { BookOpen, Clock, Plus, Star, CheckCircle, Archive, Calendar, Folder, ExternalLink, Check, ListTodo } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { ReadingItem } from '@/types/readingItem';
 import { 
@@ -97,48 +98,64 @@ function SuggestedItemRow({ item, reason, onOpen, onMarkRead, onFlag, onTask }: 
         {reason}
       </p>
       
-      <div className="flex items-center gap-1">
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-6 px-2 text-[10px] text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400"
-          onClick={(e) => { e.stopPropagation(); onOpen(); }}
-        >
-          <ExternalLink className="w-3 h-3 mr-1" />
-          Open
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-6 px-2 text-[10px] text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400"
-          onClick={(e) => { e.stopPropagation(); onMarkRead(); }}
-        >
-          <Check className="w-3 h-3 mr-1" />
-          Read
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className={cn(
-            "h-6 px-2 text-[10px]",
-            item.isFlagged 
-              ? "text-amber-500 dark:text-amber-400" 
-              : "text-slate-600 dark:text-slate-400 hover:text-amber-500 dark:hover:text-amber-400"
-          )}
-          onClick={(e) => { e.stopPropagation(); onFlag(); }}
-        >
-          <Star className={cn("w-3 h-3 mr-1", item.isFlagged && "fill-current")} />
-          {item.isFlagged ? 'Unfavorite' : 'Favorite'}
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          className="h-6 px-2 text-[10px] text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400"
-          onClick={(e) => { e.stopPropagation(); onTask(); }}
-        >
-          <ListTodo className="w-3 h-3 mr-1" />
-          Task
-        </Button>
+      <div className="flex items-center gap-0.5">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400"
+              onClick={(e) => { e.stopPropagation(); onOpen(); }}
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">Open</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0 text-slate-600 dark:text-slate-400 hover:text-green-600 dark:hover:text-green-400"
+              onClick={(e) => { e.stopPropagation(); onMarkRead(); }}
+            >
+              <Check className="w-3.5 h-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">Mark as read</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant="ghost"
+              className={cn(
+                "h-6 w-6 p-0",
+                item.isFlagged 
+                  ? "text-amber-500 dark:text-amber-400" 
+                  : "text-slate-600 dark:text-slate-400 hover:text-amber-500 dark:hover:text-amber-400"
+              )}
+              onClick={(e) => { e.stopPropagation(); onFlag(); }}
+            >
+              <Star className={cn("w-3.5 h-3.5", item.isFlagged && "fill-current")} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">{item.isFlagged ? 'Remove favorite' : 'Add to favorites'}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400"
+              onClick={(e) => { e.stopPropagation(); onTask(); }}
+            >
+              <ListTodo className="w-3.5 h-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="text-xs">Create task</TooltipContent>
+        </Tooltip>
       </div>
     </div>
   );
