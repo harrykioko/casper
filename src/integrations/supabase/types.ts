@@ -408,6 +408,41 @@ export type Database = {
           },
         ]
       }
+      note_links: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean
+          note_id: string
+          target_id: string
+          target_type: Database["public"]["Enums"]["note_target_type"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          note_id: string
+          target_id: string
+          target_type: Database["public"]["Enums"]["note_target_type"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          note_id?: string
+          target_id?: string
+          target_type?: Database["public"]["Enums"]["note_target_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_links_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "project_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       outlook_connections: {
         Row: {
           access_token: string
@@ -637,7 +672,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
-          project_id: string
+          note_type: string | null
+          project_id: string | null
           title: string | null
           updated_at: string
         }
@@ -646,7 +682,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          project_id: string
+          note_type?: string | null
+          project_id?: string | null
           title?: string | null
           updated_at?: string
         }
@@ -655,7 +692,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          project_id?: string
+          note_type?: string | null
+          project_id?: string | null
           title?: string | null
           updated_at?: string
         }
@@ -976,6 +1014,7 @@ export type Database = {
       company_kind: "portfolio" | "pipeline" | "other"
       company_status: "active" | "watching" | "exited" | "archived"
       interaction_type: "note" | "call" | "meeting" | "email" | "update"
+      note_target_type: "task" | "company" | "project" | "reading_item"
       round_enum:
         | "Seed"
         | "Series A"
@@ -1124,6 +1163,7 @@ export const Constants = {
       company_kind: ["portfolio", "pipeline", "other"],
       company_status: ["active", "watching", "exited", "archived"],
       interaction_type: ["note", "call", "meeting", "email", "update"],
+      note_target_type: ["task", "company", "project", "reading_item"],
       round_enum: [
         "Seed",
         "Series A",
