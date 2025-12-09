@@ -7,6 +7,7 @@ import { Task } from "@/hooks/useTasks";
 import { TaskDetailsForm } from "./task-details/TaskDetailsForm";
 import { useTaskDetails } from "@/hooks/useTaskDetails";
 import { toast } from "@/hooks/use-toast";
+import { TaskNotesSection } from "@/components/notes/TaskNotesSection";
 
 interface TaskDetailsDialogProps {
   open: boolean;
@@ -90,20 +91,27 @@ export function TaskDetailsDialog({
         </GlassModalHeader>
 
         {task && (
-          <TaskDetailsForm
-            content={content}
-            setContent={setContent}
-            status={status}
-            setStatus={setStatus}
-            scheduledFor={scheduledFor}
-            setScheduledFor={setScheduledFor}
-            selectedProject={selectedProject}
-            setSelectedProject={setSelectedProject}
-            priority={priority}
-            setPriority={setPriority}
-            category={category}
-            setCategory={setCategory}
-          />
+          <>
+            <TaskDetailsForm
+              content={content}
+              setContent={setContent}
+              status={status}
+              setStatus={setStatus}
+              scheduledFor={scheduledFor}
+              setScheduledFor={setScheduledFor}
+              selectedProject={selectedProject}
+              setSelectedProject={setSelectedProject}
+              priority={priority}
+              setPriority={setPriority}
+              category={category}
+              setCategory={setCategory}
+            />
+
+            {/* Notes section */}
+            <div className="mt-4 pt-4 border-t border-muted">
+              <TaskNotesSection taskId={task.id} />
+            </div>
+          </>
         )}
 
         <div className="flex justify-between pt-6 border-t border-muted mt-4">

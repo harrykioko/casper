@@ -10,7 +10,8 @@ import {
   Settings, 
   Plus, 
   CheckSquare, 
-  Link 
+  Link,
+  StickyNote
 } from 'lucide-react';
 
 interface UseCommandPaletteProps {
@@ -19,6 +20,7 @@ interface UseCommandPaletteProps {
   onAddProject?: () => void;
   onAddPrompt?: () => void;
   onAddLink?: () => void;
+  onAddNote?: () => void;
 }
 
 export function useCommandPalette({
@@ -26,7 +28,8 @@ export function useCommandPalette({
   onAddTask,
   onAddProject,
   onAddPrompt,
-  onAddLink
+  onAddLink,
+  onAddNote
 }: UseCommandPaletteProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -117,6 +120,15 @@ export function useCommandPalette({
       action: () => onAddLink?.(),
       group: 'actions',
       keywords: ['add', 'save', 'bookmark']
+    },
+    {
+      id: 'action-note',
+      title: 'New Note',
+      description: 'Create a new note',
+      icon: StickyNote,
+      action: () => onAddNote?.(),
+      group: 'actions',
+      keywords: ['add', 'create', 'note']
     }
   ], [onNavigate, onAddTask, onAddProject, onAddPrompt, onAddLink]);
 
