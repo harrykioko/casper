@@ -732,6 +732,8 @@ export type Database = {
           hostname: string | null
           id: string
           image: string | null
+          is_archived: boolean
+          is_flagged: boolean
           is_read: boolean | null
           project_id: string | null
           title: string
@@ -746,6 +748,8 @@ export type Database = {
           hostname?: string | null
           id?: string
           image?: string | null
+          is_archived?: boolean
+          is_flagged?: boolean
           is_read?: boolean | null
           project_id?: string | null
           title: string
@@ -760,6 +764,8 @@ export type Database = {
           hostname?: string | null
           id?: string
           image?: string | null
+          is_archived?: boolean
+          is_flagged?: boolean
           is_read?: boolean | null
           project_id?: string | null
           title?: string
