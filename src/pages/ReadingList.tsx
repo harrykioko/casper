@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Plus, Search, ExternalLink, Trash, Check, RefreshCw, Star } from "lucide-react";
+import { BookOpen, Plus, Search, ExternalLink, Trash, Check, RefreshCw, Star, Folder } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CommandModal } from "@/components/modals/CommandModal";
@@ -16,6 +16,12 @@ import { toast } from "sonner";
 import { ReadingCommandPanel } from "@/components/reading/ReadingCommandPanel";
 import { ReadingFilter, applyReadingFilter } from "@/components/reading/readingHelpers";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function ReadingList() {
   const navigate = useNavigate();
@@ -84,6 +90,20 @@ export default function ReadingList() {
     } catch (error) {
       console.error('Failed to archive reading item:', error);
       toast.error('Failed to archive item');
+    }
+  };
+
+  // Handle updating item project
+  const handleUpdateProject = async (id: string, newProjectId: string | null) => {
+    try {
+      await updateReadingItem(id, { project_id: newProjectId });
+      const projectName = newProjectId 
+        ? projects.find(p => p.id === newProjectId)?.name 
+        : null;
+      toast.success(projectName ? `Added to ${projectName}` : 'Removed from project');
+    } catch (error) {
+      console.error('Failed to update reading item project:', error);
+      toast.error('Failed to update project');
     }
   };
   
@@ -325,10 +345,73 @@ export default function ReadingList() {
                           {item.isFlagged && (
                             <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />
                           )}
+                          {/* Project badge */}
+                          {item.project_id && (() => {
+                            const project = projects.find(p => p.id === item.project_id);
+                            return project ? (
+                              <span
+                                className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 bg-muted/80 text-muted-foreground border border-border/50"
+                                style={project.color ? { 
+                                  backgroundColor: `${project.color}15`,
+                                  borderColor: `${project.color}30`,
+                                  color: project.color
+                                } : undefined}
+                              >
+                                <Folder className="w-2.5 h-2.5" />
+                                <span className="max-w-[60px] truncate">{project.name}</span>
+                              </span>
+                            ) : null;
+                          })()}
                         </div>
                         
                         {/* Action Buttons */}
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {/* Project Assignment Dropdown */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className={cn(
+                                  "h-6 w-6 rounded-full",
+                                  item.project_id ? "text-primary" : "text-zinc-500 hover:text-primary"
+                                )}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Folder className="h-3 w-3" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent 
+                              align="end" 
+                              className="w-48 bg-popover border border-border z-50"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <DropdownMenuItem
+                                onClick={() => handleUpdateProject(item.id, null)}
+                                className={cn(!item.project_id && "bg-accent")}
+                              >
+                                No project
+                              </DropdownMenuItem>
+                              {projects.map((project) => (
+                                <DropdownMenuItem
+                                  key={project.id}
+                                  onClick={() => handleUpdateProject(item.id, project.id)}
+                                  className={cn(item.project_id === project.id && "bg-accent")}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {project.color && (
+                                      <div 
+                                        className="w-2 h-2 rounded-full flex-shrink-0" 
+                                        style={{ backgroundColor: project.color }}
+                                      />
+                                    )}
+                                    <span>{project.name}</span>
+                                  </div>
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          
                           <Button
                             size="icon"
                             variant="ghost"

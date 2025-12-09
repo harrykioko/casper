@@ -18,12 +18,14 @@ export function useAddLinkForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [metadata, setMetadata] = useState<LinkMetadata | null>(null);
   const [fetchingMetadata, setFetchingMetadata] = useState(false);
+  const [projectId, setProjectId] = useState<string | undefined>(undefined);
 
   const resetForm = () => {
     setUrl("");
     setMetadata(null);
     setIsLoading(false);
     setFetchingMetadata(false);
+    setProjectId(undefined);
   };
 
   const handleUrlChange = async (value: string) => {
@@ -43,45 +45,46 @@ export function useAddLinkForm() {
     }
   };
 
-  const createLinkData = (url: string, metadata: LinkMetadata | null): Omit<ReadingItem, 'id'> => {
+  const createLinkData = (url: string, metadata: LinkMetadata | null, selectedProjectId?: string): Omit<ReadingItem, 'id'> => {
+    const baseData = {
+      isRead: false,
+      isFlagged: false,
+      isArchived: false,
+      project_id: selectedProjectId || projectId,
+    };
+
     if (metadata) {
       return {
+        ...baseData,
         url: metadata.url,
         title: metadata.title,
         description: metadata.description || undefined,
         favicon: metadata.favicon || undefined,
         image: metadata.image || undefined,
         hostname: metadata.hostname || undefined,
-        isRead: false,
-        isFlagged: false,
-        isArchived: false
       };
     }
 
     try {
       const urlObj = new URL(url);
       return {
+        ...baseData,
         url,
         title: urlObj.hostname,
         description: undefined,
         favicon: undefined,
         image: undefined,
         hostname: urlObj.hostname,
-        isRead: false,
-        isFlagged: false,
-        isArchived: false
       };
     } catch {
       return {
+        ...baseData,
         url,
         title: url,
         description: undefined,
         favicon: undefined,
         image: undefined,
         hostname: undefined,
-        isRead: false,
-        isFlagged: false,
-        isArchived: false
       };
     }
   };
@@ -103,6 +106,8 @@ export function useAddLinkForm() {
     isLoading,
     metadata,
     fetchingMetadata,
+    projectId,
+    setProjectId,
     setIsLoading,
     resetForm,
     handleUrlChange,
