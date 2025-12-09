@@ -239,7 +239,7 @@ export default function Priority() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Button
@@ -322,13 +322,13 @@ export default function Priority() {
       </div>
 
       {/* Content - 3 column layout on desktop */}
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-6 py-6">
         <div className={cn(
           "grid gap-6",
           isDesktop && selectedItem
-            ? "grid-cols-[280px_minmax(320px,1fr)_minmax(400px,1.2fr)]"
+            ? "grid-cols-[280px_minmax(320px,1fr)_minmax(400px,1.2fr)] 2xl:grid-cols-[320px_minmax(400px,1.2fr)_minmax(500px,1.4fr)]"
             : isDesktop
-              ? "grid-cols-[280px_1fr]"
+              ? "grid-cols-[280px_1fr] 2xl:grid-cols-[320px_1fr]"
               : "grid-cols-1"
         )}>
           {/* Left: Summary Panel (desktop only) */}
@@ -346,7 +346,6 @@ export default function Priority() {
 
           {/* Middle: Item List */}
           <div className={cn(
-            "space-y-2",
             isDesktop && "lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto lg:pr-2"
           )}>
             {loading ? (
@@ -364,23 +363,30 @@ export default function Priority() {
                 }}
               />
             ) : (
-              filteredItems.map((item, index) => (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.02 }}
-                >
-                  <PriorityItemRow
-                    item={item}
-                    isSelected={selectedItem?.id === item.id}
-                    onClick={() => handleItemClick(item)}
-                    onResolve={() => handleResolve(item)}
-                    onSnooze={(duration) => handleSnooze(item, duration)}
-                    onToggleTopPriority={(isTop) => handleToggleTopPriority(item, isTop)}
-                  />
-                </motion.div>
-              ))
+              <div className={cn(
+                "gap-2",
+                isDesktop && !selectedItem
+                  ? "grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3"
+                  : "space-y-2"
+              )}>
+                {filteredItems.map((item, index) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.02 }}
+                  >
+                    <PriorityItemRow
+                      item={item}
+                      isSelected={selectedItem?.id === item.id}
+                      onClick={() => handleItemClick(item)}
+                      onResolve={() => handleResolve(item)}
+                      onSnooze={(duration) => handleSnooze(item, duration)}
+                      onToggleTopPriority={(isTop) => handleToggleTopPriority(item, isTop)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
             )}
           </div>
 

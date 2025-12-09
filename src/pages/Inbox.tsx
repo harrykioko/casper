@@ -190,9 +190,9 @@ export default function Inbox() {
   const gridClasses = cn(
     "grid gap-5",
     isDesktop && selectedItem
-      ? "grid-cols-[280px_minmax(320px,1fr)_minmax(460px,1.4fr)]"
+      ? "grid-cols-[280px_minmax(320px,1fr)_minmax(460px,1.4fr)] 2xl:grid-cols-[320px_minmax(400px,1.2fr)_minmax(560px,1.4fr)]"
       : isDesktop
-        ? "grid-cols-[280px_minmax(0,1fr)]"
+        ? "grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[320px_1fr]"
         : "grid-cols-1"
   );
 
@@ -200,7 +200,7 @@ export default function Inbox() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Button
@@ -275,7 +275,7 @@ export default function Inbox() {
       </div>
 
       {/* Content - 3 column layout on desktop with selected item */}
-      <div className="max-w-7xl mx-auto px-4 lg:px-6 py-4">
+      <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-4 lg:px-6 py-4">
         <div className={gridClasses}>
           {/* Left: Summary Panel (sticky) */}
           <div className="hidden lg:block sticky top-24 self-start">
@@ -309,7 +309,12 @@ export default function Inbox() {
                 }}
               />
             ) : (
-              <div className="space-y-2">
+              <div className={cn(
+                "gap-2",
+                isDesktop && !selectedItem
+                  ? "grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3"
+                  : "space-y-2"
+              )}>
                 {filteredItems.map((item, index) => (
                   <motion.div
                     key={item.id}
