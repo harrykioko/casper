@@ -9,7 +9,8 @@ import {
   Star,
   BookOpen,
   CheckSquare,
-  MoreHorizontal
+  MoreHorizontal,
+  Folder
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import type { PriorityItem, PriorityIconType, PrioritySourceType } from "@/types/priority";
@@ -20,6 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -175,6 +177,27 @@ export function PriorityItemRow({ item, isSelected, onClick, onResolve, onSnooze
           >
             {config?.label || defaultIconConfig.label}
           </span>
+          {/* Project badge */}
+          {item.projectName && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 bg-muted/80 text-muted-foreground border border-border/50"
+                  style={item.projectColor ? { 
+                    backgroundColor: `${item.projectColor}15`,
+                    borderColor: `${item.projectColor}30`,
+                    color: item.projectColor
+                  } : undefined}
+                >
+                  <Folder className="w-3 h-3" />
+                  <span className="max-w-[80px] truncate">{item.projectName}</span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Project: {item.projectName}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
         <p className="text-sm text-muted-foreground truncate">
           {item.subtitle || item.reasoning}
