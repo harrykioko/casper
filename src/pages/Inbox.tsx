@@ -309,12 +309,7 @@ export default function Inbox() {
                 }}
               />
             ) : (
-              <div className={cn(
-                "gap-2",
-                isDesktop && !selectedItem
-                  ? "grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3"
-                  : "space-y-2"
-              )}>
+              <div className="space-y-2">
                 {filteredItems.map((item, index) => (
                   <motion.div
                     key={item.id}
