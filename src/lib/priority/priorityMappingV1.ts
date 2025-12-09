@@ -112,6 +112,7 @@ export function mapTaskToPriorityItemV1(task: Task): PriorityItem {
     isDueToday,
     isDueSoon: !isOverdue && !isDueToday && task.scheduledFor ? urgencyScore >= 0.5 : false,
     isCompleted: task.completed,
+    isTopPriority: task.is_top_priority ?? false,
     reasoning,
     signals,
     companyId: task.company_id || task.pipeline_company_id,
@@ -176,6 +177,7 @@ export function mapInboxItemToPriorityItemV1(inboxItem: InboxItem): PriorityItem
     lastTouchedAt: inboxItem.receivedAt,
     isSnoozed: !!inboxItem.snoozedUntil,
     snoozedUntil: inboxItem.snoozedUntil,
+    isTopPriority: inboxItem.isTopPriority ?? false,
     reasoning,
     signals,
     companyId: inboxItem.relatedCompanyId,
@@ -237,6 +239,7 @@ export function mapCalendarEventToPriorityItemV1(event: CalendarEvent): Priority
     commitmentScore: 0, // Not used in v1 (but calendar events are implicitly high commitment)
     priorityScore,
     eventStartAt: event.startTime,
+    isTopPriority: false, // Calendar events don't support override in v1
     reasoning,
     signals,
   };

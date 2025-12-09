@@ -6,7 +6,8 @@ import {
   Calendar,
   Sparkles,
   ChevronRight,
-  CheckCircle
+  CheckCircle,
+  Star
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -20,10 +21,12 @@ import {
 
 interface PrioritySummaryPanelProps {
   items: PriorityItem[];
+  topPriorityItems?: PriorityItem[];
   activeFilter: PriorityViewFilter;
   onFilterChange: (filter: PriorityViewFilter) => void;
   onItemClick: (item: PriorityItem) => void;
   onResolveItem: (item: PriorityItem) => void;
+  onToggleTopPriority?: (item: PriorityItem, isTop: boolean) => void;
 }
 
 interface StatChipProps {
@@ -62,13 +65,16 @@ function StatChip({ label, count, icon, isActive, onClick, colorClass }: StatChi
 function ProposedActionRow({ 
   action, 
   onOpen, 
-  onResolve 
+  onResolve,
+  onToggleTopPriority,
 }: { 
   action: ProposedPriorityAction;
   onOpen: () => void;
   onResolve: () => void;
+  onToggleTopPriority?: (isTop: boolean) => void;
 }) {
   const canResolve = action.item.sourceType === "task" || action.item.sourceType === "inbox";
+  const canToggleTopPriority = action.item.sourceType === "task" || action.item.sourceType === "inbox";
   
   return (
     <div className="p-2.5 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors group">
@@ -91,6 +97,20 @@ function ProposedActionRow({
         </div>
       </div>
       <div className="flex items-center gap-1.5 mt-2">
+        {canToggleTopPriority && onToggleTopPriority && (
+          <Button 
+            size="sm" 
+            variant={action.item.isTopPriority ? "default" : "outline"}
+            onClick={() => onToggleTopPriority(!action.item.isTopPriority)}
+            className={cn(
+              "h-6 text-[11px] px-2",
+              action.item.isTopPriority && "bg-amber-500 hover:bg-amber-600 text-white"
+            )}
+          >
+            <Star className={cn("h-3 w-3 mr-1", action.item.isTopPriority && "fill-current")} />
+            {action.item.isTopPriority ? "Flagged" : "Flag"}
+          </Button>
+        )}
         <Button 
           size="sm" 
           variant="ghost"
@@ -118,13 +138,20 @@ function ProposedActionRow({
 
 export function PrioritySummaryPanel({
   items,
+  topPriorityItems = [],
   activeFilter,
   onFilterChange,
   onItemClick,
   onResolveItem,
+  onToggleTopPriority,
 }: PrioritySummaryPanelProps) {
   const counts = getPriorityCounts(items);
   const proposedActions = getProposedPriorityActions(items, 4);
+
+  // Use topPriorityItems for the "Top Priority" section if available
+  const displayTopPriority = topPriorityItems.length > 0 
+    ? topPriorityItems.slice(0, 3).map(item => ({ item, reason: "Flagged by you" }))
+    : proposedActions.slice(0, 3);
 
   return (
     <div className="sticky top-24 space-y-5">
@@ -210,19 +237,24 @@ export function PrioritySummaryPanel({
           />
         </div>
 
-        {/* Proposed Actions */}
-        {proposedActions.length > 0 && (
+        {/* Top Priority Section */}
+        {displayTopPriority.length > 0 && (
           <div className="pt-4 border-t border-border">
-            <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-              Top Priority
+            <h3 className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <Star className="h-3.5 w-3.5 text-amber-500" />
+              {topPriorityItems.length > 0 ? "Your Top Priority" : "Suggested Priority"}
             </h3>
             <div className="space-y-1.5">
-              {proposedActions.slice(0, 3).map((action) => (
+              {displayTopPriority.map((action) => (
                 <ProposedActionRow
                   key={action.item.id}
                   action={action}
                   onOpen={() => onItemClick(action.item)}
                   onResolve={() => onResolveItem(action.item)}
+                  onToggleTopPriority={onToggleTopPriority 
+                    ? (isTop) => onToggleTopPriority(action.item, isTop)
+                    : undefined
+                  }
                 />
               ))}
             </div>

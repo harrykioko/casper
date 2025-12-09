@@ -29,6 +29,7 @@ interface PriorityItemRowProps {
   onClick: () => void;
   onResolve: () => void;
   onSnooze: (duration: "later_today" | "tomorrow" | "next_week") => void;
+  onToggleTopPriority?: (isTop: boolean) => void;
 }
 
 const iconConfig: Record<
@@ -114,12 +115,13 @@ function getSourceIcon(sourceType: PrioritySourceType) {
   }
 }
 
-export function PriorityItemRow({ item, isSelected, onClick, onResolve, onSnooze }: PriorityItemRowProps) {
+export function PriorityItemRow({ item, isSelected, onClick, onResolve, onSnooze, onToggleTopPriority }: PriorityItemRowProps) {
   const config = item.iconType ? iconConfig[item.iconType] : defaultIconConfig;
   const Icon = config?.icon || defaultIconConfig.icon;
   const SourceIcon = getSourceIcon(item.sourceType);
 
   const canSnooze = item.sourceType === "task" || item.sourceType === "inbox";
+  const canToggleTopPriority = item.sourceType === "task" || item.sourceType === "inbox";
 
   return (
     <div
@@ -209,6 +211,27 @@ export function PriorityItemRow({ item, isSelected, onClick, onResolve, onSnooze
 
       {/* Actions */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        {/* Top Priority Toggle */}
+        {canToggleTopPriority && onToggleTopPriority && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(
+              "h-8 w-8",
+              item.isTopPriority 
+                ? "text-amber-500 hover:text-amber-600" 
+                : "text-muted-foreground hover:text-amber-500"
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleTopPriority(!item.isTopPriority);
+            }}
+            title={item.isTopPriority ? "Remove from Top Priority" : "Make Top Priority"}
+          >
+            <Star className={cn("h-4 w-4", item.isTopPriority && "fill-current")} />
+          </Button>
+        )}
+
         <Button
           variant="ghost"
           size="icon"
@@ -252,6 +275,13 @@ export function PriorityItemRow({ item, isSelected, onClick, onResolve, onSnooze
           </DropdownMenu>
         )}
       </div>
+
+      {/* Top Priority indicator (always visible when flagged) */}
+      {item.isTopPriority && (
+        <div className="flex-shrink-0">
+          <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+        </div>
+      )}
     </div>
   );
 }

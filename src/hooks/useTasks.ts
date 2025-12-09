@@ -29,6 +29,7 @@ export interface Task {
   pipeline_company_id?: string;
   inbox?: boolean;
   snoozed_until?: string | null;
+  is_top_priority?: boolean;
 }
 
 // Transform database row to frontend Task type
@@ -51,6 +52,7 @@ const transformTask = (row: TaskRow & { project?: any; category?: any }): Task =
     pipeline_company_id: row.pipeline_company_id || undefined,
     inbox: row.is_quick_task || false,
     snoozed_until: row.snoozed_until || null,
+    is_top_priority: row.is_top_priority || false,
   };
 };
 
@@ -204,6 +206,25 @@ export function useTasks() {
     return transformedTask;
   };
 
+  const markTaskTopPriority = async (taskId: string, isTop: boolean) => {
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ is_top_priority: isTop })
+      .eq('id', taskId)
+      .select(`
+        *,
+        project:projects(id, name, color),
+        category:categories(id, name)
+      `)
+      .single();
+
+    if (error) throw error;
+
+    const transformedTask = transformTask(data);
+    setTasks(prev => prev.map(t => t.id === taskId ? transformedTask : t));
+    return transformedTask;
+  };
+
   return { 
     tasks, 
     loading, 
@@ -212,6 +233,7 @@ export function useTasks() {
     updateTask, 
     deleteTask,
     snoozeTask,
+    markTaskTopPriority,
     getInboxTasks,
     getNonInboxTasks 
   };

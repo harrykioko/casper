@@ -23,6 +23,7 @@ import { useTasks, Task } from "@/hooks/useTasks";
 import { useInboxItems } from "@/hooks/useInboxItems";
 import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
 import { useDismissedPriorityItems } from "@/hooks/useDismissedPriorityItems";
+import { useTopPriorityItems } from "@/hooks/useTopPriorityItems";
 import { useIsDesktop } from "@/hooks/use-mobile";
 import { InboxDetailDrawer } from "@/components/dashboard/InboxDetailDrawer";
 import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
@@ -39,10 +40,11 @@ export default function Priority() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const { items, loading, debug, totalCount } = useUnifiedPriorityV1();
-  const { tasks, updateTask, snoozeTask } = useTasks();
-  const { markComplete: markInboxComplete, snooze: snoozeInbox, archive: archiveInbox, inboxItems } = useInboxItems();
+  const { tasks, updateTask, snoozeTask, markTaskTopPriority } = useTasks();
+  const { markComplete: markInboxComplete, snooze: snoozeInbox, archive: archiveInbox, inboxItems, markTopPriority: markInboxTopPriority } = useInboxItems();
   const { events } = useOutlookCalendar();
   const { dismissItem } = useDismissedPriorityItems();
+  const { items: topPriorityItems, hasTopPriority } = useTopPriorityItems();
   
   // All items from debug, or fallback to the top 8 items
   const allItems = debug.allItems.length > 0 ? debug.allItems : items;
@@ -169,6 +171,19 @@ export default function Priority() {
       setSelectedItem(null);
     }
     toast.success(`Snoozed until ${format(snoozeUntil, "MMM d, h:mm a")}`);
+  };
+
+  const handleToggleTopPriority = async (item: PriorityItem, isTop: boolean) => {
+    try {
+      if (item.sourceType === "task") {
+        await markTaskTopPriority(item.sourceId, isTop);
+      } else if (item.sourceType === "inbox") {
+        markInboxTopPriority(item.sourceId, isTop);
+      }
+      toast.success(isTop ? "Added to Top Priority" : "Removed from Top Priority");
+    } catch (error) {
+      toast.error("Failed to update top priority");
+    }
   };
 
   const handleItemClick = (item: PriorityItem) => {
@@ -320,10 +335,12 @@ export default function Priority() {
           {isDesktop && (
             <PrioritySummaryPanel
               items={allItems.filter(item => !resolvedIds.has(item.id))}
+              topPriorityItems={topPriorityItems}
               activeFilter={viewFilter}
               onFilterChange={setViewFilter}
               onItemClick={handleItemClick}
               onResolveItem={handleResolve}
+              onToggleTopPriority={handleToggleTopPriority}
             />
           )}
 
@@ -360,6 +377,7 @@ export default function Priority() {
                     onClick={() => handleItemClick(item)}
                     onResolve={() => handleResolve(item)}
                     onSnooze={(duration) => handleSnooze(item, duration)}
+                    onToggleTopPriority={(isTop) => handleToggleTopPriority(item, isTop)}
                   />
                 </motion.div>
               ))

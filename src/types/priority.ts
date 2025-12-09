@@ -117,6 +117,7 @@ export interface PriorityItem {
   isOverdue?: boolean;             // Past due date
   isDueToday?: boolean;            // Due today
   isDueSoon?: boolean;             // Due in next 1-3 days
+  isTopPriority?: boolean;         // User-flagged as top priority (v1 override)
 
   // ============================================================================
   // Related Entities (for context and navigation)
