@@ -1,8 +1,9 @@
-
-import { MessageSquareText, Copy, Plus } from "lucide-react";
-import { CardTitle, Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Sparkles, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { GlassModuleCard } from "./GlassModuleCard";
+import { ProjectEmptyState } from "./ProjectEmptyState";
+import { cn } from "@/lib/utils";
 
 interface Prompt {
   id: string;
@@ -29,53 +30,57 @@ export function ProjectPromptsList({ prompts, onAddPrompt }: ProjectPromptsListP
   };
 
   return (
-    <Card className="relative rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur-sm ring-1 ring-black/5 dark:ring-white/10 hover:shadow-md/10 transition hover:translate-y-[-2px] group">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex items-center">
-          <MessageSquareText className="mr-2 h-5 w-5" />
-          Prompts
-          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="gap-1 text-xs"
-              onClick={onAddPrompt}
+    <GlassModuleCard
+      icon={<Sparkles className="w-4 h-4" />}
+      title="Prompts"
+      count={prompts.length}
+      onAdd={onAddPrompt}
+      addLabel="Add Prompt"
+      accentColor="#ec4899"
+    >
+      {prompts.length === 0 ? (
+        <ProjectEmptyState
+          icon={<Sparkles className="w-7 h-7" />}
+          title="No prompts yet"
+          description="Create reusable AI prompts for this project."
+          actionLabel="Add Prompt"
+          onAction={onAddPrompt}
+        />
+      ) : (
+        <ul className="space-y-1.5">
+          {prompts.map(prompt => (
+            <li 
+              key={prompt.id}
+              className={cn(
+                "p-3 rounded-xl transition-all duration-200 cursor-pointer",
+                "bg-white/30 dark:bg-white/[0.03]",
+                "border border-white/20 dark:border-white/[0.06]",
+                "hover:bg-white/50 dark:hover:bg-white/[0.06]",
+                "hover:translate-y-[-1px] hover:shadow-sm",
+                "flex items-start justify-between gap-3 group/prompt"
+              )}
             >
-              <Plus className="h-3.5 w-3.5" />
-              Prompt
-            </Button>
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {prompts.length === 0 ? (
-          <p className="text-muted-foreground text-center py-4">No prompts yet</p>
-        ) : (
-          <ul className="space-y-2">
-            {prompts.map(prompt => (
-              <li 
-                key={prompt.id}
-                className="p-3 rounded-md hover:bg-accent/30 transition-colors cursor-pointer flex items-start justify-between"
+              <div className="flex-1 min-w-0">
+                <h4 className="font-medium text-sm text-foreground">{prompt.title}</h4>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                  {prompt.description}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 opacity-0 group-hover/prompt:opacity-100 transition-all active:scale-95 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopyPrompt(prompt.content);
+                }}
               >
-                <div>
-                  <h4 className="font-medium text-sm">{prompt.title}</h4>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                    {prompt.description}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 shrink-0 mt-1 opacity-0 group-hover:opacity-100 hover:opacity-100 transition active:scale-95"
-                  onClick={() => handleCopyPrompt(prompt.content)}
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </GlassModuleCard>
   );
 }

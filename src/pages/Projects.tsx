@@ -1,20 +1,17 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { FolderKanban, Plus, Pin } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { FolderKanban, Plus, Search, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { CommandModal } from "@/components/modals/CommandModal";
 import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useProjects } from "@/hooks/useProjects";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { ProjectCard } from "@/components/projects/ProjectCard";
 import { 
-  PROJECT_TYPES, 
-  PROJECT_STATUSES, 
   PROJECT_STATUS_OPTIONS,
   PROJECT_TYPE_OPTIONS,
   ProjectStatus, 
@@ -32,6 +29,8 @@ interface ProjectWithCounts {
   taskCount: number;
   completedTaskCount: number;
   promptCount: number;
+  notesCount: number;
+  lastUpdated: string;
 }
 
 export default function Projects() {
@@ -44,8 +43,9 @@ export default function Projects() {
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<ProjectType | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch task and prompt counts for each project
+  // Fetch task, prompt, and notes counts for each project
   useEffect(() => {
     const fetchProjectCounts = async () => {
       if (projects.length === 0) {
@@ -74,12 +74,20 @@ export default function Projects() {
 
         if (promptError) throw promptError;
 
+        // Fetch notes counts
+        const { data: notesCounts, error: notesError } = await supabase
+          .from('project_notes')
+          .select('project_id')
+          .in('project_id', projectIds);
+
+        if (notesError) throw notesError;
+
         // Process counts
-        const countsMap = new Map<string, { taskCount: number; completedTaskCount: number; promptCount: number }>();
+        const countsMap = new Map<string, { taskCount: number; completedTaskCount: number; promptCount: number; notesCount: number }>();
         
         // Initialize counts
         projectIds.forEach(id => {
-          countsMap.set(id, { taskCount: 0, completedTaskCount: 0, promptCount: 0 });
+          countsMap.set(id, { taskCount: 0, completedTaskCount: 0, promptCount: 0, notesCount: 0 });
         });
 
         // Count tasks
@@ -105,18 +113,30 @@ export default function Projects() {
           }
         });
 
+        // Count notes
+        notesCounts?.forEach(note => {
+          if (note.project_id) {
+            const counts = countsMap.get(note.project_id);
+            if (counts) {
+              counts.notesCount++;
+            }
+          }
+        });
+
         // Combine with project data
         const projectsWithCounts = projects.map(project => ({
           id: project.id,
           name: project.name,
           description: project.description || "",
-          color: project.color || "#FF1464",
+          color: project.color || "#6366f1",
           type: (project.type as ProjectType) || 'other',
           status: (project.status as ProjectStatus) || 'active',
           is_pinned: project.is_pinned || false,
           taskCount: countsMap.get(project.id)?.taskCount || 0,
           completedTaskCount: countsMap.get(project.id)?.completedTaskCount || 0,
-          promptCount: countsMap.get(project.id)?.promptCount || 0
+          promptCount: countsMap.get(project.id)?.promptCount || 0,
+          notesCount: countsMap.get(project.id)?.notesCount || 0,
+          lastUpdated: project.updated_at || project.created_at,
         }));
 
         setProjectsWithCounts(projectsWithCounts);
@@ -154,7 +174,6 @@ export default function Projects() {
   // Handle project creation
   const handleCreateProject = async (data: any) => {
     try {
-      console.log('Creating project with data:', data);
       await createProject(data);
       closeCreateProjectModal();
       toast({
@@ -175,6 +194,7 @@ export default function Projects() {
   const filteredProjects = projectsWithCounts
     .filter(p => statusFilter === 'all' || p.status === statusFilter)
     .filter(p => typeFilter === 'all' || p.type === typeFilter)
+    .filter(p => !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase()))
     .sort((a, b) => {
       // Pinned projects first
       if (a.is_pinned && !b.is_pinned) return -1;
@@ -193,9 +213,9 @@ export default function Projects() {
               <Skeleton className="h-10 w-16" />
             </div>
           </div>
-          <div className="grid auto-rows-[10rem] grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-6">
+          <div className="grid auto-rows-[12rem] grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-6">
             {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-40 rounded-2xl" />
+              <Skeleton key={i} className="h-48 rounded-2xl" />
             ))}
           </div>
         </div>
@@ -210,12 +230,17 @@ export default function Projects() {
       onKeyDown={handleKeyDown}
     >
       <div className="max-w-7xl mx-auto">
+        {/* Header */}
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Projects</h1>
-          <div className="flex gap-3">
+          <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
+          <div className="flex items-center gap-3">
             <Button 
-              variant="outline" 
-              className="gap-2"
+              variant="default" 
+              className={cn(
+                "gap-2 h-9 px-4 rounded-xl",
+                "bg-primary hover:bg-primary/90",
+                "shadow-lg shadow-primary/20"
+              )}
               onClick={openCreateProjectModal}
             >
               <Plus className="h-4 w-4" />
@@ -223,161 +248,179 @@ export default function Projects() {
             </Button>
             <Button 
               variant="outline"
-              className="glassmorphic"
+              size="icon"
+              className={cn(
+                "h-9 w-9 rounded-xl",
+                "bg-white/60 dark:bg-zinc-800/60 backdrop-blur-md",
+                "border-white/30 dark:border-white/10",
+                "hover:bg-white/80 dark:hover:bg-zinc-800/80"
+              )}
               onClick={openCommandModal}
             >
-              <span className="sr-only">Command</span>
-              <kbd className="text-xs bg-muted px-2 py-0.5 rounded">⌘K</kbd>
+              <kbd className="text-[10px] font-medium">⌘K</kbd>
             </Button>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          {/* Status filters */}
-          <Button
-            size="sm"
-            variant={statusFilter === 'all' ? 'secondary' : 'ghost'}
-            className="h-7 text-xs"
-            onClick={() => setStatusFilter('all')}
-          >
-            All Statuses
-          </Button>
-          {PROJECT_STATUS_OPTIONS.map(status => (
-            <Button
-              key={status.value}
-              size="sm"
-              variant={statusFilter === status.value ? 'secondary' : 'ghost'}
-              className={cn("h-7 text-xs gap-1", statusFilter === status.value && status.bgColor)}
-              onClick={() => setStatusFilter(status.value as ProjectStatus)}
-            >
-              <span className={cn("w-1.5 h-1.5 rounded-full", status.dotColor)} />
-              {status.label}
-            </Button>
-          ))}
+        <div className={cn(
+          "flex flex-wrap items-center gap-3 mb-6 p-3 rounded-2xl",
+          "bg-white/50 dark:bg-zinc-900/40 backdrop-blur-md",
+          "border border-white/30 dark:border-white/[0.08]"
+        )}>
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px] max-w-[280px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search projects..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={cn(
+                "pl-9 h-8 text-sm rounded-lg",
+                "bg-white/60 dark:bg-zinc-800/60",
+                "border-white/30 dark:border-white/10",
+                "focus-visible:ring-primary/30"
+              )}
+            />
+          </div>
 
-          <div className="w-px h-6 bg-border mx-1" />
+          <div className="w-px h-6 bg-border/50 mx-1" />
+
+          {/* Status filters */}
+          <div className="flex items-center gap-1">
+            <button
+              className={cn(
+                "h-7 px-2.5 text-xs font-medium rounded-lg transition-all duration-200",
+                statusFilter === 'all' 
+                  ? "bg-primary/10 text-primary ring-2 ring-primary/30" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}
+              onClick={() => setStatusFilter('all')}
+            >
+              All
+            </button>
+            {PROJECT_STATUS_OPTIONS.map(status => (
+              <button
+                key={status.value}
+                className={cn(
+                  "h-7 px-2.5 text-xs font-medium rounded-lg flex items-center gap-1.5 transition-all duration-200",
+                  statusFilter === status.value 
+                    ? cn("ring-2 ring-primary/30", status.bgColor, status.color)
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                )}
+                onClick={() => setStatusFilter(status.value as ProjectStatus)}
+              >
+                <span className={cn(
+                  "w-1.5 h-1.5 rounded-full",
+                  status.dotColor,
+                  statusFilter === status.value && "shadow-[0_0_6px_currentColor]"
+                )} />
+                {status.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="w-px h-6 bg-border/50 mx-1" />
 
           {/* Type filters */}
-          <Button
-            size="sm"
-            variant={typeFilter === 'all' ? 'secondary' : 'ghost'}
-            className="h-7 text-xs"
-            onClick={() => setTypeFilter('all')}
-          >
-            All Types
-          </Button>
-          {PROJECT_TYPE_OPTIONS.map(type => {
-            const TypeIcon = type.icon;
-            return (
-              <Button
-                key={type.value}
-                size="sm"
-                variant={typeFilter === type.value ? 'secondary' : 'ghost'}
-                className={cn("h-7 text-xs gap-1", typeFilter === type.value && type.bgColor)}
-                onClick={() => setTypeFilter(type.value as ProjectType)}
-              >
-                <TypeIcon className="w-3 h-3" />
-                {type.label.split(' / ')[0]}
-              </Button>
-            );
-          })}
+          <div className="flex items-center gap-1">
+            <button
+              className={cn(
+                "h-7 px-2.5 text-xs font-medium rounded-lg transition-all duration-200",
+                typeFilter === 'all' 
+                  ? "bg-primary/10 text-primary ring-2 ring-primary/30" 
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}
+              onClick={() => setTypeFilter('all')}
+            >
+              All Types
+            </button>
+            {PROJECT_TYPE_OPTIONS.map(type => {
+              const TypeIcon = type.icon;
+              return (
+                <button
+                  key={type.value}
+                  className={cn(
+                    "h-7 px-2.5 text-xs font-medium rounded-lg flex items-center gap-1.5 transition-all duration-200",
+                    typeFilter === type.value 
+                      ? cn("ring-2 ring-primary/30", type.bgColor, type.color)
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                  onClick={() => setTypeFilter(type.value as ProjectType)}
+                >
+                  <TypeIcon className="w-3 h-3" />
+                  {type.label.split(' / ')[0]}
+                </button>
+              );
+            })}
+          </div>
         </div>
         
-        <div className="grid auto-rows-[11rem] grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-6">
-          {filteredProjects.map((project) => {
-            const progressPercentage = project.taskCount > 0 
-              ? (project.completedTaskCount / project.taskCount) * 100 
-              : 0;
-            const typeConfig = PROJECT_TYPES[project.type] || PROJECT_TYPES.other;
-            const statusConfig = PROJECT_STATUSES[project.status] || PROJECT_STATUSES.active;
-            const TypeIcon = typeConfig.icon;
-            
-            return (
-              <Link
-                key={project.id}
-                to={`/projects/${project.id}`}
-                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-cyan-500"
-              >
-                <Card
-                  className="relative rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur-sm ring-1 ring-black/5 dark:ring-white/10 transition-shadow duration-200 hover:shadow-lg/20 hover:scale-[1.01] h-full"
-                  style={{ '--accentColor': project.color } as React.CSSProperties}
-                >
-                  <div className="absolute left-0 top-3 bottom-3 w-1 rounded-l-2xl bg-[var(--accentColor)]"></div>
-                  {project.is_pinned && (
-                    <div className="absolute top-2 right-2">
-                      <Pin className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                    </div>
-                  )}
-                  <CardHeader className="pb-1">
-                    <CardTitle className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100 text-base">
-                      {project.name}
-                    </CardTitle>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <Badge variant="secondary" className={cn("text-[10px] h-5 gap-1 px-1.5", typeConfig.bgColor, typeConfig.color)}>
-                        <TypeIcon className="w-2.5 h-2.5" />
-                        {typeConfig.label.split(' / ')[0]}
-                      </Badge>
-                      <Badge variant="secondary" className={cn("text-[10px] h-5 gap-1 px-1.5", statusConfig.bgColor, statusConfig.color)}>
-                        <span className={cn("w-1 h-1 rounded-full", statusConfig.dotColor)} />
-                        {statusConfig.label}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-2">
-                    <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                      {project.description || 'No description'}
-                    </p>
-                    
-                    {countsLoading ? (
-                      <Skeleton className="h-1.5 w-full mb-2" />
-                    ) : (
-                      <Progress 
-                        value={progressPercentage} 
-                        className="h-1 rounded-full bg-muted dark:bg-muted/30 mb-2" 
-                      />
-                    )}
-                    
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <div className="flex items-center">
-                        <FolderKanban className="h-3.5 w-3.5 mr-1" />
-                        <span>{countsLoading ? '...' : `${project.taskCount} tasks`}</span>
-                      </div>
-                      {project.promptCount > 0 && (
-                        <span>{project.promptCount} prompts</span>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            );
-          })}
+        {/* Projects Grid */}
+        <div className="grid auto-rows-[12rem] grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-6">
+          {filteredProjects.map((project) => (
+            <ProjectCard
+              key={project.id}
+              id={project.id}
+              name={project.name}
+              description={project.description}
+              color={project.color}
+              type={project.type}
+              status={project.status}
+              isPinned={project.is_pinned}
+              taskCount={project.taskCount}
+              completedTaskCount={project.completedTaskCount}
+              promptCount={project.promptCount}
+              notesCount={project.notesCount}
+              lastUpdated={project.lastUpdated}
+            />
+          ))}
           
           {/* New Project Card */}
           <div 
-            className="flex items-center justify-center rounded-2xl border border-dashed border-muted/40 text-muted-foreground hover:bg-white/50 dark:hover:bg-zinc-800/50 hover:shadow-lg transition cursor-pointer hover:scale-[1.01]"
+            className={cn(
+              "flex items-center justify-center rounded-2xl cursor-pointer transition-all duration-300",
+              "border-2 border-dashed border-muted/30 hover:border-primary/30",
+              "bg-gradient-to-br from-white/30 to-white/10 dark:from-zinc-900/30 dark:to-zinc-900/10",
+              "hover:from-white/50 hover:to-white/30 dark:hover:from-zinc-800/50 dark:hover:to-zinc-800/30",
+              "hover:shadow-lg hover:translate-y-[-2px]"
+            )}
             onClick={openCreateProjectModal}
           >
-            <div className="flex flex-col items-center gap-2">
-              <Plus className="h-6 w-6" />
-              <span className="text-lg font-semibold">New Project</span>
+            <div className="flex flex-col items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+              <div className={cn(
+                "w-12 h-12 rounded-xl flex items-center justify-center",
+                "bg-muted/30 group-hover:bg-primary/10"
+              )}>
+                <Plus className="h-6 w-6" />
+              </div>
+              <span className="text-sm font-medium">New Project</span>
             </div>
           </div>
         </div>
 
+        {/* Empty states */}
         {filteredProjects.length === 0 && projectsWithCounts.length > 0 && (
-          <div className="text-center py-12 text-muted-foreground">
-            <FolderKanban className="h-12 w-12 mx-auto mb-3 opacity-20" />
-            <p className="text-lg font-medium">No matching projects</p>
-            <p className="text-sm">Try adjusting your filters</p>
+          <div className={cn(
+            "text-center py-16 rounded-2xl mt-6",
+            "bg-white/40 dark:bg-zinc-900/30 backdrop-blur-md",
+            "border border-white/30 dark:border-white/[0.08]"
+          )}>
+            <FolderKanban className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+            <p className="text-lg font-medium text-foreground/70">No matching projects</p>
+            <p className="text-sm text-muted-foreground mt-1">Try adjusting your filters</p>
           </div>
         )}
 
         {projectsWithCounts.length === 0 && !loading && (
-          <div className="text-center py-12 text-muted-foreground">
-            <FolderKanban className="h-12 w-12 mx-auto mb-3 opacity-20" />
-            <p className="text-lg font-medium">No projects yet</p>
-            <p className="text-sm">Create your first project to get started</p>
+          <div className={cn(
+            "text-center py-16 rounded-2xl",
+            "bg-white/40 dark:bg-zinc-900/30 backdrop-blur-md",
+            "border border-white/30 dark:border-white/[0.08]"
+          )}>
+            <FolderKanban className="h-12 w-12 mx-auto mb-3 text-muted-foreground/30" />
+            <p className="text-lg font-medium text-foreground/70">No projects yet</p>
+            <p className="text-sm text-muted-foreground mt-1">Create your first project to get started</p>
           </div>
         )}
       </div>
