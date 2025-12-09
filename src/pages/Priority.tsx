@@ -17,24 +17,29 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PriorityFilters } from "@/components/priority/PriorityFilters";
 import { PriorityItemRow } from "@/components/priority/PriorityItemRow";
 import { PriorityEmptyState } from "@/components/priority/PriorityEmptyState";
+import { PrioritySummaryPanel } from "@/components/priority/PrioritySummaryPanel";
+import { PriorityDetailPane } from "@/components/priority/PriorityDetailPane";
 import { useTasks, Task } from "@/hooks/useTasks";
 import { useInboxItems } from "@/hooks/useInboxItems";
 import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
+import { useIsDesktop } from "@/hooks/use-mobile";
 import { InboxDetailDrawer } from "@/components/dashboard/InboxDetailDrawer";
 import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
 import { EventDetailsModal } from "@/components/dashboard/EventDetailsModal";
 import type { InboxItem } from "@/types/inbox";
 import type { CalendarEvent } from "@/types/outlook";
+import type { PriorityViewFilter } from "@/components/priority/priorityHelpers";
+import { filterPriorityItems } from "@/components/priority/priorityHelpers";
+import { cn } from "@/lib/utils";
 
-type SourceFilter = "all" | PrioritySourceType;
-type UrgencyFilter = "all" | PriorityIconType;
 type SortOption = "score" | "due" | "recency";
 
 export default function Priority() {
   const navigate = useNavigate();
+  const isDesktop = useIsDesktop();
   const { items, loading, debug, totalCount } = useUnifiedPriorityV1();
   const { tasks, updateTask, snoozeTask } = useTasks();
-  const { markComplete: markInboxComplete, snooze: snoozeInbox, inboxItems } = useInboxItems();
+  const { markComplete: markInboxComplete, snooze: snoozeInbox, archive: archiveInbox, inboxItems } = useInboxItems();
   const { events } = useOutlookCalendar();
   
   // All items from debug, or fallback to the top 8 items
@@ -42,32 +47,43 @@ export default function Priority() {
   
   // Filters and sorting state
   const [search, setSearch] = useState("");
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
-  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>("all");
+  const [viewFilter, setViewFilter] = useState<PriorityViewFilter>("all");
   const [sortBy, setSortBy] = useState<SortOption>("score");
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Selected item for detail pane (desktop)
+  const [selectedItem, setSelectedItem] = useState<PriorityItem | null>(null);
   
   // Resolved items tracking
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   
-  // Detail modal states
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [selectedInboxItem, setSelectedInboxItem] = useState<InboxItem | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  // Modal states for mobile
+  const [selectedTaskModal, setSelectedTaskModal] = useState<Task | null>(null);
+  const [selectedInboxModal, setSelectedInboxModal] = useState<InboxItem | null>(null);
+  const [selectedEventModal, setSelectedEventModal] = useState<CalendarEvent | null>(null);
+
+  // Get source data for selected item
+  const selectedTask = useMemo(() => {
+    if (!selectedItem || selectedItem.sourceType !== "task") return null;
+    return tasks?.find(t => t.id === selectedItem.sourceId) || null;
+  }, [selectedItem, tasks]);
+
+  const selectedInboxItem = useMemo(() => {
+    if (!selectedItem || selectedItem.sourceType !== "inbox") return null;
+    return inboxItems?.find(i => i.id === selectedItem.sourceId) || null;
+  }, [selectedItem, inboxItems]);
+
+  const selectedEvent = useMemo(() => {
+    if (!selectedItem || selectedItem.sourceType !== "calendar_event") return null;
+    return events?.find(e => e.id === selectedItem.sourceId) || null;
+  }, [selectedItem, events]);
 
   // Filtered and sorted items
   const filteredItems = useMemo(() => {
     let result = allItems.filter(item => !resolvedIds.has(item.id));
     
-    // Filter by source type
-    if (sourceFilter !== "all") {
-      result = result.filter(item => item.sourceType === sourceFilter);
-    }
-    
-    // Filter by urgency/icon type
-    if (urgencyFilter !== "all") {
-      result = result.filter(item => item.iconType === urgencyFilter);
-    }
+    // Filter by view filter
+    result = filterPriorityItems(result, viewFilter);
     
     // Filter by search
     if (search.trim()) {
@@ -97,7 +113,7 @@ export default function Priority() {
           return 0;
       }
     });
-  }, [allItems, sourceFilter, urgencyFilter, search, sortBy, resolvedIds]);
+  }, [allItems, viewFilter, search, sortBy, resolvedIds]);
 
   const handleResolve = (item: PriorityItem) => {
     switch (item.sourceType) {
@@ -109,6 +125,10 @@ export default function Priority() {
         break;
     }
     setResolvedIds(prev => new Set(prev).add(item.id));
+    if (selectedItem?.id === item.id) {
+      setSelectedItem(null);
+    }
+    toast.success("Item resolved");
   };
 
   const handleSnooze = (item: PriorityItem, duration: "later_today" | "tomorrow" | "next_week") => {
@@ -140,27 +160,46 @@ export default function Priority() {
     }
     
     setResolvedIds(prev => new Set(prev).add(item.id));
+    if (selectedItem?.id === item.id) {
+      setSelectedItem(null);
+    }
     toast.success(`Snoozed until ${format(snoozeUntil, "MMM d, h:mm a")}`);
   };
 
   const handleItemClick = (item: PriorityItem) => {
+    // On desktop, select item for detail pane
+    if (isDesktop) {
+      // For companies, navigate directly
+      if (item.sourceType === "portfolio_company" && item.companyId) {
+        navigate(`/portfolio/${item.companyId}`);
+        return;
+      }
+      if (item.sourceType === "pipeline_company" && item.companyId) {
+        navigate(`/pipeline?company=${item.companyId}`);
+        return;
+      }
+      setSelectedItem(item);
+      return;
+    }
+
+    // On mobile, open modals
     switch (item.sourceType) {
       case "task":
         const task = tasks?.find(t => t.id === item.sourceId);
         if (task) {
-          setSelectedTask(task);
+          setSelectedTaskModal(task);
         }
         break;
       case "inbox":
         const inboxItem = inboxItems?.find(i => i.id === item.sourceId);
         if (inboxItem) {
-          setSelectedInboxItem(inboxItem);
+          setSelectedInboxModal(inboxItem);
         }
         break;
       case "calendar_event":
         const event = events?.find(e => e.id === item.sourceId);
         if (event) {
-          setSelectedEvent(event);
+          setSelectedEventModal(event);
         }
         break;
       case "portfolio_company":
@@ -176,22 +215,11 @@ export default function Priority() {
     }
   };
 
-  // Get unique source types and icon types for filter options
-  const availableSourceTypes = useMemo(() => {
-    const types = new Set(allItems.map(item => item.sourceType));
-    return Array.from(types);
-  }, [allItems]);
-
-  const availableIconTypes = useMemo(() => {
-    const types = new Set(allItems.map(item => item.iconType).filter(Boolean));
-    return Array.from(types) as PriorityIconType[];
-  }, [allItems]);
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border">
-        <div className="max-w-5xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Button
@@ -215,19 +243,32 @@ export default function Priority() {
               </div>
             </div>
             
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowFilters(!showFilters)}
-              className={showFilters ? "bg-accent" : ""}
-            >
-              <SlidersHorizontal className="h-4 w-4 mr-2" />
-              Filters
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* Search - visible on larger screens */}
+              <div className="relative hidden sm:block">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10 w-64"
+                />
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                className={cn("lg:hidden", showFilters && "bg-accent")}
+              >
+                <SlidersHorizontal className="h-4 w-4 mr-2" />
+                Filters
+              </Button>
+            </div>
           </div>
 
-          {/* Search */}
-          <div className="relative">
+          {/* Mobile search */}
+          <div className="relative sm:hidden">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search priority items..."
@@ -237,8 +278,8 @@ export default function Priority() {
             />
           </div>
 
-          {/* Filters */}
-          {showFilters && (
+          {/* Mobile Filters */}
+          {showFilters && !isDesktop && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
@@ -246,89 +287,141 @@ export default function Priority() {
               className="mt-4"
             >
               <PriorityFilters
-                sourceFilter={sourceFilter}
-                setSourceFilter={setSourceFilter}
-                urgencyFilter={urgencyFilter}
-                setUrgencyFilter={setUrgencyFilter}
+                sourceFilter="all"
+                setSourceFilter={() => {}}
+                urgencyFilter="all"
+                setUrgencyFilter={() => {}}
                 sortBy={sortBy}
                 setSortBy={setSortBy}
-                availableSourceTypes={availableSourceTypes}
-                availableIconTypes={availableIconTypes}
+                availableSourceTypes={[]}
+                availableIconTypes={[]}
               />
             </motion.div>
           )}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="max-w-5xl mx-auto px-6 py-6">
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Skeleton key={i} className="h-20 w-full rounded-xl" />
-            ))}
+      {/* Content - 3 column layout on desktop */}
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className={cn(
+          "grid gap-6",
+          isDesktop && selectedItem
+            ? "grid-cols-[280px_minmax(320px,1fr)_minmax(400px,1.2fr)]"
+            : isDesktop
+              ? "grid-cols-[280px_1fr]"
+              : "grid-cols-1"
+        )}>
+          {/* Left: Summary Panel (desktop only) */}
+          {isDesktop && (
+            <PrioritySummaryPanel
+              items={allItems.filter(item => !resolvedIds.has(item.id))}
+              activeFilter={viewFilter}
+              onFilterChange={setViewFilter}
+              onItemClick={handleItemClick}
+              onResolveItem={handleResolve}
+            />
+          )}
+
+          {/* Middle: Item List */}
+          <div className={cn(
+            "space-y-2",
+            isDesktop && "lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto lg:pr-2"
+          )}>
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : filteredItems.length === 0 ? (
+              <PriorityEmptyState
+                hasFilters={viewFilter !== "all" || search.trim() !== ""}
+                onClearFilters={() => {
+                  setViewFilter("all");
+                  setSearch("");
+                }}
+              />
+            ) : (
+              filteredItems.map((item, index) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.02 }}
+                >
+                  <PriorityItemRow
+                    item={item}
+                    isSelected={selectedItem?.id === item.id}
+                    onClick={() => handleItemClick(item)}
+                    onResolve={() => handleResolve(item)}
+                    onSnooze={(duration) => handleSnooze(item, duration)}
+                  />
+                </motion.div>
+              ))
+            )}
           </div>
-        ) : filteredItems.length === 0 ? (
-          <PriorityEmptyState
-            hasFilters={sourceFilter !== "all" || urgencyFilter !== "all" || search.trim() !== ""}
-            onClearFilters={() => {
-              setSourceFilter("all");
-              setUrgencyFilter("all");
-              setSearch("");
-            }}
-          />
-        ) : (
-          <div className="space-y-2">
-            {filteredItems.map((item, index) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.03 }}
-              >
-                <PriorityItemRow
-                  item={item}
-                  onClick={() => handleItemClick(item)}
-                  onResolve={() => handleResolve(item)}
-                  onSnooze={(duration) => handleSnooze(item, duration)}
-                />
-              </motion.div>
-            ))}
-          </div>
-        )}
+
+          {/* Right: Detail Pane (desktop only, when item selected) */}
+          {isDesktop && selectedItem && (
+            <div className="sticky top-28 self-start h-[calc(100vh-10rem)]">
+              <PriorityDetailPane
+                item={selectedItem}
+                task={selectedTask}
+                inboxItem={selectedInboxItem}
+                event={selectedEvent}
+                onClose={() => setSelectedItem(null)}
+                onResolve={() => handleResolve(selectedItem)}
+                onSnooze={(duration) => handleSnooze(selectedItem, duration)}
+                onEditTask={() => {
+                  if (selectedTask) {
+                    setSelectedTaskModal(selectedTask);
+                  }
+                }}
+                onCreateTaskFromInbox={() => {}}
+                onArchiveInbox={(id) => {
+                  archiveInbox(id);
+                  setSelectedItem(null);
+                }}
+              />
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Task Details Dialog */}
+      {/* Modal fallbacks for mobile & task editing */}
       <TaskDetailsDialog
-        open={!!selectedTask}
-        onOpenChange={(open) => !open && setSelectedTask(null)}
-        task={selectedTask}
+        open={!!selectedTaskModal}
+        onOpenChange={(open) => !open && setSelectedTaskModal(null)}
+        task={selectedTaskModal}
         onUpdateTask={(task) => {
           updateTask(task.id, task);
-          setSelectedTask(null);
+          setSelectedTaskModal(null);
         }}
-        onDeleteTask={() => setSelectedTask(null)}
+        onDeleteTask={() => setSelectedTaskModal(null)}
       />
 
-      {/* Inbox Detail Drawer */}
-      <InboxDetailDrawer
-        open={!!selectedInboxItem}
-        onClose={() => setSelectedInboxItem(null)}
-        item={selectedInboxItem}
-        onCreateTask={() => {}}
-        onMarkComplete={(id) => {
-          markInboxComplete(id);
-          setSelectedInboxItem(null);
-        }}
-        onArchive={() => setSelectedInboxItem(null)}
-      />
+      {!isDesktop && (
+        <InboxDetailDrawer
+          mode="sheet"
+          open={!!selectedInboxModal}
+          onClose={() => setSelectedInboxModal(null)}
+          item={selectedInboxModal}
+          onCreateTask={() => {}}
+          onMarkComplete={(id) => {
+            markInboxComplete(id);
+            setSelectedInboxModal(null);
+          }}
+          onArchive={() => setSelectedInboxModal(null)}
+        />
+      )}
 
-      {/* Event Details Modal */}
-      <EventDetailsModal
-        event={selectedEvent}
-        isOpen={!!selectedEvent}
-        onClose={() => setSelectedEvent(null)}
-      />
+      {!isDesktop && (
+        <EventDetailsModal
+          event={selectedEventModal}
+          isOpen={!!selectedEventModal}
+          onClose={() => setSelectedEventModal(null)}
+        />
+      )}
     </div>
   );
 }
