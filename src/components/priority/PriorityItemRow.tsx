@@ -25,6 +25,7 @@ import { toast } from "sonner";
 
 interface PriorityItemRowProps {
   item: PriorityItem;
+  isSelected?: boolean;
   onClick: () => void;
   onResolve: () => void;
   onSnooze: (duration: "later_today" | "tomorrow" | "next_week") => void;
@@ -113,7 +114,7 @@ function getSourceIcon(sourceType: PrioritySourceType) {
   }
 }
 
-export function PriorityItemRow({ item, onClick, onResolve, onSnooze }: PriorityItemRowProps) {
+export function PriorityItemRow({ item, isSelected, onClick, onResolve, onSnooze }: PriorityItemRowProps) {
   const config = item.iconType ? iconConfig[item.iconType] : defaultIconConfig;
   const Icon = config?.icon || defaultIconConfig.icon;
   const SourceIcon = getSourceIcon(item.sourceType);
@@ -123,7 +124,12 @@ export function PriorityItemRow({ item, onClick, onResolve, onSnooze }: Priority
   return (
     <div
       onClick={onClick}
-      className="group flex items-center gap-4 p-4 rounded-xl bg-card hover:bg-accent/50 border border-border hover:border-border/80 cursor-pointer transition-all"
+      className={cn(
+        "group flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all border",
+        isSelected
+          ? "bg-accent border-primary/30 ring-1 ring-primary/20"
+          : "bg-card hover:bg-accent/50 border-border hover:border-border/80"
+      )}
     >
       {/* Status icon */}
       <div
