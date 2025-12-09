@@ -13,6 +13,7 @@ export const transformReadingItem = (row: ReadingItemRow): ReadingItem => {
     isRead: row.is_read || false,
     isFlagged: row.is_flagged || false,
     isArchived: row.is_archived || false,
+    readAt: (row as any).read_at || undefined,
     created_at: row.created_at,
     updated_at: row.updated_at,
     created_by: row.created_by || undefined,
@@ -40,6 +41,10 @@ export const transformReadingItemForDatabase = (itemData: any): any => {
   if (itemData.projectId !== undefined) {
     dbData.project_id = itemData.projectId;
     delete dbData.projectId;
+  }
+  if (itemData.readAt !== undefined) {
+    dbData.read_at = itemData.readAt;
+    delete dbData.readAt;
   }
   
   return dbData;

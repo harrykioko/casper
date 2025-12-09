@@ -15,6 +15,7 @@ export interface ReadingItem {
   isRead: boolean;
   isFlagged: boolean;
   isArchived: boolean;
+  readAt?: string;
   created_at?: string;
   updated_at?: string;
   created_by?: string;

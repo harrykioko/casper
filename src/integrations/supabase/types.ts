@@ -736,6 +736,7 @@ export type Database = {
           is_flagged: boolean
           is_read: boolean | null
           project_id: string | null
+          read_at: string | null
           title: string
           updated_at: string
           url: string
@@ -752,6 +753,7 @@ export type Database = {
           is_flagged?: boolean
           is_read?: boolean | null
           project_id?: string | null
+          read_at?: string | null
           title: string
           updated_at?: string
           url: string
@@ -768,6 +770,7 @@ export type Database = {
           is_flagged?: boolean
           is_read?: boolean | null
           project_id?: string | null
+          read_at?: string | null
           title?: string
           updated_at?: string
           url?: string

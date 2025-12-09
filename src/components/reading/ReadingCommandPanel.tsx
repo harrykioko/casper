@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { BookOpen, Clock, Plus, Flag, CheckCircle, Archive, Calendar, Folder, ExternalLink, Check, ListTodo } from 'lucide-react';
+import { BookOpen, Clock, Plus, Star, CheckCircle, Archive, Calendar, Folder, ExternalLink, Check, ListTodo } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -89,7 +89,7 @@ function SuggestedItemRow({ item, reason, onOpen, onMarkRead, onFlag, onTask }: 
           </p>
         </div>
         {item.isFlagged && (
-          <Flag className="w-3 h-3 text-rose-500 flex-shrink-0" />
+          <Star className="w-3 h-3 text-amber-500 fill-amber-500 flex-shrink-0" />
         )}
       </div>
       
@@ -122,13 +122,13 @@ function SuggestedItemRow({ item, reason, onOpen, onMarkRead, onFlag, onTask }: 
           className={cn(
             "h-6 px-2 text-[10px]",
             item.isFlagged 
-              ? "text-rose-500 dark:text-rose-400" 
-              : "text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400"
+              ? "text-amber-500 dark:text-amber-400" 
+              : "text-slate-600 dark:text-slate-400 hover:text-amber-500 dark:hover:text-amber-400"
           )}
           onClick={(e) => { e.stopPropagation(); onFlag(); }}
         >
-          <Flag className="w-3 h-3 mr-1" />
-          {item.isFlagged ? 'Unflag' : 'Flag'}
+          <Star className={cn("w-3 h-3 mr-1", item.isFlagged && "fill-current")} />
+          {item.isFlagged ? 'Unfavorite' : 'Favorite'}
         </Button>
         <Button
           size="sm"
@@ -238,19 +238,19 @@ export function ReadingCommandPanel({
             variant="rose"
           />
           <StatChip
-            label="Flagged"
-            count={counts.flagged}
-            icon={<Flag className="w-3 h-3" />}
-            isActive={filter.primaryView === 'flagged'}
-            onClick={() => handleViewChange('flagged')}
+            label="Favorites"
+            count={counts.favorites}
+            icon={<Star className="w-3 h-3" />}
+            isActive={filter.primaryView === 'favorites'}
+            onClick={() => handleViewChange('favorites')}
             variant="rose"
           />
           <StatChip
-            label="Done"
-            count={counts.done}
+            label="Read"
+            count={counts.read}
             icon={<CheckCircle className="w-3 h-3" />}
-            isActive={filter.primaryView === 'done'}
-            onClick={() => handleViewChange('done')}
+            isActive={filter.primaryView === 'read'}
+            onClick={() => handleViewChange('read')}
             variant="rose"
           />
           <StatChip
