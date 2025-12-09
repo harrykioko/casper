@@ -1,8 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { FolderKanban, Plus } from "lucide-react";
+import { FolderKanban, Plus, Pin } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CommandModal } from "@/components/modals/CommandModal";
 import { CreateProjectModal } from "@/components/modals/CreateProjectModal";
@@ -11,12 +11,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { useProjects } from "@/hooks/useProjects";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { 
+  PROJECT_TYPES, 
+  PROJECT_STATUSES, 
+  PROJECT_STATUS_OPTIONS,
+  PROJECT_TYPE_OPTIONS,
+  ProjectStatus, 
+  ProjectType 
+} from "@/lib/constants/projectTypes";
 
 interface ProjectWithCounts {
   id: string;
   name: string;
   description: string;
   color: string;
+  type: ProjectType;
+  status: ProjectStatus;
+  is_pinned: boolean;
   taskCount: number;
   completedTaskCount: number;
   promptCount: number;
@@ -30,6 +42,8 @@ export default function Projects() {
   const [countsLoading, setCountsLoading] = useState(true);
   const [isCommandModalOpen, setIsCommandModalOpen] = useState(false);
   const [isCreateProjectModalOpen, setIsCreateProjectModalOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
+  const [typeFilter, setTypeFilter] = useState<ProjectType | 'all'>('all');
 
   // Fetch task and prompt counts for each project
   useEffect(() => {
@@ -97,6 +111,9 @@ export default function Projects() {
           name: project.name,
           description: project.description || "",
           color: project.color || "#FF1464",
+          type: (project.type as ProjectType) || 'other',
+          status: (project.status as ProjectStatus) || 'active',
+          is_pinned: project.is_pinned || false,
           taskCount: countsMap.get(project.id)?.taskCount || 0,
           completedTaskCount: countsMap.get(project.id)?.completedTaskCount || 0,
           promptCount: countsMap.get(project.id)?.promptCount || 0
@@ -154,6 +171,17 @@ export default function Projects() {
     }
   };
 
+  // Filter projects
+  const filteredProjects = projectsWithCounts
+    .filter(p => statusFilter === 'all' || p.status === statusFilter)
+    .filter(p => typeFilter === 'all' || p.type === typeFilter)
+    .sort((a, b) => {
+      // Pinned projects first
+      if (a.is_pinned && !b.is_pinned) return -1;
+      if (!a.is_pinned && b.is_pinned) return 1;
+      return 0;
+    });
+
   if (loading) {
     return (
       <div className="p-8 pl-24 min-h-screen">
@@ -182,7 +210,7 @@ export default function Projects() {
       onKeyDown={handleKeyDown}
     >
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Projects</h1>
           <div className="flex gap-3">
             <Button 
@@ -203,12 +231,67 @@ export default function Projects() {
             </Button>
           </div>
         </div>
+
+        {/* Filters */}
+        <div className="flex flex-wrap gap-2 mb-6">
+          {/* Status filters */}
+          <Button
+            size="sm"
+            variant={statusFilter === 'all' ? 'secondary' : 'ghost'}
+            className="h-7 text-xs"
+            onClick={() => setStatusFilter('all')}
+          >
+            All Statuses
+          </Button>
+          {PROJECT_STATUS_OPTIONS.map(status => (
+            <Button
+              key={status.value}
+              size="sm"
+              variant={statusFilter === status.value ? 'secondary' : 'ghost'}
+              className={cn("h-7 text-xs gap-1", statusFilter === status.value && status.bgColor)}
+              onClick={() => setStatusFilter(status.value as ProjectStatus)}
+            >
+              <span className={cn("w-1.5 h-1.5 rounded-full", status.dotColor)} />
+              {status.label}
+            </Button>
+          ))}
+
+          <div className="w-px h-6 bg-border mx-1" />
+
+          {/* Type filters */}
+          <Button
+            size="sm"
+            variant={typeFilter === 'all' ? 'secondary' : 'ghost'}
+            className="h-7 text-xs"
+            onClick={() => setTypeFilter('all')}
+          >
+            All Types
+          </Button>
+          {PROJECT_TYPE_OPTIONS.map(type => {
+            const TypeIcon = type.icon;
+            return (
+              <Button
+                key={type.value}
+                size="sm"
+                variant={typeFilter === type.value ? 'secondary' : 'ghost'}
+                className={cn("h-7 text-xs gap-1", typeFilter === type.value && type.bgColor)}
+                onClick={() => setTypeFilter(type.value as ProjectType)}
+              >
+                <TypeIcon className="w-3 h-3" />
+                {type.label.split(' / ')[0]}
+              </Button>
+            );
+          })}
+        </div>
         
-        <div className="grid auto-rows-[10rem] grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-6">
-          {projectsWithCounts.map((project) => {
+        <div className="grid auto-rows-[11rem] grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-6">
+          {filteredProjects.map((project) => {
             const progressPercentage = project.taskCount > 0 
               ? (project.completedTaskCount / project.taskCount) * 100 
               : 0;
+            const typeConfig = PROJECT_TYPES[project.type] || PROJECT_TYPES.other;
+            const statusConfig = PROJECT_STATUSES[project.status] || PROJECT_STATUSES.active;
+            const TypeIcon = typeConfig.icon;
             
             return (
               <Link
@@ -221,28 +304,43 @@ export default function Projects() {
                   style={{ '--accentColor': project.color } as React.CSSProperties}
                 >
                   <div className="absolute left-0 top-3 bottom-3 w-1 rounded-l-2xl bg-[var(--accentColor)]"></div>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                  {project.is_pinned && (
+                    <div className="absolute top-2 right-2">
+                      <Pin className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                    </div>
+                  )}
+                  <CardHeader className="pb-1">
+                    <CardTitle className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100 text-base">
                       {project.name}
                     </CardTitle>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Badge variant="secondary" className={cn("text-[10px] h-5 gap-1 px-1.5", typeConfig.bgColor, typeConfig.color)}>
+                        <TypeIcon className="w-2.5 h-2.5" />
+                        {typeConfig.label.split(' / ')[0]}
+                      </Badge>
+                      <Badge variant="secondary" className={cn("text-[10px] h-5 gap-1 px-1.5", statusConfig.bgColor, statusConfig.color)}>
+                        <span className={cn("w-1 h-1 rounded-full", statusConfig.dotColor)} />
+                        {statusConfig.label}
+                      </Badge>
+                    </div>
                   </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground mb-3">
+                  <CardContent className="pt-2">
+                    <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
                       {project.description || 'No description'}
                     </p>
                     
                     {countsLoading ? (
-                      <Skeleton className="h-1.5 w-full mb-3" />
+                      <Skeleton className="h-1.5 w-full mb-2" />
                     ) : (
                       <Progress 
                         value={progressPercentage} 
-                        className="h-1.5 rounded-full bg-muted dark:bg-muted/30 mb-3" 
+                        className="h-1 rounded-full bg-muted dark:bg-muted/30 mb-2" 
                       />
                     )}
                     
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <div className="flex items-center">
-                        <FolderKanban className="h-4 w-4 mr-1.5" />
+                        <FolderKanban className="h-3.5 w-3.5 mr-1" />
                         <span>{countsLoading ? '...' : `${project.taskCount} tasks`}</span>
                       </div>
                       {project.promptCount > 0 && (
@@ -266,6 +364,14 @@ export default function Projects() {
             </div>
           </div>
         </div>
+
+        {filteredProjects.length === 0 && projectsWithCounts.length > 0 && (
+          <div className="text-center py-12 text-muted-foreground">
+            <FolderKanban className="h-12 w-12 mx-auto mb-3 opacity-20" />
+            <p className="text-lg font-medium">No matching projects</p>
+            <p className="text-sm">Try adjusting your filters</p>
+          </div>
+        )}
 
         {projectsWithCounts.length === 0 && !loading && (
           <div className="text-center py-12 text-muted-foreground">

@@ -1,13 +1,14 @@
-
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Control } from "react-hook-form";
 import { CreateProjectFormData, colorSwatches } from "./schema";
+import { PROJECT_TYPE_OPTIONS } from "@/lib/constants/projectTypes";
 
 interface MetaSectionProps {
   control: Control<CreateProjectFormData>;
@@ -20,6 +21,41 @@ export function MetaSection({ control }: MetaSectionProps) {
         Meta
       </h3>
 
+      {/* Project Type */}
+      <FormField
+        control={control}
+        name="type"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel className="text-sm font-medium text-muted-foreground">
+              Project Type
+            </FormLabel>
+            <Select onValueChange={field.onChange} defaultValue={field.value}>
+              <FormControl>
+                <SelectTrigger className="bg-background/80 border border-muted/30">
+                  <SelectValue placeholder="Select project type" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                {PROJECT_TYPE_OPTIONS.map((type) => {
+                  const TypeIcon = type.icon;
+                  return (
+                    <SelectItem key={type.value} value={type.value}>
+                      <div className="flex items-center gap-2">
+                        <TypeIcon className={cn("w-4 h-4", type.color)} />
+                        <span>{type.label}</span>
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      {/* Color */}
       <FormField
         control={control}
         name="color"
@@ -50,6 +86,7 @@ export function MetaSection({ control }: MetaSectionProps) {
         )}
       />
 
+      {/* Due Date */}
       <FormField
         control={control}
         name="dueDate"

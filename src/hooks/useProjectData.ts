@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,6 +9,9 @@ interface Project {
   description: string;
   color: string;
   context: string;
+  type: string;
+  status: string;
+  is_pinned: boolean;
 }
 
 export function useProjectData() {
@@ -20,7 +22,10 @@ export function useProjectData() {
     name: "",
     description: "",
     color: "#FF1464",
-    context: ""
+    context: "",
+    type: "other",
+    status: "active",
+    is_pinned: false
   });
   const [loading, setLoading] = useState(true);
   
@@ -46,7 +51,10 @@ export function useProjectData() {
             name: projectData.name,
             description: projectData.description || "",
             color: projectData.color || "#FF1464",
-            context: projectData.context || ""
+            context: projectData.context || "",
+            type: projectData.type || "other",
+            status: projectData.status || "active",
+            is_pinned: projectData.is_pinned || false
           });
         }
       } catch (error) {
@@ -89,10 +97,34 @@ export function useProjectData() {
       });
     }
   };
+
+  const updateProjectMetadata = async (updates: Partial<Pick<Project, 'type' | 'status' | 'is_pinned'>>) => {
+    if (!id) return;
+    
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update(updates)
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setProject(prev => ({ ...prev, ...updates }));
+      toast({ title: "Project updated" });
+    } catch (error) {
+      console.error('Error updating project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update project",
+        variant: "destructive"
+      });
+    }
+  };
   
   return {
     project,
     loading,
-    updateProjectContext
+    updateProjectContext,
+    updateProjectMetadata
   };
 }
