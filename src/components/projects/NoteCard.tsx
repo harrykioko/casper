@@ -50,12 +50,16 @@ export function NoteCard({ note, onUpdate, onDelete, onSelect, isSelected }: Not
 
   if (isEditing) {
     return (
-      <div className="p-3 rounded-lg border border-border bg-background space-y-2">
+      <div className={cn(
+        "p-3 rounded-xl space-y-2",
+        "bg-white/60 dark:bg-white/[0.06]",
+        "border border-white/40 dark:border-white/10"
+      )}>
         <Textarea
           value={editContent}
           onChange={(e) => setEditContent(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="min-h-[100px] text-sm resize-none"
+          className="min-h-[100px] text-sm resize-none bg-white/50 dark:bg-white/[0.04] border-white/30 dark:border-white/10"
           autoFocus
         />
         <div className="flex items-center justify-between">
@@ -77,7 +81,7 @@ export function NoteCard({ note, onUpdate, onDelete, onSelect, isSelected }: Not
             <Button
               size="sm"
               variant="ghost"
-              className="h-7 w-7 p-0 text-emerald-500 hover:text-emerald-600"
+              className="h-7 w-7 p-0 text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10"
               onClick={handleSave}
               disabled={!editContent.trim()}
             >
@@ -92,16 +96,23 @@ export function NoteCard({ note, onUpdate, onDelete, onSelect, isSelected }: Not
   return (
     <div
       className={cn(
-        "group p-3 rounded-lg border transition-colors cursor-pointer",
+        "group p-3 rounded-xl transition-all duration-200 cursor-pointer",
+        "border",
         isSelected
-          ? "border-primary/50 bg-primary/5"
-          : "border-border/50 bg-background/50 hover:border-border hover:bg-background"
+          ? "border-primary/40 bg-primary/5 shadow-[0_0_12px_rgba(99,102,241,0.1)]"
+          : cn(
+              "border-white/20 dark:border-white/[0.06]",
+              "bg-white/40 dark:bg-white/[0.03]",
+              "hover:bg-white/60 dark:hover:bg-white/[0.06]",
+              "hover:border-white/40 dark:hover:border-white/10",
+              "hover:translate-y-[-1px] hover:shadow-md"
+            )
       )}
       onClick={() => onSelect?.(note)}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-sm whitespace-pre-wrap break-words">
+          <p className="text-sm whitespace-pre-wrap break-words text-foreground/90">
             {preview}
             {hasMore && <span className="text-muted-foreground">...</span>}
           </p>
@@ -113,7 +124,7 @@ export function NoteCard({ note, onUpdate, onDelete, onSelect, isSelected }: Not
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground hover:bg-white/40 dark:hover:bg-white/10"
             onClick={(e) => {
               e.stopPropagation();
               setIsEditing(true);
@@ -124,7 +135,7 @@ export function NoteCard({ note, onUpdate, onDelete, onSelect, isSelected }: Not
           <Button
             size="sm"
             variant="ghost"
-            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+            className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
             onClick={(e) => {
               e.stopPropagation();
               handleDelete();
