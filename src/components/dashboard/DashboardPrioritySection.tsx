@@ -316,48 +316,22 @@ export function DashboardPrioritySection({
               isLast={isLast}
             >
               {/* Left content */}
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                {/* Status icon */}
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                {/* Status icon - smaller */}
                 <div
                   className={cn(
-                    "w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0",
+                    "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0",
                     config?.bgColor || defaultIconConfig.bgColor
                   )}
                 >
-                  <Icon className={cn("w-4 h-4", config?.color || defaultIconConfig.color)} />
+                  <Icon className={cn("w-3.5 h-3.5", config?.color || defaultIconConfig.color)} />
                 </div>
 
-                {/* Avatar/Logo or Source icon */}
-                <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {item.companyLogoUrl ? (
-                    <img
-                      src={item.companyLogoUrl}
-                      alt={item.companyName || ""}
-                      className="max-w-full max-h-full object-contain p-1"
-                    />
-                  ) : item.companyName ? (
-                    <span className="text-sm font-medium text-slate-500">
-                      {item.companyName.charAt(0).toUpperCase()}
-                    </span>
-                  ) : (
-                    <SourceIcon className="w-4 h-4 text-slate-400" />
-                  )}
-                </div>
-
-                {/* Content */}
+                {/* Content - takes full remaining width */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
+                  <div className="flex items-center gap-1.5 mb-0.5">
                     <span className="font-medium text-sm text-slate-700 dark:text-slate-200 truncate">
                       {item.title}
-                    </span>
-                    <span
-                      className={cn(
-                        "text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0",
-                        config?.bgColor || defaultIconConfig.bgColor,
-                        config?.color || defaultIconConfig.color
-                      )}
-                    >
-                      {config?.label || defaultIconConfig.label}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
@@ -366,21 +340,43 @@ export function DashboardPrioritySection({
                 </div>
               </div>
 
-              {/* Right side */}
-              <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Right side - badge + timestamp/actions */}
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                {/* Badge - always visible */}
+                <span
+                  className={cn(
+                    "text-[9px] px-1.5 py-0.5 rounded-full font-medium hidden sm:inline-flex",
+                    config?.bgColor || defaultIconConfig.bgColor,
+                    config?.color || defaultIconConfig.color
+                  )}
+                >
+                  {config?.label || defaultIconConfig.label}
+                </span>
+
                 {/* Quick Actions (appear on hover) */}
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="hidden group-hover:flex items-center gap-0.5">
+                  {/* Resolve */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-slate-500 hover:text-emerald-600"
+                    onClick={(e) => handleResolve(e, item)}
+                    title="Resolve"
+                  >
+                    <CheckCircle className="h-3.5 w-3.5" />
+                  </Button>
+
                   {/* Snooze */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+                        className="h-6 w-6 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
                         onClick={(e) => e.stopPropagation()}
                         title="Snooze"
                       >
-                        <Clock className="h-4 w-4" />
+                        <Clock className="h-3.5 w-3.5" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-popover">
@@ -393,46 +389,17 @@ export function DashboardPrioritySection({
                       <DropdownMenuItem onClick={(e) => handleSnooze(e as any, item, "next_week")}>
                         Next week
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={(e) => handleSnooze(e as any, item, "custom")}>
-                        Custom...
-                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-
-                  {/* Resolve */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-slate-500 hover:text-emerald-600"
-                    onClick={(e) => handleResolve(e, item)}
-                    title="Resolve"
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                  </Button>
-
-                  {/* Create Task (only show for non-task items) */}
-                  {item.sourceType !== "task" && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
-                      onClick={(e) => handleCreateTask(e, item)}
-                      title="Create task"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  )}
                 </div>
 
-                {/* Timestamp or event time */}
-                <span className="text-[10px] text-slate-400 group-hover:hidden">
+                {/* Timestamp (visible when not hovering) */}
+                <span className="text-[10px] text-slate-400 group-hover:hidden min-w-[40px] text-right">
                   {item.eventStartAt 
                     ? format(new Date(item.eventStartAt), "h:mm a")
                     : item.dueAt 
-                      ? formatDistanceToNow(new Date(item.dueAt), { addSuffix: true })
-                      : item.createdAt 
-                        ? formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })
-                        : ""
+                      ? formatDistanceToNow(new Date(item.dueAt), { addSuffix: true }).replace(' ago', '').replace('about ', '')
+                      : ""
                   }
                 </span>
               </div>

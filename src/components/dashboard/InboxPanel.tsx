@@ -99,17 +99,17 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
                   isLast={isLast}
                 >
                   {/* Left content */}
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {/* Avatar */}
-                    <div className="w-9 h-9 rounded-full bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-sm font-medium text-sky-600 dark:text-sky-300">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {/* Avatar - smaller */}
+                    <div className="w-7 h-7 rounded-full bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-medium text-sky-600 dark:text-sky-300">
                         {item.senderName.charAt(0).toUpperCase()}
                       </span>
                     </div>
 
-                    {/* Content */}
+                    {/* Content - combined sender + subject line */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-0.5">
+                      <div className="flex items-center gap-1.5 mb-0.5">
                         <span
                           className={cn(
                             "text-sm truncate",
@@ -120,60 +120,51 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
                         >
                           {item.senderName}
                         </span>
+                        <span className="text-slate-300 dark:text-slate-600 flex-shrink-0">·</span>
+                        <span className="text-sm text-slate-600 dark:text-slate-300 truncate">
+                          {item.subject}
+                        </span>
                         {!item.isRead && (
-                          <div className="w-2 h-2 rounded-full bg-sky-500 flex-shrink-0" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
                         )}
                       </div>
-                      <p className="text-sm text-slate-700 dark:text-slate-200 truncate">{item.subject}</p>
                       <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{item.preview}</p>
                     </div>
                   </div>
 
                   {/* Right side */}
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-1 flex-shrink-0">
                     {/* Quick Actions (appear on hover) */}
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="hidden group-hover:flex items-center gap-0.5">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-slate-500 hover:text-sky-600"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCreateTaskFromEmail(item);
-                        }}
-                        title="Create task"
-                      >
-                        <ListTodo className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-slate-500 hover:text-emerald-600"
+                        className="h-6 w-6 text-slate-500 hover:text-emerald-600"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleMarkComplete(item.id);
                         }}
                         title="Mark complete"
                       >
-                        <Check className="h-4 w-4" />
+                        <Check className="h-3.5 w-3.5" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-7 w-7 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+                        className="h-6 w-6 text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleArchive(item.id);
                         }}
                         title="Archive"
                       >
-                        <Archive className="h-4 w-4" />
+                        <Archive className="h-3.5 w-3.5" />
                       </Button>
                     </div>
 
                     {/* Timestamp (visible when not hovering) */}
-                    <span className="text-[10px] text-slate-400 group-hover:hidden">
-                      {formatDistanceToNow(new Date(item.receivedAt), { addSuffix: true })}
+                    <span className="text-[10px] text-slate-400 group-hover:hidden min-w-[40px] text-right">
+                      {formatDistanceToNow(new Date(item.receivedAt), { addSuffix: true }).replace(' ago', '').replace('about ', '')}
                     </span>
                   </div>
                 </ActionPanelRow>
