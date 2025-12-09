@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useUnifiedPriorityV1 } from "@/hooks/useUnifiedPriorityV1";
+import { useTopPriorityItems } from "@/hooks/useTopPriorityItems";
 import type { PriorityItem, PriorityIconType, PrioritySourceType } from "@/types/priority";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -141,11 +142,18 @@ export function DashboardPrioritySection({
   onOpenEventDetail,
 }: DashboardPrioritySectionProps) {
   const navigate = useNavigate();
-  const { items: priorityItems, loading, totalCount } = useUnifiedPriorityV1();
+  const { items: v1Items, loading, totalCount } = useUnifiedPriorityV1();
+  const { items: topPriorityItems, hasTopPriority } = useTopPriorityItems();
   const { updateTask } = useTasks();
   const { markComplete: markInboxComplete } = useInboxItems();
   const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
 
+  const MAX_TILE_ITEMS = 4;
+
+  // Prefer Top Priority items when they exist, otherwise use v1 items
+  const itemsToShow = hasTopPriority
+    ? topPriorityItems.slice(0, MAX_TILE_ITEMS)
+    : v1Items.slice(0, MAX_TILE_ITEMS);
   const handleSnooze = (
     e: React.MouseEvent,
     item: PriorityItem,
@@ -236,8 +244,8 @@ export function DashboardPrioritySection({
     }
   };
 
-  // Filter out resolved items
-  const visibleItems = priorityItems.filter((item) => !resolvedIds.has(item.id));
+  // Filter out resolved items from the items to show
+  const visibleItems = itemsToShow.filter((item) => !resolvedIds.has(item.id));
 
   if (loading) {
     return (
@@ -286,13 +294,16 @@ export function DashboardPrioritySection({
       <ActionPanelHeader
         icon={<AlertTriangle className="h-4 w-4" />}
         title="Priority Items"
-        subtitle={`${visibleItems.length} requiring attention`}
+        subtitle={hasTopPriority 
+          ? `${visibleItems.length} flagged as top priority`
+          : `${visibleItems.length} requiring attention`
+        }
         badge={<LiveBadge accentColor="amber" />}
         accentColor="amber"
       />
 
       <ActionPanelListArea accentColor="amber" className="overflow-y-auto max-h-[280px]">
-        {visibleItems.slice(0, 8).map((item, index) => {
+        {visibleItems.map((item, index) => {
           const config = item.iconType ? iconConfig[item.iconType] : defaultIconConfig;
           const Icon = config?.icon || defaultIconConfig.icon;
           const isLast = index === Math.min(visibleItems.length, 8) - 1;

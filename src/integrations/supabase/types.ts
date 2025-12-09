@@ -296,6 +296,7 @@ export type Database = {
           is_deleted: boolean
           is_read: boolean
           is_resolved: boolean
+          is_top_priority: boolean
           received_at: string
           related_company_id: string | null
           related_company_name: string | null
@@ -316,6 +317,7 @@ export type Database = {
           is_deleted?: boolean
           is_read?: boolean
           is_resolved?: boolean
+          is_top_priority?: boolean
           received_at?: string
           related_company_id?: string | null
           related_company_name?: string | null
@@ -336,6 +338,7 @@ export type Database = {
           is_deleted?: boolean
           is_read?: boolean
           is_resolved?: boolean
+          is_top_priority?: boolean
           received_at?: string
           related_company_id?: string | null
           related_company_name?: string | null
@@ -791,6 +794,7 @@ export type Database = {
           created_by: string | null
           id: string
           is_quick_task: boolean | null
+          is_top_priority: boolean
           pipeline_company_id: string | null
           priority: string | null
           project_id: string | null
@@ -809,6 +813,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_quick_task?: boolean | null
+          is_top_priority?: boolean
           pipeline_company_id?: string | null
           priority?: string | null
           project_id?: string | null
@@ -827,6 +832,7 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_quick_task?: boolean | null
+          is_top_priority?: boolean
           pipeline_company_id?: string | null
           priority?: string | null
           project_id?: string | null

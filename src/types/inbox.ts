@@ -15,6 +15,7 @@ export interface InboxItem {
   relatedCompanyId?: string;
   relatedCompanyName?: string;
   createdBy: string;
+  isTopPriority?: boolean;
 }
 
 export interface TaskPrefillOptions {

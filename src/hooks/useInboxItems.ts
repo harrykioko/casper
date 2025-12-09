@@ -23,6 +23,7 @@ interface InboxItemRow {
   created_by: string;
   created_at: string;
   updated_at: string;
+  is_top_priority?: boolean;
 }
 
 function transformRow(row: InboxItemRow): InboxItem {
@@ -43,6 +44,7 @@ function transformRow(row: InboxItemRow): InboxItem {
     relatedCompanyId: row.related_company_id || undefined,
     relatedCompanyName: row.related_company_name || undefined,
     createdBy: row.created_by,
+    isTopPriority: row.is_top_priority || false,
   };
 }
 
@@ -188,6 +190,24 @@ export function useInboxItems(options: UseInboxItemsOptions = {}) {
     },
   });
 
+  const markTopPriorityMutation = useMutation({
+    mutationFn: async ({ id, isTop }: { id: string; isTop: boolean }) => {
+      const { error } = await supabase
+        .from("inbox_items")
+        .update({ is_top_priority: isTop })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inbox_items"] });
+    },
+    onError: (error) => {
+      console.error("Error updating top priority:", error);
+      toast.error("Failed to update top priority");
+    },
+  });
+
   return {
     inboxItems,
     isLoading,
@@ -197,5 +217,6 @@ export function useInboxItems(options: UseInboxItemsOptions = {}) {
     archive: (id: string) => archiveMutation.mutate(id),
     unarchive: (id: string) => unarchiveMutation.mutate(id),
     snooze: (id: string, until: Date) => snoozeMutation.mutate({ id, until }),
+    markTopPriority: (id: string, isTop: boolean) => markTopPriorityMutation.mutate({ id, isTop }),
   };
 }
