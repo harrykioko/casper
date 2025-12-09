@@ -147,8 +147,8 @@ export function ActionPanelRow({
       type="button"
       onClick={onClick}
       className={cn(
-        "w-full flex items-center justify-between gap-3",
-        "py-2.5 px-1 rounded-xl",
+        "w-full flex items-center justify-between gap-2",
+        "py-2 px-0.5 rounded-xl",
         "hover:bg-slate-50/80 dark:hover:bg-slate-800/60",
         !isLast && "border-b border-slate-100/70 dark:border-slate-800/80",
         "transition group text-left",
