@@ -86,7 +86,7 @@ export function NoteEditor({
 
   return (
     <div className={cn(
-      "space-y-3 p-4 rounded-xl",
+      "flex flex-col gap-3 p-4 rounded-xl h-full",
       "bg-white/60 dark:bg-zinc-900/60 backdrop-blur-xl",
       "border border-white/20 dark:border-white/10",
       className
@@ -151,7 +151,7 @@ export function NoteEditor({
         value={content}
         onChange={(e) => setContent(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="min-h-[120px] text-sm resize-none bg-transparent border-white/20 dark:border-white/10 focus:ring-2 focus:ring-primary/30"
+        className="flex-1 min-h-[120px] text-sm resize-none bg-transparent border-white/20 dark:border-white/10 focus:ring-2 focus:ring-primary/30"
         autoFocus
       />
 
