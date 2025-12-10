@@ -1,6 +1,5 @@
-
 import { useEffect } from "react";
-import { Edit, Trash } from "lucide-react";
+import { Edit, Trash, StickyNote } from "lucide-react";
 import { GlassModal, GlassModalContent, GlassModalHeader, GlassModalTitle } from "@/components/ui/GlassModal";
 import { Button } from "@/components/ui/button";
 import { Task } from "@/hooks/useTasks";
@@ -8,6 +7,7 @@ import { TaskDetailsForm } from "./task-details/TaskDetailsForm";
 import { useTaskDetails } from "@/hooks/useTaskDetails";
 import { toast } from "@/hooks/use-toast";
 import { TaskNotesSection } from "@/components/notes/TaskNotesSection";
+import { useFloatingNote } from "@/contexts/FloatingNoteContext";
 
 interface TaskDetailsDialogProps {
   open: boolean;
@@ -24,6 +24,7 @@ export function TaskDetailsDialog({
   onUpdateTask, 
   onDeleteTask 
 }: TaskDetailsDialogProps) {
+  const { openFloatingNote } = useFloatingNote();
   const {
     content,
     setContent,
@@ -81,13 +82,33 @@ export function TaskDetailsDialog({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, onOpenChange, handleSave]);
 
+  const handleOpenFloatingNote = () => {
+    if (!task) return;
+    openFloatingNote({
+      target: { targetType: 'task', targetId: task.id, entityName: task.content },
+      initialData: { initialTitle: task.content }
+    });
+  };
+
   return (
     <GlassModal open={open} onOpenChange={onOpenChange}>
       <GlassModalContent className="w-full max-w-lg bg-muted/30 backdrop-blur-md rounded-xl shadow-xl p-6">
         <GlassModalHeader className="mb-6">
-          <GlassModalTitle className="flex items-center gap-2 text-xl font-semibold">
-            <Edit className="w-5 h-5 text-muted-foreground" /> Edit Task
-          </GlassModalTitle>
+          <div className="flex items-center justify-between">
+            <GlassModalTitle className="flex items-center gap-2 text-xl font-semibold">
+              <Edit className="w-5 h-5 text-muted-foreground" /> Edit Task
+            </GlassModalTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-muted-foreground hover:text-foreground"
+              onClick={handleOpenFloatingNote}
+              title="Open floating note"
+            >
+              <StickyNote className="w-4 h-4 mr-1" />
+              Float
+            </Button>
+          </div>
         </GlassModalHeader>
 
         {task && (
