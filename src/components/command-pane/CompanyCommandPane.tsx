@@ -25,6 +25,7 @@ import { usePipelineTasks } from '@/hooks/usePipelineTasks';
 import { usePipelineTimeline } from '@/hooks/usePipelineTimeline';
 import { useCompanyLinkedCommunications } from '@/hooks/useCompanyLinkedCommunications';
 import { useInboxItems } from '@/hooks/useInboxItems';
+import { useFloatingNote } from '@/contexts/FloatingNoteContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { differenceInDays, parseISO } from 'date-fns';
 import { InboxItem } from '@/types/inbox';
@@ -46,6 +47,8 @@ function getHealthBorderColor(lastInteractionAt: string | null | undefined): str
 }
 
 export function CompanyCommandPane({ open, onClose, entityType, entityId }: CompanyCommandPaneProps) {
+  const { openFloatingNote } = useFloatingNote();
+  
   // Modal/drawer state for communications
   const [selectedEvent, setSelectedEvent] = useState<{
     id: string;
@@ -225,6 +228,11 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
                   const textarea = document.querySelector<HTMLTextAreaElement>('[data-note-input]');
                   textarea?.focus();
                 }}
+                onFloatingNote={() => {
+                  openFloatingNote({
+                    target: { targetType: 'company', targetId: portfolioCompany.id, entityName: portfolioCompany.name }
+                  });
+                }}
               />
 
               {portfolioFounders.length > 0 && (
@@ -285,6 +293,11 @@ export function CompanyCommandPane({ open, onClose, entityType, entityId }: Comp
                 onAddNote={() => {
                   const textarea = document.querySelector<HTMLTextAreaElement>('[data-note-input]');
                   textarea?.focus();
+                }}
+                onFloatingNote={() => {
+                  openFloatingNote({
+                    target: { targetType: 'company', targetId: pipelineCompany.id, entityName: pipelineCompany.company_name }
+                  });
                 }}
                 entityType="pipeline"
               />

@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +11,7 @@ import { useEffect } from "react";
 
 import { NavSidebar } from "@/components/layout/NavSidebar";
 import { SidebarStateProvider, useSidebarState } from "@/contexts/SidebarStateContext";
+import { FloatingNoteProvider } from "@/contexts/FloatingNoteContext";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -42,9 +42,11 @@ const App = () => {
             <Toaster />
             <Sonner />
             <SidebarStateProvider>
-              <BrowserRouter>
-                <AppContent />
-              </BrowserRouter>
+              <FloatingNoteProvider>
+                <BrowserRouter>
+                  <AppContent />
+                </BrowserRouter>
+              </FloatingNoteProvider>
             </SidebarStateProvider>
           </TooltipProvider>
         </AuthProvider>
