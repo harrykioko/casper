@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { NoteTargetType } from '@/types/notes';
 import { FloatingNoteOverlay } from '@/components/notes/FloatingNoteOverlay';
@@ -62,6 +62,30 @@ export function FloatingNoteProvider({ children }: FloatingNoteProviderProps) {
       setInitialData(undefined);
     }, 200);
   };
+
+  // Global keyboard shortcut: ⌘+Shift+N (Mac) / Ctrl+Shift+N (Windows)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // ⌘+Shift+N or Ctrl+Shift+N to toggle floating note
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'n') {
+        e.preventDefault();
+        if (isOpen) {
+          closeFloatingNote();
+        } else {
+          openFloatingNote(); // Opens in scratch note mode
+        }
+      }
+      
+      // Escape to close when open
+      if (e.key === 'Escape' && isOpen) {
+        e.preventDefault();
+        closeFloatingNote();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   const value: FloatingNoteContextValue = {
     isOpen,
