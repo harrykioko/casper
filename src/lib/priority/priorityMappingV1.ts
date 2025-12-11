@@ -225,9 +225,9 @@ export function mapCalendarEventToPriorityItemV1(event: CalendarEvent): Priority
   );
 
   return {
-    id: `calendar-${event.id}`,
+    id: `calendar-${event.microsoftEventId || event.id}`,
     sourceType: "calendar_event",
-    sourceId: event.id,
+    sourceId: event.microsoftEventId || event.id,
     title: event.title,
     subtitle,
     description: event.description,

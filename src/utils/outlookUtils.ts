@@ -15,6 +15,7 @@ export function parseAttendees(attendeesJson: any): Array<{ name: string; email?
 export function transformDatabaseEvent(event: any) {
   return {
     id: event.id,
+    microsoftEventId: event.microsoft_event_id,
     title: event.title,
     startTime: event.start_time,
     endTime: event.end_time || undefined,
