@@ -85,8 +85,6 @@ export function EventCard({ event, delay = 0, isToday = false, isPast = false, i
         getCategoryColor(),
         "hover:shadow-md hover:bg-muted/70 transition-all duration-200 cursor-pointer",
         "hover:scale-[1.02] active:scale-[0.98]",
-        // Past event styling - dimmed
-        isPast && "opacity-55",
         // Current event styling - glowing border
         isCurrent && [
           "ring-2 ring-coral/40 shadow-lg",
@@ -95,7 +93,7 @@ export function EventCard({ event, delay = 0, isToday = false, isPast = false, i
         ]
       )}
       initial={{ opacity: 0, y: 5 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{ opacity: isPast ? 0.55 : 1, y: 0 }}
       transition={{ duration: 0.2, delay }}
       onClick={handleClick}
       role="button"
