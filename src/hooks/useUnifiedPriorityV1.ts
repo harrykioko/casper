@@ -140,8 +140,9 @@ export function useUnifiedPriorityV1(): UnifiedPriorityV1Result {
         continue;
       }
 
-      // Skip if dismissed
-      if (dismissedSet.has(`calendar_event-${event.id}`)) {
+      // Skip if dismissed - use microsoftEventId for stable tracking across re-syncs
+      const dismissalId = event.microsoftEventId || event.id;
+      if (dismissedSet.has(`calendar_event-${dismissalId}`)) {
         continue;
       }
 
