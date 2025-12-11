@@ -18,7 +18,7 @@ export default function Dashboard() {
   const { tasks, loading: tasksLoading, createTask, updateTask, deleteTask } = useTasks();
   const { readingItems, loading: readingLoading, createReadingItem, updateReadingItem, deleteReadingItem } = useReadingItems();
   const { nonnegotiables, loading: nonnegotiablesLoading } = useNonnegotiables();
-  const { events: calendarEvents } = useOutlookCalendar();
+  const { events: calendarEvents, syncCalendar, syncing } = useOutlookCalendar();
   const { isCommandModalOpen, openCommandModal, closeCommandModal } = useCommandModal();
   
   // Modal state
@@ -77,7 +77,9 @@ export default function Dashboard() {
         <div className="w-[260px] xl:w-[320px] flex-shrink-0">
           <CalendarSidebar 
             events={calendarEvents} 
-            nonnegotiables={transformedNonnegotiables} 
+            nonnegotiables={transformedNonnegotiables}
+            onSync={syncCalendar}
+            isSyncing={syncing}
           />
         </div>
       </div>
