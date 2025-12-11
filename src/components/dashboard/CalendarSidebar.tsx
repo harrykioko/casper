@@ -1,4 +1,4 @@
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EventGroup } from "./EventGroup";
 import { EventDetailsModal } from "./EventDetailsModal";
@@ -28,9 +28,11 @@ interface CalendarSidebarProps {
   className?: string;
   events: CalendarEvent[];
   nonnegotiables: Nonnegotiable[];
+  onSync?: () => Promise<void>;
+  isSyncing?: boolean;
 }
 
-export function CalendarSidebar({ className, events, nonnegotiables }: CalendarSidebarProps) {
+export function CalendarSidebar({ className, events, nonnegotiables, onSync, isSyncing }: CalendarSidebarProps) {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -91,18 +93,40 @@ export function CalendarSidebar({ className, events, nonnegotiables }: CalendarS
               <CalendarIcon className="h-4 w-4 text-zinc-600 dark:text-white/60" /> 
               Calendar
             </h2>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:shadow-sm ring-1 ring-zinc-300 dark:ring-white/10 rounded-full bg-white/5">
-                    <CalendarIcon className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>View full calendar</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <div className="flex items-center gap-1.5">
+              {/* Refresh button */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 hover:shadow-sm ring-1 ring-zinc-300 dark:ring-white/10 rounded-full bg-white/5 hover:scale-[1.03] transition-all"
+                      onClick={onSync}
+                      disabled={isSyncing}
+                    >
+                      <RefreshCw className={cn("h-3.5 w-3.5", isSyncing && "animate-spin")} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{isSyncing ? "Syncing..." : "Refresh calendar"}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              {/* Full calendar button */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 hover:shadow-sm ring-1 ring-zinc-300 dark:ring-white/10 rounded-full bg-white/5 hover:scale-[1.03] transition-all">
+                      <CalendarIcon className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>View full calendar</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
         </div>
 
