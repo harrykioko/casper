@@ -18,6 +18,27 @@ export interface InboxItem {
   isTopPriority?: boolean;
 }
 
+export interface InboxAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  storagePath: string;
+  createdAt: string;
+}
+
+export interface SuggestedAction {
+  id: string;
+  title: string;
+  effortMinutes: number | null;
+  effortBucket: "quick" | "medium" | "long";
+  confidence: "low" | "medium" | "high";
+  source: "heuristic" | "ai";
+  rationale: string;
+  dueHint?: string;
+  category?: string;
+}
+
 export interface TaskPrefillOptions {
   content?: string;
   description?: string;
@@ -25,6 +46,7 @@ export interface TaskPrefillOptions {
   companyType?: 'portfolio' | 'pipeline';
   companyName?: string;
   dueDate?: Date;
+  sourceInboxItemId?: string;
 }
 
 export type InboxViewFilter = 'all' | 'action' | 'waiting' | 'archived';
