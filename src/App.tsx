@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +11,7 @@ import { useEffect } from "react";
 
 import { NavSidebar } from "@/components/layout/NavSidebar";
 import { SidebarStateProvider, useSidebarState } from "@/contexts/SidebarStateContext";
+import { FloatingNoteProvider } from "@/contexts/FloatingNoteContext";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -24,7 +24,10 @@ import Pipeline from "./pages/Pipeline";
 import Portfolio from "./pages/Portfolio";
 import PortfolioCompanyDetail from "./pages/PortfolioCompanyDetail";
 import PromptBuilder from "./pages/PromptBuilder";
+import Priority from "./pages/Priority";
+import Inbox from "./pages/Inbox";
 import Settings from "./pages/Settings";
+import Notes from "./pages/Notes";
 import NotFound from "./pages/NotFound";
 import OAuthCallback from "./pages/OAuthCallback";
 
@@ -39,9 +42,11 @@ const App = () => {
             <Toaster />
             <Sonner />
             <SidebarStateProvider>
-              <BrowserRouter>
-                <AppContent />
-              </BrowserRouter>
+              <FloatingNoteProvider>
+                <BrowserRouter>
+                  <AppContent />
+                </BrowserRouter>
+              </FloatingNoteProvider>
             </SidebarStateProvider>
           </TooltipProvider>
         </AuthProvider>
@@ -107,6 +112,9 @@ const MainContent = () => {
           <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/portfolio/:companyId" element={<PortfolioCompanyDetail />} />
+          <Route path="/priority" element={<Priority />} />
+          <Route path="/inbox" element={<Inbox />} />
+          <Route path="/notes" element={<Notes />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

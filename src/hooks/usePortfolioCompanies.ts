@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Company, CompanyStatus, CompanyWithStats } from '@/types/portfolio';
 import { toast } from 'sonner';
+import { extractDomainFromWebsite } from '@/lib/domainMatching';
 
 export function usePortfolioCompanies(statusFilter?: CompanyStatus | 'all') {
   const { user } = useAuth();
@@ -99,6 +100,7 @@ export function usePortfolioCompanies(statusFilter?: CompanyStatus | 'all') {
         .insert({
           name: companyData.name,
           website_url: companyData.website_url || null,
+          primary_domain: extractDomainFromWebsite(companyData.website_url),
           logo_url: companyData.logo_url || null,
           status: companyData.status || 'active',
           kind: 'portfolio',
@@ -123,9 +125,17 @@ export function usePortfolioCompanies(statusFilter?: CompanyStatus | 'all') {
     updates: Partial<Pick<Company, 'name' | 'website_url' | 'logo_url' | 'status'>>
   ) => {
     try {
+      // Auto-update primary_domain if website_url is being changed
+      const finalUpdates = {
+        ...updates,
+        ...(updates.website_url !== undefined && {
+          primary_domain: extractDomainFromWebsite(updates.website_url),
+        }),
+      };
+
       const { error } = await supabase
         .from('companies')
-        .update(updates)
+        .update(finalUpdates)
         .eq('id', companyId);
 
       if (error) throw error;

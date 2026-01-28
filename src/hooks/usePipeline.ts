@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PipelineCompany, PipelineStats, RoundEnum, SectorEnum, PipelineStatus } from '@/types/pipeline';
 import { useToast } from '@/hooks/use-toast';
+import { extractDomainFromWebsite } from '@/lib/domainMatching';
 
 export function usePipeline() {
   const [companies, setCompanies] = useState<PipelineCompany[]>([]);
@@ -101,6 +102,7 @@ export function usePipeline() {
         .from('pipeline_companies' as any)
         .insert({
           ...companyData,
+          primary_domain: extractDomainFromWebsite(companyData.website),
           status: 'new',
           created_by: user.id
         })
@@ -126,13 +128,21 @@ export function usePipeline() {
   };
 
   const updateCompany = async (id: string, updates: Partial<PipelineCompany>) => {
+    // Auto-update primary_domain if website is being changed
+    const finalUpdates = {
+      ...updates,
+      ...(updates.website !== undefined && {
+        primary_domain: extractDomainFromWebsite(updates.website),
+      }),
+    };
+
     // Optimistic update
-    setCompanies(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+    setCompanies(prev => prev.map(c => c.id === id ? { ...c, ...finalUpdates } : c));
 
     try {
       const { data, error } = await supabase
         .from('pipeline_companies' as any)
-        .update(updates)
+        .update(finalUpdates)
         .eq('id', id)
         .select()
         .single();

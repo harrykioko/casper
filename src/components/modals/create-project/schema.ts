@@ -1,4 +1,3 @@
-
 import { z } from "zod";
 
 export const colorSwatches = [
@@ -14,6 +13,8 @@ export const createProjectFormSchema = z.object({
   name: z.string().min(1, "Project name is required"),
   description: z.string().optional(),
   color: z.string().default("#FF1464"),
+  type: z.enum(['research', 'thought_piece', 'market_map', 'coding', 'other']).default('other'),
+  status: z.enum(['active', 'paused', 'completed', 'archived']).default('active'),
   dueDate: z.date().optional(),
   resources: z.array(
     z.object({

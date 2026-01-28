@@ -1,4 +1,3 @@
-
 import { Database } from '@/integrations/supabase/types';
 
 export type ReadingItemRow = Database['public']['Tables']['reading_items']['Row'];
@@ -14,6 +13,9 @@ export interface ReadingItem {
   image?: string;
   hostname?: string;
   isRead: boolean;
+  isFlagged: boolean;
+  isArchived: boolean;
+  readAt?: string;
   created_at?: string;
   updated_at?: string;
   created_by?: string;

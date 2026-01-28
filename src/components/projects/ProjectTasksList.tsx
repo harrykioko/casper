@@ -1,11 +1,11 @@
-
 import { useState } from "react";
-import { CheckCircle, Plus } from "lucide-react";
-import { CardTitle, Card, CardHeader, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { CheckSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Task } from "@/hooks/useTasks";
 import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
+import { GlassModuleCard } from "./GlassModuleCard";
+import { ProjectEmptyState } from "./ProjectEmptyState";
+import { cn } from "@/lib/utils";
 
 interface ProjectTasksListProps {
   tasks: Task[];
@@ -18,7 +18,7 @@ export function ProjectTasksList({ tasks, onAddTask }: ProjectTasksListProps) {
   const getBadgeColorForSchedule = (scheduledFor: string) => {
     if (scheduledFor === 'Today') return 'bg-indigo-500/10 text-indigo-500 border-indigo-200/50';
     if (scheduledFor === 'Yesterday') return 'bg-zinc-400/10 text-zinc-500 border-zinc-200/50';
-    return 'bg-teal-500/10 text-teal-500 border-teal-200/50'; // Future
+    return 'bg-teal-500/10 text-teal-500 border-teal-200/50';
   };
   
   const handleAddTask = (content: string) => {
@@ -30,55 +30,57 @@ export function ProjectTasksList({ tasks, onAddTask }: ProjectTasksListProps) {
   
   return (
     <>
-      <Card className="lg:col-span-2 relative rounded-2xl bg-white/70 dark:bg-zinc-900/60 backdrop-blur-sm ring-1 ring-black/5 dark:ring-white/10 hover:shadow-md/10 transition group">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex items-center">
-            <CheckCircle className="mr-2 h-5 w-5" />
-            Tasks
-            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="gap-1 text-xs"
-                onClick={() => setIsAddTaskOpen(true)}
+      <GlassModuleCard
+        icon={<CheckSquare className="w-4 h-4" />}
+        title="Tasks"
+        count={tasks.length}
+        onAdd={() => setIsAddTaskOpen(true)}
+        addLabel="Add Task"
+        accentColor="#10b981"
+      >
+        {tasks.length === 0 ? (
+          <ProjectEmptyState
+            icon={<CheckSquare className="w-7 h-7" />}
+            title="No tasks yet"
+            description="Break down your project into actionable steps."
+            actionLabel="Add Task"
+            onAction={() => setIsAddTaskOpen(true)}
+          />
+        ) : (
+          <ul className="space-y-1.5">
+            {tasks.map(task => (
+              <li 
+                key={task.id}
+                className={cn(
+                  "flex items-center gap-3 p-2.5 rounded-xl transition-all duration-200",
+                  "bg-white/30 dark:bg-white/[0.03]",
+                  "border border-white/20 dark:border-white/[0.06]",
+                  "hover:bg-white/50 dark:hover:bg-white/[0.06]",
+                  "hover:translate-y-[-1px] hover:shadow-sm"
+                )}
               >
-                <Plus className="h-3.5 w-3.5" />
-                Task
-              </Button>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {tasks.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No tasks yet</p>
-          ) : (
-            <ul className="space-y-2">
-              {tasks.map(task => (
-                <li 
-                  key={task.id}
-                  className="flex items-center gap-3 p-2 rounded-md hover:bg-accent/30 transition-colors"
-                >
-                  <span 
-                    className={`flex-1 ${task.completed ? "line-through text-muted-foreground" : ""}`}
-                  >
-                    {task.content}
-                  </span>
-                  {task.scheduledFor && (
-                    <Badge 
-                      variant="outline" 
-                      className={`text-xs ${getBadgeColorForSchedule(task.scheduledFor)}`}
-                    >
-                      {task.scheduledFor}
-                    </Badge>
+                <span 
+                  className={cn(
+                    "flex-1 text-sm",
+                    task.completed && "line-through text-muted-foreground"
                   )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+                >
+                  {task.content}
+                </span>
+                {task.scheduledFor && (
+                  <Badge 
+                    variant="outline" 
+                    className={cn("text-[10px] h-5 font-medium", getBadgeColorForSchedule(task.scheduledFor))}
+                  >
+                    {task.scheduledFor}
+                  </Badge>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </GlassModuleCard>
       
-      {/* Add Task Dialog */}
       <AddTaskDialog
         open={isAddTaskOpen}
         onOpenChange={setIsAddTaskOpen}

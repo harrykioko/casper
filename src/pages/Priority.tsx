@@ -1,0 +1,451 @@
+import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { 
+  AlertTriangle, 
+  ArrowLeft,
+  Search,
+  SlidersHorizontal
+} from "lucide-react";
+import { addHours, addDays, startOfTomorrow, startOfDay, setHours, format } from "date-fns";
+import { useUnifiedPriorityV1 } from "@/hooks/useUnifiedPriorityV1";
+import { toast } from "sonner";
+import type { PriorityItem, PrioritySourceType, PriorityIconType } from "@/types/priority";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { PriorityFilters } from "@/components/priority/PriorityFilters";
+import { PriorityItemRow } from "@/components/priority/PriorityItemRow";
+import { PriorityEmptyState } from "@/components/priority/PriorityEmptyState";
+import { PrioritySummaryPanel } from "@/components/priority/PrioritySummaryPanel";
+import { PriorityDetailPane } from "@/components/priority/PriorityDetailPane";
+import { useTasks, Task } from "@/hooks/useTasks";
+import { useInboxItems } from "@/hooks/useInboxItems";
+import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
+import { useDismissedPriorityItems } from "@/hooks/useDismissedPriorityItems";
+import { useTopPriorityItems } from "@/hooks/useTopPriorityItems";
+import { useIsDesktop } from "@/hooks/use-mobile";
+import { InboxDetailDrawer } from "@/components/dashboard/InboxDetailDrawer";
+import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
+import { EventDetailsModal } from "@/components/dashboard/EventDetailsModal";
+import type { InboxItem } from "@/types/inbox";
+import type { CalendarEvent } from "@/types/outlook";
+import type { PriorityViewFilter } from "@/components/priority/priorityHelpers";
+import { filterPriorityItems } from "@/components/priority/priorityHelpers";
+import { cn } from "@/lib/utils";
+
+type SortOption = "score" | "due" | "recency";
+
+export default function Priority() {
+  const navigate = useNavigate();
+  const isDesktop = useIsDesktop();
+  const { items, loading, debug, totalCount } = useUnifiedPriorityV1();
+  const { tasks, updateTask, snoozeTask, markTaskTopPriority } = useTasks();
+  const { markComplete: markInboxComplete, snooze: snoozeInbox, archive: archiveInbox, inboxItems, markTopPriority: markInboxTopPriority } = useInboxItems();
+  const { events } = useOutlookCalendar();
+  const { dismissItem } = useDismissedPriorityItems();
+  const { items: topPriorityItems, hasTopPriority } = useTopPriorityItems();
+  
+  // All items from debug, or fallback to the top 8 items
+  const allItems = debug.allItems.length > 0 ? debug.allItems : items;
+  
+  // Filters and sorting state
+  const [search, setSearch] = useState("");
+  const [viewFilter, setViewFilter] = useState<PriorityViewFilter>("all");
+  const [sortBy, setSortBy] = useState<SortOption>("score");
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Selected item for detail pane (desktop)
+  const [selectedItem, setSelectedItem] = useState<PriorityItem | null>(null);
+  
+  // Resolved items tracking
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+  
+  // Modal states for mobile
+  const [selectedTaskModal, setSelectedTaskModal] = useState<Task | null>(null);
+  const [selectedInboxModal, setSelectedInboxModal] = useState<InboxItem | null>(null);
+  const [selectedEventModal, setSelectedEventModal] = useState<CalendarEvent | null>(null);
+
+  // Get source data for selected item
+  const selectedTask = useMemo(() => {
+    if (!selectedItem || selectedItem.sourceType !== "task") return null;
+    return tasks?.find(t => t.id === selectedItem.sourceId) || null;
+  }, [selectedItem, tasks]);
+
+  const selectedInboxItem = useMemo(() => {
+    if (!selectedItem || selectedItem.sourceType !== "inbox") return null;
+    return inboxItems?.find(i => i.id === selectedItem.sourceId) || null;
+  }, [selectedItem, inboxItems]);
+
+  const selectedEvent = useMemo(() => {
+    if (!selectedItem || selectedItem.sourceType !== "calendar_event") return null;
+    return events?.find(e => e.id === selectedItem.sourceId) || null;
+  }, [selectedItem, events]);
+
+  // Filtered and sorted items
+  const filteredItems = useMemo(() => {
+    let result = allItems.filter(item => !resolvedIds.has(item.id));
+    
+    // Filter by view filter
+    result = filterPriorityItems(result, viewFilter);
+    
+    // Filter by search
+    if (search.trim()) {
+      const searchLower = search.toLowerCase();
+      result = result.filter(item =>
+        item.title.toLowerCase().includes(searchLower) ||
+        item.subtitle?.toLowerCase().includes(searchLower) ||
+        item.reasoning?.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Sort
+    return [...result].sort((a, b) => {
+      switch (sortBy) {
+        case "score":
+          return b.priorityScore - a.priorityScore;
+        case "due":
+          if (!a.dueAt && !b.dueAt) return 0;
+          if (!a.dueAt) return 1;
+          if (!b.dueAt) return -1;
+          return new Date(a.dueAt).getTime() - new Date(b.dueAt).getTime();
+        case "recency":
+          const aTime = a.createdAt || a.lastTouchedAt || "";
+          const bTime = b.createdAt || b.lastTouchedAt || "";
+          return bTime.localeCompare(aTime);
+        default:
+          return 0;
+      }
+    });
+  }, [allItems, viewFilter, search, sortBy, resolvedIds]);
+
+  const handleResolve = (item: PriorityItem) => {
+    switch (item.sourceType) {
+      case "task":
+        updateTask(item.sourceId, { completed: true });
+        break;
+      case "inbox":
+        markInboxComplete(item.sourceId);
+        break;
+      case "calendar_event":
+        dismissItem("calendar_event", item.sourceId);
+        break;
+    }
+    setResolvedIds(prev => new Set(prev).add(item.id));
+    if (selectedItem?.id === item.id) {
+      setSelectedItem(null);
+    }
+    toast.success(item.sourceType === "calendar_event" ? "Event dismissed from priority" : "Item resolved");
+  };
+
+  const handleSnooze = (item: PriorityItem, duration: "later_today" | "tomorrow" | "next_week") => {
+    const now = new Date();
+    let snoozeUntil: Date;
+    
+    switch (duration) {
+      case "later_today":
+        snoozeUntil = addHours(now, 4);
+        break;
+      case "tomorrow":
+        snoozeUntil = setHours(startOfTomorrow(), 9);
+        break;
+      case "next_week":
+        snoozeUntil = setHours(addDays(startOfDay(now), 7), 9);
+        break;
+    }
+    
+    switch (item.sourceType) {
+      case "task":
+        snoozeTask(item.sourceId, snoozeUntil);
+        break;
+      case "inbox":
+        snoozeInbox(item.sourceId, snoozeUntil);
+        break;
+      default:
+        toast.error("Cannot snooze this item type");
+        return;
+    }
+    
+    setResolvedIds(prev => new Set(prev).add(item.id));
+    if (selectedItem?.id === item.id) {
+      setSelectedItem(null);
+    }
+    toast.success(`Snoozed until ${format(snoozeUntil, "MMM d, h:mm a")}`);
+  };
+
+  const handleToggleTopPriority = async (item: PriorityItem, isTop: boolean) => {
+    try {
+      if (item.sourceType === "task") {
+        await markTaskTopPriority(item.sourceId, isTop);
+      } else if (item.sourceType === "inbox") {
+        markInboxTopPriority(item.sourceId, isTop);
+      }
+      toast.success(isTop ? "Added to Top Priority" : "Removed from Top Priority");
+    } catch (error) {
+      toast.error("Failed to update top priority");
+    }
+  };
+
+  const handleItemClick = (item: PriorityItem) => {
+    // On desktop, select item for detail pane
+    if (isDesktop) {
+      // For companies, navigate directly
+      if (item.sourceType === "portfolio_company" && item.companyId) {
+        navigate(`/portfolio/${item.companyId}`);
+        return;
+      }
+      if (item.sourceType === "pipeline_company" && item.companyId) {
+        navigate(`/pipeline?company=${item.companyId}`);
+        return;
+      }
+      setSelectedItem(item);
+      return;
+    }
+
+    // On mobile, open modals
+    switch (item.sourceType) {
+      case "task":
+        const task = tasks?.find(t => t.id === item.sourceId);
+        if (task) {
+          setSelectedTaskModal(task);
+        }
+        break;
+      case "inbox":
+        const inboxItem = inboxItems?.find(i => i.id === item.sourceId);
+        if (inboxItem) {
+          setSelectedInboxModal(inboxItem);
+        }
+        break;
+      case "calendar_event":
+        const event = events?.find(e => e.id === item.sourceId);
+        if (event) {
+          setSelectedEventModal(event);
+        }
+        break;
+      case "portfolio_company":
+        if (item.companyId) {
+          navigate(`/portfolio/${item.companyId}`);
+        }
+        break;
+      case "pipeline_company":
+        if (item.companyId) {
+          navigate(`/pipeline?company=${item.companyId}`);
+        }
+        break;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border">
+        <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-6 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate("/dashboard")}
+                className="h-9 w-9"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-semibold text-foreground">Priority Items</h1>
+                  <p className="text-sm text-muted-foreground">
+                    {totalCount} total • {filteredItems.length} showing
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* Search - visible on larger screens */}
+              <div className="relative hidden sm:block">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-10 w-64"
+                />
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowFilters(!showFilters)}
+                className={cn("lg:hidden", showFilters && "bg-accent")}
+              >
+                <SlidersHorizontal className="h-4 w-4 mr-2" />
+                Filters
+              </Button>
+            </div>
+          </div>
+
+          {/* Mobile search */}
+          <div className="relative sm:hidden">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search priority items..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          {/* Mobile Filters */}
+          {showFilters && !isDesktop && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="mt-4"
+            >
+              <PriorityFilters
+                sourceFilter="all"
+                setSourceFilter={() => {}}
+                urgencyFilter="all"
+                setUrgencyFilter={() => {}}
+                sortBy={sortBy}
+                setSortBy={setSortBy}
+                availableSourceTypes={[]}
+                availableIconTypes={[]}
+              />
+            </motion.div>
+          )}
+        </div>
+      </div>
+
+      {/* Content - 3 column layout on desktop */}
+      <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-6 py-6">
+        <div className={cn(
+          "grid gap-6",
+          isDesktop && selectedItem
+            ? "grid-cols-[280px_minmax(320px,1fr)_minmax(400px,1.2fr)] 2xl:grid-cols-[320px_minmax(400px,1.2fr)_minmax(500px,1.4fr)]"
+            : isDesktop
+              ? "grid-cols-[280px_1fr] 2xl:grid-cols-[320px_1fr]"
+              : "grid-cols-1"
+        )}>
+          {/* Left: Summary Panel (desktop only) */}
+          {isDesktop && (
+            <PrioritySummaryPanel
+              items={allItems.filter(item => !resolvedIds.has(item.id))}
+              topPriorityItems={topPriorityItems}
+              activeFilter={viewFilter}
+              onFilterChange={setViewFilter}
+              onItemClick={handleItemClick}
+              onResolveItem={handleResolve}
+              onToggleTopPriority={handleToggleTopPriority}
+            />
+          )}
+
+          {/* Middle: Item List */}
+          <div className={cn(
+            isDesktop && "lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto lg:pr-2"
+          )}>
+            {loading ? (
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : filteredItems.length === 0 ? (
+              <PriorityEmptyState
+                hasFilters={viewFilter !== "all" || search.trim() !== ""}
+                onClearFilters={() => {
+                  setViewFilter("all");
+                  setSearch("");
+                }}
+              />
+            ) : (
+                <div className="space-y-2">
+                {filteredItems.map((item, index) => (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.02 }}
+                  >
+                    <PriorityItemRow
+                      item={item}
+                      isSelected={selectedItem?.id === item.id}
+                      onClick={() => handleItemClick(item)}
+                      onResolve={() => handleResolve(item)}
+                      onSnooze={(duration) => handleSnooze(item, duration)}
+                      onToggleTopPriority={(isTop) => handleToggleTopPriority(item, isTop)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Right: Detail Pane (desktop only, when item selected) */}
+          {isDesktop && selectedItem && (
+            <div className="sticky top-28 self-start h-[calc(100vh-10rem)]">
+              <PriorityDetailPane
+                item={selectedItem}
+                task={selectedTask}
+                inboxItem={selectedInboxItem}
+                event={selectedEvent}
+                onClose={() => setSelectedItem(null)}
+                onResolve={() => handleResolve(selectedItem)}
+                onSnooze={(duration) => handleSnooze(selectedItem, duration)}
+                onEditTask={() => {
+                  if (selectedTask) {
+                    setSelectedTaskModal(selectedTask);
+                  }
+                }}
+                onCreateTaskFromInbox={() => {}}
+                onArchiveInbox={(id) => {
+                  archiveInbox(id);
+                  setSelectedItem(null);
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal fallbacks for mobile & task editing */}
+      <TaskDetailsDialog
+        open={!!selectedTaskModal}
+        onOpenChange={(open) => !open && setSelectedTaskModal(null)}
+        task={selectedTaskModal}
+        onUpdateTask={(task) => {
+          updateTask(task.id, task);
+          setSelectedTaskModal(null);
+        }}
+        onDeleteTask={() => setSelectedTaskModal(null)}
+      />
+
+      {!isDesktop && (
+        <InboxDetailDrawer
+          mode="sheet"
+          open={!!selectedInboxModal}
+          onClose={() => setSelectedInboxModal(null)}
+          item={selectedInboxModal}
+          onCreateTask={() => {}}
+          onMarkComplete={(id) => {
+            markInboxComplete(id);
+            setSelectedInboxModal(null);
+          }}
+          onArchive={() => setSelectedInboxModal(null)}
+        />
+      )}
+
+      {!isDesktop && (
+        <EventDetailsModal
+          event={selectedEventModal}
+          isOpen={!!selectedEventModal}
+          onClose={() => setSelectedEventModal(null)}
+        />
+      )}
+    </div>
+  );
+}

@@ -3,13 +3,16 @@ import { useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
+  AlertTriangle,
+  Inbox,
   List,
   FolderKanban, 
   MessageSquareText, 
   Sparkles,
   BookOpen,
   TrendingUp,
-  Briefcase
+  Briefcase,
+  StickyNote
 } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme";
 import { useSidebarState } from "@/contexts/SidebarStateContext";
@@ -30,6 +33,18 @@ export function NavSidebar() {
       path: "/dashboard", 
       label: "Dashboard",
       active: location.pathname === "/dashboard" 
+    },
+    { 
+      icon: AlertTriangle, 
+      path: "/priority", 
+      label: "Priority",
+      active: location.pathname.startsWith("/priority") 
+    },
+    { 
+      icon: Inbox, 
+      path: "/inbox", 
+      label: "Inbox",
+      active: location.pathname.startsWith("/inbox") 
     },
     { 
       icon: List, 
@@ -58,6 +73,12 @@ export function NavSidebar() {
   ];
 
   const knowledgeToolsItems = [
+    { 
+      icon: StickyNote, 
+      path: "/notes", 
+      label: "Notes",
+      active: location.pathname.startsWith("/notes") 
+    },
     { 
       icon: MessageSquareText, 
       path: "/prompts", 

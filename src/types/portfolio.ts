@@ -10,6 +10,7 @@ export interface Company {
   kind: CompanyKind;
   status: CompanyStatus;
   last_interaction_at?: string | null;
+  primary_domain?: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;

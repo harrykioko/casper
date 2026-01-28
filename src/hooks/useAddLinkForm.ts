@@ -18,12 +18,14 @@ export function useAddLinkForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [metadata, setMetadata] = useState<LinkMetadata | null>(null);
   const [fetchingMetadata, setFetchingMetadata] = useState(false);
+  const [projectId, setProjectId] = useState<string | undefined>(undefined);
 
   const resetForm = () => {
     setUrl("");
     setMetadata(null);
     setIsLoading(false);
     setFetchingMetadata(false);
+    setProjectId(undefined);
   };
 
   const handleUrlChange = async (value: string) => {
@@ -43,39 +45,46 @@ export function useAddLinkForm() {
     }
   };
 
-  const createLinkData = (url: string, metadata: LinkMetadata | null): Omit<ReadingItem, 'id'> => {
+  const createLinkData = (url: string, metadata: LinkMetadata | null, selectedProjectId?: string): Omit<ReadingItem, 'id'> => {
+    const baseData = {
+      isRead: false,
+      isFlagged: false,
+      isArchived: false,
+      project_id: selectedProjectId || projectId,
+    };
+
     if (metadata) {
       return {
+        ...baseData,
         url: metadata.url,
         title: metadata.title,
-        description: metadata.description || null,
-        favicon: metadata.favicon || null,
-        image: metadata.image || null,
-        hostname: metadata.hostname || null,
-        isRead: false
+        description: metadata.description || undefined,
+        favicon: metadata.favicon || undefined,
+        image: metadata.image || undefined,
+        hostname: metadata.hostname || undefined,
       };
     }
 
     try {
       const urlObj = new URL(url);
       return {
+        ...baseData,
         url,
         title: urlObj.hostname,
-        description: null,
-        favicon: null,
-        image: null,
+        description: undefined,
+        favicon: undefined,
+        image: undefined,
         hostname: urlObj.hostname,
-        isRead: false
       };
     } catch {
       return {
+        ...baseData,
         url,
         title: url,
-        description: null,
-        favicon: null,
-        image: null,
-        hostname: null,
-        isRead: false
+        description: undefined,
+        favicon: undefined,
+        image: undefined,
+        hostname: undefined,
       };
     }
   };
@@ -97,6 +106,8 @@ export function useAddLinkForm() {
     isLoading,
     metadata,
     fetchingMetadata,
+    projectId,
+    setProjectId,
     setIsLoading,
     resetForm,
     handleUrlChange,

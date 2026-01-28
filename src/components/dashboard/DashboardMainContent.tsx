@@ -140,23 +140,23 @@ export function DashboardMainContent({
         todoCount={todoCount}
       />
 
-      {/* Main 12-Column Grid Content */}
+      {/* Main Content Area - Responsive Grid */}
       <div className="px-4 sm:px-6 lg:px-8 pb-8">
-        <div className="grid grid-cols-12 gap-6">
-          
-          {/* Row 1: Triage Cockpit - Priority Items, Inbox, To-Do */}
-          <div className="col-span-12 lg:col-span-4">
+        
+        {/* Row 1: Action Panels - responsive: 2 cols on lg, 3 cols on xl */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
+          <div className="w-full min-w-[260px]">
             <DashboardPrioritySection 
               onCompanyClick={openCommandPaneByEntityType}
               onOpenTaskCreate={handleOpenTaskCreate}
             />
           </div>
           
-          <div className="col-span-12 lg:col-span-4">
+          <div className="w-full min-w-[260px]">
             <InboxPanel onOpenTaskCreate={handleOpenTaskCreate} />
           </div>
           
-          <div className="col-span-12 lg:col-span-4">
+          <div className="w-full min-w-[260px]">
             {/* To-Do Panel */}
             <ActionPanel accentColor="emerald" className="h-full">
               <ActionPanelHeader
@@ -200,9 +200,11 @@ export function DashboardMainContent({
               </ActionPanelFooter>
             </ActionPanel>
           </div>
+        </div>
 
-          {/* Rows 2-3: Companies Command Pane (cols 1-8) + Reading List (cols 9-12) */}
-          <div className="col-span-12 lg:col-span-8">
+        {/* Row 2: Companies + Reading List - responsive: stacked on lg, side-by-side on xl */}
+        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6">
+          <div className="w-full min-w-[260px]">
             <CompaniesCommandPane 
               onCompanyClick={openCommandPaneByEntityType}
               onCreateTask={(companyId, companyType) => {
@@ -214,7 +216,7 @@ export function DashboardMainContent({
             />
           </div>
           
-          <div className="col-span-12 lg:col-span-4">
+          <div className="w-full min-w-[260px]">
             <ReadingListSection
               readingItems={readingItems}
               onMarkRead={onMarkRead}
@@ -223,7 +225,6 @@ export function DashboardMainContent({
               className="h-full min-h-[400px]"
             />
           </div>
-          
         </div>
       </div>
 

@@ -1,9 +1,9 @@
-
 import { useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useCommandPalette } from '@/hooks/useCommandPalette';
 import { DesktopModal } from './command-palette/DesktopModal';
 import { MobileDrawer } from './command-palette/MobileDrawer';
+import { useFloatingNote } from '@/contexts/FloatingNoteContext';
 
 interface EnhancedCommandModalProps {
   isOpen: boolean;
@@ -17,12 +17,15 @@ interface EnhancedCommandModalProps {
 
 export function EnhancedCommandModal(props: EnhancedCommandModalProps) {
   const isMobile = useIsMobile();
+  const { openFloatingNote } = useFloatingNote();
+  
   const commandPalette = useCommandPalette({
     onNavigate: props.onNavigate,
     onAddTask: props.onAddTask,
     onAddProject: props.onAddProject,
     onAddPrompt: props.onAddPrompt,
-    onAddLink: props.onAddLink
+    onAddLink: props.onAddLink,
+    onAddNote: () => openFloatingNote()
   });
 
   // Sync external control with internal state

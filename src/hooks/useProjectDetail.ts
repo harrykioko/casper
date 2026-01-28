@@ -1,4 +1,3 @@
-
 import { useProjectData } from "./useProjectData";
 import { useProjectTasks } from "./useProjectTasks";
 import { useProjectPrompts } from "./useProjectPrompts";
@@ -6,7 +5,7 @@ import { useProjectLinks } from "./useProjectLinks";
 import { useProjectModals } from "./useProjectModals";
 
 export function useProjectDetail() {
-  const { project, loading, updateProjectContext } = useProjectData();
+  const { project, loading, updateProjectContext, updateProjectMetadata } = useProjectData();
   const { tasks, addTask } = useProjectTasks();
   const { prompts, addPrompt } = useProjectPrompts();
   const { links, addLink, removeLink } = useProjectLinks();
@@ -32,6 +31,7 @@ export function useProjectDetail() {
     openCreatePromptModal,
     closeCreatePromptModal,
     updateProjectContext,
+    updateProjectMetadata,
     addTask,
     addPrompt,
     addLink,

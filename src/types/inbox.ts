@@ -15,6 +15,7 @@ export interface InboxItem {
   relatedCompanyId?: string;
   relatedCompanyName?: string;
   createdBy: string;
+  isTopPriority?: boolean;
 }
 
 export interface TaskPrefillOptions {
@@ -25,3 +26,5 @@ export interface TaskPrefillOptions {
   companyName?: string;
   dueDate?: Date;
 }
+
+export type InboxViewFilter = 'all' | 'action' | 'waiting' | 'archived';

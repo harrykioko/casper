@@ -350,8 +350,8 @@ export function generatePriorityItemId(sourceType: string, sourceId: string): st
  */
 export function getTaskIconType(task: Task): PriorityIconType {
   // TODO: Implement logic based on task due dates and priority
-  if (task.scheduled_for) {
-    const dueDate = parseISO(task.scheduled_for);
+  if (task.scheduledFor) {
+    const dueDate = parseISO(task.scheduledFor);
     if (isPast(startOfDay(dueDate)) && !isToday(dueDate)) {
       return "overdue";
     }

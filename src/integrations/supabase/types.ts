@@ -133,6 +133,7 @@ export type Database = {
           last_interaction_at: string | null
           logo_url: string | null
           name: string
+          primary_domain: string | null
           status: Database["public"]["Enums"]["company_status"]
           updated_at: string | null
           website_url: string | null
@@ -145,6 +146,7 @@ export type Database = {
           last_interaction_at?: string | null
           logo_url?: string | null
           name: string
+          primary_domain?: string | null
           status?: Database["public"]["Enums"]["company_status"]
           updated_at?: string | null
           website_url?: string | null
@@ -157,6 +159,7 @@ export type Database = {
           last_interaction_at?: string | null
           logo_url?: string | null
           name?: string
+          primary_domain?: string | null
           status?: Database["public"]["Enums"]["company_status"]
           updated_at?: string | null
           website_url?: string | null
@@ -255,6 +258,33 @@ export type Database = {
           },
         ]
       }
+      dismissed_priority_items: {
+        Row: {
+          created_at: string
+          dismissed_at: string
+          id: string
+          source_id: string
+          source_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          dismissed_at?: string
+          id?: string
+          source_id: string
+          source_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          dismissed_at?: string
+          id?: string
+          source_id?: string
+          source_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       inbox_items: {
         Row: {
           created_at: string
@@ -266,6 +296,7 @@ export type Database = {
           is_deleted: boolean
           is_read: boolean
           is_resolved: boolean
+          is_top_priority: boolean
           received_at: string
           related_company_id: string | null
           related_company_name: string | null
@@ -286,6 +317,7 @@ export type Database = {
           is_deleted?: boolean
           is_read?: boolean
           is_resolved?: boolean
+          is_top_priority?: boolean
           received_at?: string
           related_company_id?: string | null
           related_company_name?: string | null
@@ -306,6 +338,7 @@ export type Database = {
           is_deleted?: boolean
           is_read?: boolean
           is_resolved?: boolean
+          is_top_priority?: boolean
           received_at?: string
           related_company_id?: string | null
           related_company_name?: string | null
@@ -375,6 +408,41 @@ export type Database = {
           },
         ]
       }
+      note_links: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean
+          note_id: string
+          target_id: string
+          target_type: Database["public"]["Enums"]["note_target_type"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          note_id: string
+          target_id: string
+          target_type: Database["public"]["Enums"]["note_target_type"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean
+          note_id?: string
+          target_id?: string
+          target_type?: Database["public"]["Enums"]["note_target_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "note_links_note_id_fkey"
+            columns: ["note_id"]
+            isOneToOne: false
+            referencedRelation: "project_notes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       outlook_connections: {
         Row: {
           access_token: string
@@ -429,6 +497,7 @@ export type Database = {
           last_interaction_at: string | null
           logo_url: string | null
           next_steps: string | null
+          primary_domain: string | null
           raise_amount_usd: number | null
           sector: Database["public"]["Enums"]["sector_enum"] | null
           status: string
@@ -446,6 +515,7 @@ export type Database = {
           last_interaction_at?: string | null
           logo_url?: string | null
           next_steps?: string | null
+          primary_domain?: string | null
           raise_amount_usd?: number | null
           sector?: Database["public"]["Enums"]["sector_enum"] | null
           status: string
@@ -463,6 +533,7 @@ export type Database = {
           last_interaction_at?: string | null
           logo_url?: string | null
           next_steps?: string | null
+          primary_domain?: string | null
           raise_amount_usd?: number | null
           sector?: Database["public"]["Enums"]["sector_enum"] | null
           status?: string
@@ -595,6 +666,47 @@ export type Database = {
           },
         ]
       }
+      project_notes: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string | null
+          id: string
+          note_type: string | null
+          project_id: string | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note_type?: string | null
+          project_id?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note_type?: string | null
+          project_id?: string | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_notes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           color: string | null
@@ -603,7 +715,11 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
+          is_pinned: boolean | null
+          last_activity_at: string | null
           name: string
+          status: string | null
+          type: string | null
           updated_at: string
         }
         Insert: {
@@ -613,7 +729,11 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          is_pinned?: boolean | null
+          last_activity_at?: string | null
           name: string
+          status?: string | null
+          type?: string | null
           updated_at?: string
         }
         Update: {
@@ -623,7 +743,11 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          is_pinned?: boolean | null
+          last_activity_at?: string | null
           name?: string
+          status?: string | null
+          type?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -696,8 +820,11 @@ export type Database = {
           hostname: string | null
           id: string
           image: string | null
+          is_archived: boolean
+          is_flagged: boolean
           is_read: boolean | null
           project_id: string | null
+          read_at: string | null
           title: string
           updated_at: string
           url: string
@@ -710,8 +837,11 @@ export type Database = {
           hostname?: string | null
           id?: string
           image?: string | null
+          is_archived?: boolean
+          is_flagged?: boolean
           is_read?: boolean | null
           project_id?: string | null
+          read_at?: string | null
           title: string
           updated_at?: string
           url: string
@@ -724,8 +854,11 @@ export type Database = {
           hostname?: string | null
           id?: string
           image?: string | null
+          is_archived?: boolean
+          is_flagged?: boolean
           is_read?: boolean | null
           project_id?: string | null
+          read_at?: string | null
           title?: string
           updated_at?: string
           url?: string
@@ -758,10 +891,12 @@ export type Database = {
           created_by: string | null
           id: string
           is_quick_task: boolean | null
+          is_top_priority: boolean
           pipeline_company_id: string | null
           priority: string | null
           project_id: string | null
           scheduled_for: string | null
+          snoozed_until: string | null
           status: string | null
           updated_at: string
         }
@@ -775,10 +910,12 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_quick_task?: boolean | null
+          is_top_priority?: boolean
           pipeline_company_id?: string | null
           priority?: string | null
           project_id?: string | null
           scheduled_for?: string | null
+          snoozed_until?: string | null
           status?: string | null
           updated_at?: string
         }
@@ -792,10 +929,12 @@ export type Database = {
           created_by?: string | null
           id?: string
           is_quick_task?: boolean | null
+          is_top_priority?: boolean
           pipeline_company_id?: string | null
           priority?: string | null
           project_id?: string | null
           scheduled_for?: string | null
+          snoozed_until?: string | null
           status?: string | null
           updated_at?: string
         }
@@ -875,6 +1014,7 @@ export type Database = {
       company_kind: "portfolio" | "pipeline" | "other"
       company_status: "active" | "watching" | "exited" | "archived"
       interaction_type: "note" | "call" | "meeting" | "email" | "update"
+      note_target_type: "task" | "company" | "project" | "reading_item"
       round_enum:
         | "Seed"
         | "Series A"
@@ -1023,6 +1163,7 @@ export const Constants = {
       company_kind: ["portfolio", "pipeline", "other"],
       company_status: ["active", "watching", "exited", "archived"],
       interaction_type: ["note", "call", "meeting", "email", "update"],
+      note_target_type: ["task", "company", "project", "reading_item"],
       round_enum: [
         "Seed",
         "Series A",

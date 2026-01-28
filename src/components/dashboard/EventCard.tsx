@@ -1,6 +1,6 @@
-
 import { motion } from "framer-motion";
 import { MapPin, Video } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface CalendarEvent {
   id: string;
@@ -21,10 +21,12 @@ interface EventCardProps {
   event: CalendarEvent;
   delay?: number;
   isToday?: boolean;
+  isPast?: boolean;
+  isCurrent?: boolean;
   onClick?: (event: CalendarEvent) => void;
 }
 
-export function EventCard({ event, delay = 0, isToday = false, onClick }: EventCardProps) {
+export function EventCard({ event, delay = 0, isToday = false, isPast = false, isCurrent = false, onClick }: EventCardProps) {
   // Format time to display in a readable format
   const formatTime = (timeString: string) => {
     const date = new Date(timeString);
@@ -78,14 +80,20 @@ export function EventCard({ event, delay = 0, isToday = false, onClick }: EventC
 
   return (
     <motion.div 
-      className={`
-        rounded-2xl shadow-sm bg-muted/50 backdrop-blur border-l-4 
-        ${getCategoryColor()} 
-        hover:shadow-md hover:bg-muted/70 transition-all duration-200 cursor-pointer
-        hover:scale-[1.02] active:scale-[0.98]
-      `}
+      className={cn(
+        "rounded-2xl shadow-sm bg-muted/50 backdrop-blur border-l-4",
+        getCategoryColor(),
+        "hover:shadow-md hover:bg-muted/70 transition-all duration-200 cursor-pointer",
+        "hover:scale-[1.02] active:scale-[0.98]",
+        // Current event styling - glowing border
+        isCurrent && [
+          "ring-2 ring-coral/40 shadow-lg",
+          "shadow-coral/20 dark:shadow-coral/30",
+          "bg-muted/70"
+        ]
+      )}
       initial={{ opacity: 0, y: 5 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{ opacity: isPast ? 0.55 : 1, y: 0 }}
       transition={{ duration: 0.2, delay }}
       onClick={handleClick}
       role="button"
