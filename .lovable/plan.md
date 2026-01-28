@@ -1,145 +1,163 @@
 
-# Fix Email Disclaimer and Signature Cleaning
 
-## Problem Summary
+# Fix Email Signature Detection for Outlook-Style Signatures
 
-The current email cleaning logic has several bugs causing disclaimers, signatures, and forwarded wrappers to display in the cleaned view:
+## Problem Analysis
 
-1. **HTML body bypasses text cleaning** - When rendering HTML, the cleaner only sanitizes scripts/styles but doesn't strip disclaimers
-2. **Missing disclaimer patterns** - "CONFIDENTIALITY NOTE" is not in the pattern list
-3. **Forwarder's signature retained** - Content BEFORE the forwarded marker (forwarder's signature) is kept
-4. **Phone pattern incomplete** - "Direct Line:" not matched
-5. **Inline quote pattern not handled** - Gmail-style "On [date] [person] wrote:" not detected
+The current signature detection fails for your Outlook signature because:
+
+1. **Position-based detection fails**: The logic only looks for phone patterns in the "last 10 lines" and only strips if the signature is in the "latter 50%" of the email. Your emails are short, so the signature isn't "at the end" percentage-wise
+2. **Pattern matching is incomplete**: Outlook-style signatures have specific patterns like:
+   - `Name | Title` format (pipe separator)
+   - `C:` prefix for cell phone
+   - `mailto:` links in email addresses
+   - Bracketed company taglines like `[Canapi Ventures...]`
+3. **No name-based detection**: We don't check if the sender's name appears as the start of a signature block
 
 ## Solution
 
-### Phase 1: Fix emailCleaners.ts
+Enhance the signature detection with Outlook-specific patterns:
 
-**Add missing patterns:**
+### Pattern Updates for `emailCleaners.ts`
 
-```text
-DISCLAIMER_PATTERNS additions:
-- "CONFIDENTIALITY NOTE"
-- "CONFIDENTIALITY NOTE:"
-
-PHONE_PATTERN update:
-- Add "Direct Line" to the pattern: /(?:Tel|Phone|Mobile|Cell|Fax|Direct Line):/i
+**1. Add Outlook-style signature markers:**
+```typescript
+const OUTLOOK_SIGNATURE_PATTERNS = [
+  // Name | Title format (with pipe separator)
+  /^[A-Z][a-z]+\s+[A-Z][a-z]+\s*\|\s*.+$/m,
+  // C: or M: phone prefix (Outlook mobile format)
+  /^[CM]:\s*\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{4}/m,
+  // Email with mailto: link embedded
+  /<mailto:[^>]+>/,
+  // Bracketed company taglines
+  /\[[A-Z][^]]{10,}\]/,
+];
 ```
 
-**Fix forwarded wrapper stripping:**
+**2. Add sender-name based detection:**
+When we know the sender's name (e.g., "Harrison Kioko"), look for a line starting with that name followed by `|` or a title-like word.
 
-Currently the function keeps everything AFTER the forwarded marker. We need to:
-1. Strip content BEFORE the forwarded marker (forwarder's signature)
-2. Then strip the header block after the marker
-3. Keep only the actual forwarded content
+**3. Lower the position threshold:**
+For short emails (under 500 characters of content), be more aggressive about signature detection since the signature-to-content ratio is higher.
 
-**Add inline quote detection:**
+**4. Add combined pattern detection:**
+If 2+ signature indicators appear within 5 lines of each other, treat that block as a signature even if it's early in the email.
 
-Detect patterns like:
-- "On [date] [name] <email> wrote:"
-- "On [date], [name] wrote:"
-
-Strip content from this point onwards (it's quoted reply content).
-
-**Apply cleaning to HTML body:**
-
-Create a new function `cleanHtmlContent()` that:
-1. Converts HTML to text for pattern detection
-2. Identifies where disclaimers/signatures start in the text
-3. Removes corresponding HTML elements or truncates at the right point
-4. Falls back to rendering only the text portion if HTML cleaning is too complex
-
-### Phase 2: Update InboxContentPane.tsx
-
-**Prefer cleaned text when HTML cleaning fails:**
-
-If the HTML body contains disclaimers that can't be cleanly stripped, fall back to displaying cleaned text instead of raw HTML with disclaimers.
-
-**Add visual indicator for cleaning applied:**
-
-Show what was cleaned in the "View original email" toggle label.
-
-## Files to Modify
+### Implementation Changes
 
 | File | Changes |
 |------|---------|
-| `src/lib/emailCleaners.ts` | Add patterns, fix forwarded stripping, add HTML cleaning |
-| `src/components/inbox/InboxContentPane.tsx` | Prefer cleaned text over raw HTML with disclaimers |
+| `src/lib/emailCleaners.ts` | Add Outlook patterns, improve `stripSignatures()` with combined detection |
+| `src/components/inbox/InboxContentPane.tsx` | Pass sender name to cleaner for name-based matching |
 
-## Implementation Details
+### Specific Code Changes
 
-### emailCleaners.ts Changes
-
-**1. Add missing disclaimer patterns:**
+**Enhanced `stripSignatures` function:**
 
 ```typescript
-const DISCLAIMER_PATTERNS = [
-  // ... existing patterns ...
-  "CONFIDENTIALITY NOTE",
-  "CONFIDENTIALITY NOTE:",
-];
-```
-
-**2. Fix phone pattern:**
-
-```typescript
-const PHONE_PATTERN = /(?:Tel|Phone|Mobile|Cell|Fax|Direct Line|Direct):\s*[\d\s\-\+\(\)\.]+/i;
-```
-
-**3. Add inline quote pattern:**
-
-```typescript
-const INLINE_QUOTE_PATTERNS = [
-  /On .+wrote:\s*$/im,
-  /On .+, .+ <.+@.+> wrote:/im,
-];
-```
-
-**4. Fix stripForwardedWrapper logic:**
-
-```typescript
-export function stripForwardedWrapper(text: string): {
-  body: string;
-  meta: ForwardedMeta | null;
-  contentBeforeMarker: string | null;
-} {
-  // Find forwarded marker
-  // If found:
-  //   1. contentBeforeMarker = text before marker (forwarder's sig - discard)
-  //   2. Parse header block after marker
-  //   3. Return only the actual forwarded body content
+export function stripSignatures(text: string, senderName?: string): string {
+  let result = text;
+  
+  // 1. Check existing signature markers (unchanged)
+  
+  // 2. NEW: Check for Outlook-style "Name | Title" pattern
+  if (senderName) {
+    // Look for sender's name at start of a line followed by | or a role keyword
+    const namePattern = new RegExp(
+      `^${escapeRegex(senderName)}\\s*[|]`,
+      "im"
+    );
+    const nameMatch = result.match(namePattern);
+    if (nameMatch && nameMatch.index !== undefined) {
+      // Found sender's name - this is likely signature start
+      // Only strip if it's not too early (keep at least first 30 chars)
+      if (nameMatch.index > 30) {
+        result = result.substring(0, nameMatch.index).trim();
+        return result;
+      }
+    }
+  }
+  
+  // 3. NEW: Check for C:/M: phone pattern anywhere
+  const cellPattern = /^[CM]:\s*\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}/m;
+  const cellMatch = result.match(cellPattern);
+  if (cellMatch && cellMatch.index !== undefined) {
+    // Look back for the signature start (name line)
+    const beforeCell = result.substring(0, cellMatch.index);
+    const lines = beforeCell.split(/\r?\n/);
+    // Check last 3 lines for name-like pattern
+    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 3); i--) {
+      const line = lines[i].trim();
+      // Name | Title pattern or short name-only line
+      if (/^[A-Z][a-z]+\s+[A-Z][a-z]+\s*[|]/.test(line) || 
+          (line.length > 5 && line.length < 50 && /^[A-Z]/.test(line))) {
+        const cutIndex = result.indexOf(lines[i]);
+        if (cutIndex > 30) {
+          result = result.substring(0, cutIndex).trim();
+          return result;
+        }
+      }
+    }
+    // If no name found, cut at cell line if not too early
+    if (cellMatch.index > 50) {
+      result = result.substring(0, cellMatch.index).trim();
+      return result;
+    }
+  }
+  
+  // 4. Existing phone pattern check (unchanged but with lower threshold)
+  // ... existing code with adjusted thresholds for short emails
+  
+  return result;
 }
 ```
 
-**5. Add cleanHtmlContent function:**
-
-For HTML bodies, we'll detect disclaimer positions in the text and try to find corresponding break points in HTML. If that's too complex, we render cleaned text instead.
-
-### InboxContentPane.tsx Changes
-
-**Smart rendering decision:**
+**Update `cleanEmailContent` to accept sender name:**
 
 ```typescript
-// If HTML exists but cleaning wasn't effective (disclaimers still present)
-// prefer showing cleaned text
-const shouldUseCleanedText = !hasHtmlBody || 
-  (cleanedEmail.cleaningApplied.includes("disclaimers") && hasHtmlBody);
+export function cleanEmailContent(
+  textBody: string | null,
+  htmlBody: string | null,
+  senderName?: string  // NEW optional parameter
+): CleanedEmail {
+  // ... existing code ...
+  
+  // Step 4: Strip signatures (pass sender name)
+  const signatureResult = stripSignatures(cleanedText, senderName);
+  // ... rest unchanged
+}
+```
+
+**Update `InboxContentPane.tsx`:**
+
+```typescript
+const cleanedEmail = useMemo(() => {
+  return cleanEmailContent(bodyContent, item.htmlBody, item.senderName);
+}, [bodyContent, item.htmlBody, item.senderName]);
+```
+
+**Update `useInboxSuggestions.ts`:**
+
+```typescript
+const { cleanedText } = useMemo(() => {
+  return cleanEmailContent(textBody, htmlBody);  // No sender name needed for suggestions
+}, [textBody, htmlBody]);
 ```
 
 ## Expected Outcome
 
-After these fixes:
-- Forwarder's signature (Harrison Kioko/Canapi) will be stripped
-- "CONFIDENTIALITY NOTE" block will be stripped
-- "DISCLAIMER:" block will be stripped
-- Original sender's signature will be stripped
-- Inline quoted content ("On [date] wrote:") will be stripped
-- "View original email" will still show the complete raw content
+After these changes:
+- Emails from yourself with `Harrison Kioko | Principal` will have signature stripped
+- The `C: (917)...` phone pattern will trigger signature detection
+- Short emails won't accidentally keep signatures due to percentage thresholds
+- "View original email" still shows the full content
 
-## Testing Scenarios
+## Test Cases
 
-1. Email with CONFIDENTIALITY NOTE - should be hidden
-2. Email with DISCLAIMER: block - should be hidden
-3. Forwarded email - forwarder's signature should be hidden
-4. Email with "Direct Line:" phone - should trigger signature detection
-5. Email with inline quoted reply - quoted portion should be hidden
+| Email Type | Before | After |
+|------------|--------|-------|
+| Self-sent with Outlook sig | Shows full signature | Shows only body content |
+| Forwarded email | Shows forwarder's sig | Strips both sigs, shows original content |
+| Email with DISCLAIMER | Shows disclaimer | Strips at DISCLAIMER |
+| Very short email (1 line + sig) | Might keep sig | Strips sig correctly |
+
