@@ -160,11 +160,12 @@ export default function Inbox() {
     setSelectedItem(null);
   };
 
-  const handleCreateTask = (item: InboxItem) => {
+  const handleCreateTask = (item: InboxItem, suggestionTitle?: string) => {
     setTaskPrefill({
-      content: item.subject,
+      content: suggestionTitle || item.subject,
       description: item.preview || undefined,
       companyName: item.relatedCompanyName,
+      sourceInboxItemId: item.id,
     });
     setIsTaskDialogOpen(true);
     closeDetail();
