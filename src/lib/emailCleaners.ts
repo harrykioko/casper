@@ -42,6 +42,9 @@ const DISCLAIMER_PATTERNS = [
   "DISCLAIMER:",
   "DISCLAIMER",
   "CONFIDENTIALITY NOTICE",
+  "CONFIDENTIALITY NOTICE:",
+  "CONFIDENTIALITY NOTE",
+  "CONFIDENTIALITY NOTE:",
   "CONFIDENTIALITY:",
   "This email and any attachments",
   "This email and any files transmitted",
@@ -52,6 +55,10 @@ const DISCLAIMER_PATTERNS = [
   "The information contained in this email",
   "NOTICE: This email is intended for",
   "________________________________",
+  "This message contains confidential",
+  "The contents of this email",
+  "IMPORTANT NOTICE:",
+  "LEGAL NOTICE:",
 ];
 
 // Signature markers
@@ -62,10 +69,19 @@ const SIGNATURE_MARKERS = [
   "\nSent from my iPad",
   "\nSent from Outlook",
   "\nGet Outlook for",
+  "\nSent from Mail for",
 ];
 
 // Phone patterns that often appear in signatures
-const PHONE_PATTERN = /(?:Tel|Phone|Mobile|Cell|Fax):\s*[\d\s\-\+\(\)\.]+/i;
+const PHONE_PATTERN = /(?:Tel|Phone|Mobile|Cell|Fax|Direct Line|Direct|Office|Work|Main):\s*[\d\s\-\+\(\)\.]+/i;
+
+// Inline quote patterns (Gmail-style replies)
+const INLINE_QUOTE_PATTERNS = [
+  /On .{10,80} wrote:\s*$/im,
+  /On .{10,60}, .{3,40} <.+@.+> wrote:/im,
+  /On .{10,60} at .{5,20}, .+? wrote:/im,
+  /\d{1,2}\/\d{1,2}\/\d{2,4}.{1,40}<.+@.+>.{0,10}wrote:/im,
+];
 
 /**
  * Main function to clean email content
@@ -98,24 +114,41 @@ export function cleanEmailContent(
     cleaningApplied.push("forwarded_wrapper");
   }
 
-  // Step 2: Strip disclaimers
+  // Step 2: Strip inline quoted replies
+  const quoteResult = stripInlineQuotes(cleanedText);
+  if (quoteResult !== cleanedText) {
+    cleanedText = quoteResult;
+    cleaningApplied.push("inline_quotes");
+  }
+
+  // Step 3: Strip disclaimers
   const disclaimerResult = stripDisclaimers(cleanedText);
   if (disclaimerResult !== cleanedText) {
     cleanedText = disclaimerResult;
     cleaningApplied.push("disclaimers");
   }
 
-  // Step 3: Strip signatures (only if they don't remove too much)
+  // Step 4: Strip signatures (only if they don't remove too much)
   const signatureResult = stripSignatures(cleanedText);
   if (signatureResult !== cleanedText && signatureResult.length > cleanedText.length * 0.3) {
     cleanedText = signatureResult;
     cleaningApplied.push("signatures");
   }
 
-  // Step 4: Sanitize HTML if present
+  // Step 5: Clean HTML if present
   if (cleanedHtml) {
+    // First sanitize HTML
     cleanedHtml = sanitizeHtml(cleanedHtml);
     cleaningApplied.push("html_sanitized");
+    
+    // Then try to clean disclaimers from HTML
+    const htmlCleanResult = cleanHtmlContent(cleanedHtml, cleanedText);
+    if (htmlCleanResult.wasModified) {
+      cleanedHtml = htmlCleanResult.html;
+      if (!cleaningApplied.includes("disclaimers")) {
+        cleaningApplied.push("html_disclaimers");
+      }
+    }
   }
 
   // Safety check: if we removed more than 80% of content, fall back to original
@@ -140,6 +173,7 @@ export function cleanEmailContent(
 
 /**
  * Strip forwarded message wrapper and extract metadata
+ * Now also strips content BEFORE the forwarded marker (forwarder's signature)
  */
 export function stripForwardedWrapper(text: string): {
   body: string;
@@ -190,6 +224,9 @@ export function stripForwardedWrapper(text: string): {
 
     return { body, meta };
   }
+
+  // IMPORTANT: Strip content BEFORE the marker (forwarder's signature)
+  // Only keep content AFTER the forwarded marker
 
   // Extract lines after the marker
   const afterMarker = text.substring(markerIndex + markerLength);
@@ -278,6 +315,27 @@ function parseHeaderLines(
 }
 
 /**
+ * Strip inline quoted replies (Gmail-style "On X wrote:")
+ */
+export function stripInlineQuotes(text: string): string {
+  let result = text;
+  
+  for (const pattern of INLINE_QUOTE_PATTERNS) {
+    const match = result.match(pattern);
+    if (match && match.index !== undefined) {
+      // Only strip if we're not removing too much content (at least 20% should remain)
+      const beforeQuote = result.substring(0, match.index);
+      if (beforeQuote.length > result.length * 0.2) {
+        result = beforeQuote.trim();
+        break;
+      }
+    }
+  }
+  
+  return result;
+}
+
+/**
  * Strip legal disclaimers from content
  */
 export function stripDisclaimers(text: string): string {
@@ -286,6 +344,7 @@ export function stripDisclaimers(text: string): string {
 
   for (const pattern of DISCLAIMER_PATTERNS) {
     const index = result.toLowerCase().indexOf(pattern.toLowerCase());
+    // Only strip if pattern appears after some reasonable content (at least 50 chars)
     if (index !== -1 && index > 50 && index < earliestIndex) {
       earliestIndex = index;
     }
@@ -342,6 +401,57 @@ export function stripSignatures(text: string): string {
   }
 
   return result;
+}
+
+/**
+ * Clean HTML content by trying to remove disclaimers and signatures
+ */
+export function cleanHtmlContent(html: string, cleanedText: string): {
+  html: string;
+  wasModified: boolean;
+} {
+  let result = html;
+  let wasModified = false;
+
+  // Try to find and remove disclaimer blocks in HTML
+  // Common patterns: divs/tables at the end with disclaimer keywords
+  
+  // Look for disclaimer text in HTML and try to truncate
+  for (const pattern of DISCLAIMER_PATTERNS) {
+    const patternLower = pattern.toLowerCase();
+    const htmlLower = result.toLowerCase();
+    const index = htmlLower.indexOf(patternLower);
+    
+    if (index !== -1 && index > result.length * 0.3) {
+      // Find the nearest opening tag before the disclaimer
+      const beforeDisclaimer = result.substring(0, index);
+      
+      // Look for common wrapper patterns
+      const divMatch = beforeDisclaimer.lastIndexOf("<div");
+      const pMatch = beforeDisclaimer.lastIndexOf("<p");
+      const tableMatch = beforeDisclaimer.lastIndexOf("<table");
+      const tdMatch = beforeDisclaimer.lastIndexOf("<td");
+      
+      // Use the closest opening tag
+      const cutPoints = [divMatch, pMatch, tableMatch, tdMatch].filter(x => x > 0);
+      if (cutPoints.length > 0) {
+        const cutPoint = Math.max(...cutPoints);
+        // Only cut if we're keeping at least 30% of content
+        if (cutPoint > result.length * 0.3) {
+          result = result.substring(0, cutPoint).trim();
+          wasModified = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // Remove trailing empty divs/paragraphs
+  result = result.replace(/(<div[^>]*>\s*<\/div>\s*)+$/gi, "");
+  result = result.replace(/(<p[^>]*>\s*<\/p>\s*)+$/gi, "");
+  result = result.replace(/(<br\s*\/?\s*>\s*)+$/gi, "");
+
+  return { html: result, wasModified };
 }
 
 /**

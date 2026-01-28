@@ -138,20 +138,27 @@ export default function Priority() {
     toast.success(item.sourceType === "calendar_event" ? "Event dismissed from priority" : "Item resolved");
   };
 
-  const handleSnooze = (item: PriorityItem, duration: "later_today" | "tomorrow" | "next_week") => {
+  const handleSnooze = (item: PriorityItem, duration: "later_today" | "tomorrow" | "next_week" | "custom", customDate?: Date) => {
     const now = new Date();
     let snoozeUntil: Date;
     
-    switch (duration) {
-      case "later_today":
-        snoozeUntil = addHours(now, 4);
-        break;
-      case "tomorrow":
-        snoozeUntil = setHours(startOfTomorrow(), 9);
-        break;
-      case "next_week":
-        snoozeUntil = setHours(addDays(startOfDay(now), 7), 9);
-        break;
+    if (duration === "custom" && customDate) {
+      snoozeUntil = customDate;
+    } else {
+      switch (duration) {
+        case "later_today":
+          snoozeUntil = addHours(now, 4);
+          break;
+        case "tomorrow":
+          snoozeUntil = setHours(startOfTomorrow(), 9);
+          break;
+        case "next_week":
+          snoozeUntil = setHours(addDays(startOfDay(now), 7), 9);
+          break;
+        default:
+          toast.error("Invalid snooze duration");
+          return;
+      }
     }
     
     switch (item.sourceType) {

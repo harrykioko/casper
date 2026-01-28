@@ -363,11 +363,12 @@ export function mapPipelineCompanyToPriorityItemV2(company: DashboardPipelineCom
 // ============================================================================
 
 export function mapReadingItemToPriorityItemV2(item: ReadingItem): PriorityItem {
-  const hasProject = !!item.projectId;
+  const hasProject = !!item.project_id;
+  const createdAt = item.created_at || new Date().toISOString();
 
-  const urgencyScore = computeReadingUrgencyScoreV2(item.createdAt);
+  const urgencyScore = computeReadingUrgencyScoreV2(createdAt);
   const importanceScore = computeReadingImportanceScoreV2(item.isRead, hasProject);
-  const recencyScore = computeRecencyScoreV2(item.createdAt);
+  const recencyScore = computeRecencyScoreV2(createdAt);
 
   const priorityScore = computePriorityScoreV2(
     urgencyScore,
@@ -377,7 +378,7 @@ export function mapReadingItemToPriorityItemV2(item: ReadingItem): PriorityItem 
     0.3 // Reading is typically quick
   );
 
-  const daysOld = differenceInDays(new Date(), parseISO(item.createdAt));
+  const daysOld = differenceInDays(new Date(), parseISO(createdAt));
 
   const reasoning = `${item.isRead ? "Read" : "Unread"} article saved ${daysOld} days ago.`;
   const signals = generateSignalsV2(
@@ -402,8 +403,8 @@ export function mapReadingItemToPriorityItemV2(item: ReadingItem): PriorityItem 
     recencyScore,
     commitmentScore: 0,
     priorityScore,
-    createdAt: item.createdAt,
-    projectId: item.projectId,
+    createdAt,
+    projectId: item.project_id,
     reasoning,
     signals,
   };
