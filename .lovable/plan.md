@@ -1,163 +1,367 @@
 
 
-# Fix Email Signature Detection for Outlook-Style Signatures
+# Upgrade Inbox Suggestions to VC-Intent Aware Engine
 
-## Problem Analysis
+## Overview
 
-The current signature detection fails for your Outlook signature because:
+Transform the current bullet-based task extractor into a structured, VC-domain-aware suggestion engine that:
+- Classifies email intent (intro, follow-up, portfolio update, etc.)
+- Produces typed suggestions with entity references
+- Uses candidate retrieval to ensure LINK_COMPANY suggestions only reference real company IDs
 
-1. **Position-based detection fails**: The logic only looks for phone patterns in the "last 10 lines" and only strips if the signature is in the "latter 50%" of the email. Your emails are short, so the signature isn't "at the end" percentage-wise
-2. **Pattern matching is incomplete**: Outlook-style signatures have specific patterns like:
-   - `Name | Title` format (pipe separator)
-   - `C:` prefix for cell phone
-   - `mailto:` links in email addresses
-   - Bracketed company taglines like `[Canapi Ventures...]`
-3. **No name-based detection**: We don't check if the sender's name appears as the start of a signature block
+## Architecture
 
-## Solution
-
-Enhance the signature detection with Outlook-specific patterns:
-
-### Pattern Updates for `emailCleaners.ts`
-
-**1. Add Outlook-style signature markers:**
-```typescript
-const OUTLOOK_SIGNATURE_PATTERNS = [
-  // Name | Title format (with pipe separator)
-  /^[A-Z][a-z]+\s+[A-Z][a-z]+\s*\|\s*.+$/m,
-  // C: or M: phone prefix (Outlook mobile format)
-  /^[CM]:\s*\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{4}/m,
-  // Email with mailto: link embedded
-  /<mailto:[^>]+>/,
-  // Bracketed company taglines
-  /\[[A-Z][^]]{10,}\]/,
-];
+```text
++------------------+     +----------------------+     +------------------+
+| InboxActionRail  | --> | useInboxSuggestionsV2| --> | inbox-suggest-v2 |
+| (UI Rendering)   |     | (Frontend Hook)      |     | (Edge Function)  |
++------------------+     +----------------------+     +------------------+
+                                  |
+                                  v
+                         +------------------+
+                         | Candidate        |
+                         | Retrieval Lib    |
+                         +------------------+
+                                  |
+                                  v
+                    +---------------------------+
+                    | companies + pipeline_co.  |
+                    +---------------------------+
 ```
 
-**2. Add sender-name based detection:**
-When we know the sender's name (e.g., "Harrison Kioko"), look for a line starting with that name followed by `|` or a title-like word.
+## Data Models
 
-**3. Lower the position threshold:**
-For short emails (under 500 characters of content), be more aggressive about signature detection since the signature-to-content ratio is higher.
+### Suggestion Types
 
-**4. Add combined pattern detection:**
-If 2+ signature indicators appear within 5 lines of each other, treat that block as a signature even if it's early in the email.
+| Type | Description | When to suggest |
+|------|-------------|-----------------|
+| `LINK_COMPANY` | Link this email to an existing company | Domain match or name mention found |
+| `CREATE_PIPELINE_COMPANY` | Create new pipeline company | Intro/first touch with no strong match |
+| `CREATE_FOLLOW_UP_TASK` | Follow-up task linked to company | Pipeline or portfolio follow-up email |
+| `CREATE_PERSONAL_TASK` | Personal/one-off task (no company) | Self-sent reminders, scheduling |
+| `CREATE_INTRO_TASK` | Task to make an intro | Request for intro emails |
+| `SET_STATUS` | Update pipeline stage | Status change implied in email |
+| `EXTRACT_UPDATE_HIGHLIGHTS` | Extract key metrics/updates | Portfolio update emails |
 
-### Implementation Changes
+### Email Intent Categories
 
-| File | Changes |
-|------|---------|
-| `src/lib/emailCleaners.ts` | Add Outlook patterns, improve `stripSignatures()` with combined detection |
-| `src/components/inbox/InboxContentPane.tsx` | Pass sender name to cleaner for name-based matching |
+| Intent | Description |
+|--------|-------------|
+| `intro_first_touch` | First contact from a new company or intro request |
+| `pipeline_follow_up` | Ongoing deal discussion |
+| `portfolio_update` | Company update from portfolio co |
+| `intro_request` | Someone asking for an intro |
+| `scheduling` | Meeting scheduling |
+| `personal_todo` | Self-sent or personal reminder |
+| `fyi_informational` | No action needed |
 
-### Specific Code Changes
-
-**Enhanced `stripSignatures` function:**
+### Candidate Company Structure
 
 ```typescript
-export function stripSignatures(text: string, senderName?: string): string {
-  let result = text;
-  
-  // 1. Check existing signature markers (unchanged)
-  
-  // 2. NEW: Check for Outlook-style "Name | Title" pattern
-  if (senderName) {
-    // Look for sender's name at start of a line followed by | or a role keyword
-    const namePattern = new RegExp(
-      `^${escapeRegex(senderName)}\\s*[|]`,
-      "im"
-    );
-    const nameMatch = result.match(namePattern);
-    if (nameMatch && nameMatch.index !== undefined) {
-      // Found sender's name - this is likely signature start
-      // Only strip if it's not too early (keep at least first 30 chars)
-      if (nameMatch.index > 30) {
-        result = result.substring(0, nameMatch.index).trim();
-        return result;
-      }
-    }
-  }
-  
-  // 3. NEW: Check for C:/M: phone pattern anywhere
-  const cellPattern = /^[CM]:\s*\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}/m;
-  const cellMatch = result.match(cellPattern);
-  if (cellMatch && cellMatch.index !== undefined) {
-    // Look back for the signature start (name line)
-    const beforeCell = result.substring(0, cellMatch.index);
-    const lines = beforeCell.split(/\r?\n/);
-    // Check last 3 lines for name-like pattern
-    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 3); i--) {
-      const line = lines[i].trim();
-      // Name | Title pattern or short name-only line
-      if (/^[A-Z][a-z]+\s+[A-Z][a-z]+\s*[|]/.test(line) || 
-          (line.length > 5 && line.length < 50 && /^[A-Z]/.test(line))) {
-        const cutIndex = result.indexOf(lines[i]);
-        if (cutIndex > 30) {
-          result = result.substring(0, cutIndex).trim();
-          return result;
-        }
-      }
-    }
-    // If no name found, cut at cell line if not too early
-    if (cellMatch.index > 50) {
-      result = result.substring(0, cellMatch.index).trim();
-      return result;
-    }
-  }
-  
-  // 4. Existing phone pattern check (unchanged but with lower threshold)
-  // ... existing code with adjusted thresholds for short emails
-  
-  return result;
+interface CandidateCompany {
+  id: string;
+  name: string;
+  type: "portfolio" | "pipeline";
+  primary_domain: string | null;
+  match_score: number;
+  match_reason: "domain" | "name_mention" | "prior_link" | "sender_history";
 }
 ```
 
-**Update `cleanEmailContent` to accept sender name:**
+### Structured Suggestion
 
 ```typescript
-export function cleanEmailContent(
-  textBody: string | null,
-  htmlBody: string | null,
-  senderName?: string  // NEW optional parameter
-): CleanedEmail {
-  // ... existing code ...
-  
-  // Step 4: Strip signatures (pass sender name)
-  const signatureResult = stripSignatures(cleanedText, senderName);
-  // ... rest unchanged
+interface StructuredSuggestion {
+  id: string;
+  type: SuggestionType;
+  title: string;
+  confidence: "low" | "medium" | "high";
+  effort_bucket: "quick" | "medium" | "long";
+  effort_minutes: number;
+  rationale: string;
+  company_id?: string | null;      // Only from candidate_companies
+  company_name?: string | null;
+  company_type?: "portfolio" | "pipeline";
+  due_hint?: string | null;
+  metadata?: Record<string, unknown>;  // For EXTRACT_UPDATE_HIGHLIGHTS etc.
 }
 ```
 
-**Update `InboxContentPane.tsx`:**
+## Implementation Steps
 
-```typescript
-const cleanedEmail = useMemo(() => {
-  return cleanEmailContent(bodyContent, item.htmlBody, item.senderName);
-}, [bodyContent, item.htmlBody, item.senderName]);
+### Step 1: Candidate Retrieval Library
+
+Create `src/lib/candidateCompanyRetrieval.ts`:
+
+**Matching Strategies (in order of score):**
+
+1. **Domain Match (score: 100)** - Extract domain from sender email, match against `primary_domain` in both `companies` and `pipeline_companies`
+
+2. **Name Mention (score: 75)** - Search for company names from both tables appearing in subject or first 500 chars of body. Use Fuse.js for fuzzy matching.
+
+3. **Prior Link (score: 90)** - Check if this sender email has been previously linked to a company via `related_company_id` on past inbox items
+
+4. **Sender History (score: 50)** - Check if any email from this sender domain has been linked to a company before
+
+**Output:** Top 8 candidates with score and match reason
+
+### Step 2: Database Schema Updates
+
+**Modify `inbox_suggestions` table:**
+
+Add columns via migration:
+- `intent` (text, nullable) - Classified email intent
+- `version` (integer, default 1) - Schema version for future migrations
+- `dismissed_ids` (jsonb, default []) - IDs of dismissed suggestions
+- `candidate_companies` (jsonb, nullable) - Cached candidates used for generation
+- `updated_at` (timestamptz, default now()) - For cache validation
+
+Add index on `(inbox_item_id, updated_at)` for cache lookups.
+
+### Step 3: Edge Function inbox-suggest-v2
+
+**File:** `supabase/functions/inbox-suggest-v2/index.ts`
+
+**Flow:**
+
+1. Validate auth, get user ID
+2. Check cache: if `inbox_suggestions` row exists with `updated_at` within 1 hour and `force !== true`, return cached
+3. Fetch inbox item (subject, text_body, from_email, from_name)
+4. Fetch candidate companies from both tables (portfolio + pipeline)
+5. Run domain/name matching on candidates
+6. Build OpenAI prompt with:
+   - System prompt defining intents and suggestion types
+   - User message with email content + candidate company list (IDs + names only)
+7. Parse response using tool calling for strict schema
+8. Validate all `company_id` references exist in candidates
+9. Upsert to `inbox_suggestions` with full structured data
+10. Return suggestions
+
+**OpenAI Prompt Structure:**
+
+System prompt defines:
+- VC context (investor managing deal flow)
+- Intent classification rules
+- Suggestion type rules
+- Quality rules (e.g., portfolio updates get EXTRACT_UPDATE_HIGHLIGHTS, not task lists)
+
+Tool schema enforces:
+- `intent` must be one of defined enum values
+- `suggestions[].type` must be one of defined enum values
+- `suggestions[].company_id` must be string or null (validated post-hoc against candidates)
+
+### Step 4: Frontend Hook Update
+
+**File:** `src/hooks/useInboxSuggestionsV2.ts`
+
+Changes from current hook:
+- Call `inbox-suggest-v2` instead of `inbox-suggest`
+- Parse structured suggestions with new type
+- Provide `generateSuggestions(force?: boolean)` for regeneration
+- Expose `dismissSuggestion(id)` - updates local state and persists to `dismissed_ids`
+- Expose `intent` classification for UI display
+- Handle candidate companies for display
+
+### Step 5: UI Updates
+
+**File:** `src/components/inbox/InboxActionRail.tsx`
+
+**Suggestion Card Redesign:**
+
+```text
++--------------------------------------------------+
+| [Type Badge]  [Confidence: high]                 |
+| Title of the suggestion goes here                |
+| Effort: ~15 min  |  Due: tomorrow                |
+| ------------------------------------------------ |
+| "Rationale text in muted color"                  |
+| ------------------------------------------------ |
+| [  Approve  ]  [Edit]  [Dismiss]                 |
++--------------------------------------------------+
 ```
 
-**Update `useInboxSuggestions.ts`:**
+**Type-specific styling:**
+- `LINK_COMPANY`: Building2 icon, blue accent
+- `CREATE_PIPELINE_COMPANY`: PlusCircle icon, violet accent
+- `CREATE_FOLLOW_UP_TASK`: ArrowRight icon, amber accent
+- `CREATE_PERSONAL_TASK`: ListTodo icon, slate accent
+- `CREATE_INTRO_TASK`: Users icon, emerald accent
+- `SET_STATUS`: Flag icon, orange accent
+- `EXTRACT_UPDATE_HIGHLIGHTS`: Sparkles icon, sky accent
+
+**Generate Button:**
+- Always visible at bottom of suggestions section
+- Shows "Generate with AI" or "Regenerate" based on state
+- Loading state with spinner
+
+**Intent Badge:**
+- Small badge above suggestions showing classified intent
+- Helps user understand context
+
+### Step 6: Type Definitions
+
+**File:** `src/types/inboxSuggestions.ts`
 
 ```typescript
-const { cleanedText } = useMemo(() => {
-  return cleanEmailContent(textBody, htmlBody);  // No sender name needed for suggestions
-}, [textBody, htmlBody]);
+export type EmailIntent = 
+  | "intro_first_touch"
+  | "pipeline_follow_up"
+  | "portfolio_update"
+  | "intro_request"
+  | "scheduling"
+  | "personal_todo"
+  | "fyi_informational";
+
+export type SuggestionType =
+  | "LINK_COMPANY"
+  | "CREATE_PIPELINE_COMPANY"
+  | "CREATE_FOLLOW_UP_TASK"
+  | "CREATE_PERSONAL_TASK"
+  | "CREATE_INTRO_TASK"
+  | "SET_STATUS"
+  | "EXTRACT_UPDATE_HIGHLIGHTS";
+
+export interface StructuredSuggestion {
+  id: string;
+  type: SuggestionType;
+  title: string;
+  confidence: "low" | "medium" | "high";
+  effort_bucket: "quick" | "medium" | "long";
+  effort_minutes: number;
+  rationale: string;
+  company_id?: string | null;
+  company_name?: string | null;
+  company_type?: "portfolio" | "pipeline";
+  due_hint?: string | null;
+  metadata?: Record<string, unknown>;
+  is_dismissed?: boolean;
+}
+
+export interface CandidateCompany {
+  id: string;
+  name: string;
+  type: "portfolio" | "pipeline";
+  primary_domain: string | null;
+  match_score: number;
+  match_reason: "domain" | "name_mention" | "prior_link" | "sender_history";
+}
+
+export interface InboxSuggestionsResponse {
+  intent: EmailIntent;
+  intent_confidence: "low" | "medium" | "high";
+  asks: string[];       // Extracted asks from email
+  entities: string[];   // Mentioned entities (people, companies)
+  suggestions: StructuredSuggestion[];
+  candidate_companies: CandidateCompany[];
+  generated_at: string;
+}
 ```
 
-## Expected Outcome
+## Quality Rules (in Edge Function prompt)
 
-After these changes:
-- Emails from yourself with `Harrison Kioko | Principal` will have signature stripped
-- The `C: (917)...` phone pattern will trigger signature detection
-- Short emails won't accidentally keep signatures due to percentage thresholds
-- "View original email" still shows the full content
+1. **Portfolio Updates:**
+   - Suggest `LINK_COMPANY` if not already linked
+   - Suggest `EXTRACT_UPDATE_HIGHLIGHTS` to capture metrics
+   - Do NOT create tasks for each metric mentioned
 
-## Test Cases
+2. **Intro/First Touch:**
+   - If strong company match exists: suggest `LINK_COMPANY`
+   - If no match: suggest `CREATE_PIPELINE_COMPANY`
+   - One follow-up task at most
 
-| Email Type | Before | After |
-|------------|--------|-------|
-| Self-sent with Outlook sig | Shows full signature | Shows only body content |
-| Forwarded email | Shows forwarder's sig | Strips both sigs, shows original content |
-| Email with DISCLAIMER | Shows disclaimer | Strips at DISCLAIMER |
-| Very short email (1 line + sig) | Might keep sig | Strips sig correctly |
+3. **Pipeline Follow-ups:**
+   - Suggest single `CREATE_FOLLOW_UP_TASK` with context in notes
+   - Optionally suggest `SET_STATUS` if status change implied
+
+4. **Intro Requests:**
+   - Suggest `CREATE_INTRO_TASK`
+   - Link to relevant company if mentioned
+
+5. **Personal/Self-sent:**
+   - Suggest `CREATE_PERSONAL_TASK` with cleaned title
+   - No company linking
+
+6. **FYI/Informational:**
+   - Return empty suggestions or just `LINK_COMPANY` if relevant
+
+## Files to Create/Modify
+
+| File | Action |
+|------|--------|
+| `src/types/inboxSuggestions.ts` | Create - New type definitions |
+| `src/lib/candidateCompanyRetrieval.ts` | Create - Client-side candidate retrieval |
+| `supabase/functions/inbox-suggest-v2/index.ts` | Create - New edge function |
+| `supabase/config.toml` | Modify - Add inbox-suggest-v2 function |
+| `src/hooks/useInboxSuggestionsV2.ts` | Create - New hook with structured suggestions |
+| `src/components/inbox/InboxActionRail.tsx` | Modify - New suggestion card UI |
+| `src/components/inbox/SuggestionCard.tsx` | Create - Reusable suggestion card component |
+| Migration for inbox_suggestions schema | Create - Add new columns |
+| `docs/inbox_suggestions_types.md` | Create - README snippet |
+
+## Migration SQL
+
+```sql
+-- Add new columns to inbox_suggestions
+ALTER TABLE inbox_suggestions
+ADD COLUMN IF NOT EXISTS intent text,
+ADD COLUMN IF NOT EXISTS version integer DEFAULT 1,
+ADD COLUMN IF NOT EXISTS dismissed_ids jsonb DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS candidate_companies jsonb,
+ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
+-- Add index for cache validation
+CREATE INDEX IF NOT EXISTS idx_inbox_suggestions_cache 
+ON inbox_suggestions (inbox_item_id, updated_at DESC);
+
+-- Update RLS to allow update for dismissed_ids
+-- (Already has update policy, no change needed)
+```
+
+## Edge Function Pseudocode
+
+```typescript
+// inbox-suggest-v2/index.ts
+
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+serve(async (req) => {
+  // 1. Auth validation
+  // 2. Parse request body { inbox_item_id, force?: boolean }
+  
+  // 3. Check cache
+  const cached = await getCachedSuggestions(inbox_item_id);
+  if (cached && !force && Date.now() - cached.updated_at < CACHE_TTL_MS) {
+    return Response.json(cached);
+  }
+  
+  // 4. Fetch inbox item
+  const item = await fetchInboxItem(inbox_item_id);
+  
+  // 5. Fetch candidate companies (both portfolio + pipeline)
+  const candidates = await fetchCandidateCompanies(userId, item);
+  
+  // 6. Build and call OpenAI with tool calling
+  const response = await callOpenAI(item, candidates);
+  
+  // 7. Validate company_id references
+  const validated = validateCompanyReferences(response, candidates);
+  
+  // 8. Persist to database
+  await upsertSuggestions(inbox_item_id, validated, candidates);
+  
+  // 9. Return response
+  return Response.json(validated);
+});
+```
+
+## Testing Scenarios
+
+| Email Type | Expected Intent | Expected Suggestions |
+|------------|-----------------|---------------------|
+| Cold intro from new startup | `intro_first_touch` | CREATE_PIPELINE_COMPANY, CREATE_FOLLOW_UP_TASK |
+| Reply from pipeline company | `pipeline_follow_up` | LINK_COMPANY (if not linked), CREATE_FOLLOW_UP_TASK |
+| Quarterly update from portfolio | `portfolio_update` | LINK_COMPANY, EXTRACT_UPDATE_HIGHLIGHTS |
+| "Can you intro me to X?" | `intro_request` | CREATE_INTRO_TASK, possibly LINK_COMPANY |
+| Self-sent "call dentist" | `personal_todo` | CREATE_PERSONAL_TASK |
+| Newsletter / FYI email | `fyi_informational` | Empty or LINK_COMPANY only |
 
