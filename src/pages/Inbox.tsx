@@ -31,9 +31,20 @@ type SortOption = "newest" | "oldest" | "unread";
 export default function Inbox() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
-  const { inboxItems, isLoading, markAsRead, markComplete, archive } = useInboxItems();
+  const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze } = useInboxItems();
   const { inboxItems: archivedItems, isLoading: isLoadingArchived } = useInboxItems({ onlyArchived: true });
   const { createTask } = useTasks();
+
+  // Snooze handler
+  const handleSnooze = (id: string, until: Date) => {
+    snooze(id, until);
+  };
+
+  // Add note handler (placeholder - opens floating note or modal)
+  const handleAddNote = (item: InboxItem) => {
+    // For now, just show a toast - can be wired to AddNoteModal or FloatingNote
+    toast.info("Add note feature coming soon");
+  };
   
   // Filters and sorting state
   const [search, setSearch] = useState("");
@@ -342,6 +353,8 @@ export default function Inbox() {
                 onCreateTask={handleCreateTask}
                 onMarkComplete={handleMarkComplete}
                 onArchive={handleArchive}
+                onSnooze={handleSnooze}
+                onAddNote={handleAddNote}
               />
             </div>
           )}
@@ -358,6 +371,8 @@ export default function Inbox() {
           onCreateTask={handleCreateTask}
           onMarkComplete={handleMarkComplete}
           onArchive={handleArchive}
+          onSnooze={handleSnooze}
+          onAddNote={handleAddNote}
         />
       )}
 
