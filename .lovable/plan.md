@@ -1,256 +1,410 @@
 
-# Inbox Detail Workspace Refactor
+
+# Inbox Enhancement Plan: Clean Rendering, Attachments, and Suggested Actions
 
 ## Overview
 
-Refactor the inbox email detail pane from a single-column layout into a two-column workspace with a wide content column (left) and a sticky action rail (right), wrapped in a glassmorphic card container that matches Casper's command-center aesthetic.
+This plan implements three major upgrades to the Inbox detail workspace:
+1. **Clean email rendering** with deterministic stripping of forwarded wrappers, disclaimers, and signatures
+2. **Attachment storage and UI** with Supabase Storage bucket and inline previews
+3. **Suggested actions** with Phase A (heuristics) and Phase B (AI via Edge Function)
 
-## Current State Analysis
+---
 
-**Current Component:** `src/components/dashboard/InboxDetailDrawer.tsx`
-- Single-column layout with header (sender/subject/inline actions) and scrollable body
-- Actions are inline in the header: Create Task, Complete, Archive
-- Related company card displayed at top of body
-- Email content with collapsible disclaimer section
-- Supports both `sheet` and `embedded` modes
+## Current State Summary
 
-**Action Handlers Available (from `useInboxItems`):**
-- `markAsRead`, `markComplete`, `archive`, `unarchive`
-- `snooze` (takes Date)
-- `markTopPriority`
+**Inbox Item Schema** (`inbox_items` table):
+- `text_body`, `html_body` - raw email content
+- `snippet` - 280 char preview
+- `from_email`, `from_name`, `subject` - already parsed for forwarded emails in ingestion
+- No attachment columns or related table
 
-**UI Patterns to Reuse:**
-- `GlassPanel` / `GlassModuleCard` for glassmorphic containers
-- `ActionPanel` system for consistent styling
-- Snooze dropdown pattern from `PriorityTaskDetailContent`
+**Existing Patterns**:
+- `readingHelpers.ts` provides a good model for heuristic suggestion logic
+- OPENAI_API_KEY secret is already configured for AI features
+- Storage bucket `company-logos` exists with public access pattern
+
+**Current Content Pane** (`InboxContentPane.tsx`):
+- Has basic disclaimer splitting (`splitContentAtDisclaimer`)
+- "View original email" collapsible exists but needs improvement
+- Placeholder for attachments section exists
+
+---
 
 ## Implementation Plan
 
-### File Changes
+### Phase 1: Enhanced Email Cleaning (Client-Side First)
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/components/inbox/InboxDetailWorkspace.tsx` | CREATE | New two-column workspace component |
-| `src/components/inbox/InboxActionRail.tsx` | CREATE | Right-side sticky action rail |
-| `src/components/inbox/InboxContentPane.tsx` | CREATE | Left-side content column |
-| `src/components/dashboard/InboxDetailDrawer.tsx` | MODIFY | Use new workspace in embedded mode |
-| `src/pages/Inbox.tsx` | MODIFY | Pass additional handlers (snooze, addNote) |
+**Create: `src/lib/emailCleaners.ts`**
 
-### Component Architecture
+A utility module with pure functions for deterministic email cleaning:
 
-```text
-InboxDetailDrawer (existing, mode switch)
-  |
-  +-- mode="sheet" --> Sheet overlay (unchanged for mobile)
-  |
-  +-- mode="embedded" --> InboxDetailWorkspace (NEW)
-                              |
-                              +-- InboxContentPane (left, scrollable)
-                              |     +-- Header (sender, subject, timestamp, status pill)
-                              |     +-- Body (cleaned content)
-                              |     +-- Collapsible "View original email"
-                              |     +-- Linked Entities section
-                              |
-                              +-- InboxActionRail (right, sticky)
-                                    +-- Take Action section
-                                    +-- Suggested Actions (placeholder)
-                                    +-- Activity timeline (placeholder)
+```typescript
+interface CleanedEmail {
+  cleanedText: string;
+  cleanedHtml: string | null;
+  originalSender: { name: string | null; email: string | null } | null;
+  originalSubject: string | null;
+  originalDate: string | null;
+  wasForwarded: boolean;
+  cleaningApplied: string[];
+}
+
+// Main cleaning functions:
+- cleanEmailContent(text, html): CleanedEmail
+- stripForwardedWrapper(text): { body: string; meta: ForwardedMeta | null }
+- stripDisclaimers(text): string
+- stripSignatures(text): string  
+- sanitizeHtml(html): string
 ```
 
-### Step 1: Create InboxActionRail Component
+**Cleaning Rules**:
 
-**File:** `src/components/inbox/InboxActionRail.tsx`
+| Pattern Type | Detection | Action |
+|-------------|-----------|--------|
+| Forwarded wrapper | `---------- Forwarded message ---------`, `--- Original Message ---` | Extract original sender/subject, strip header block |
+| Header blocks | Lines starting with `From:`, `Sent:`, `To:`, `Subject:`, `Date:` at start of content | Strip entire block, preserve extracted metadata |
+| Legal disclaimers | `DISCLAIMER:`, `CONFIDENTIALITY NOTICE`, `This email and any files transmitted`, `If you are not the intended recipient`, `This message is intended only` | Strip from first match onwards |
+| Signatures | `-- ` on own line, phone patterns, multi-line blocks at end with name/title | Strip cautiously (only if after main content) |
+| HTML cleaning | `<style>`, `<script>`, tracking pixels | Use regex removal, preserve semantic structure |
 
-A compact, sticky vertical rail with action groups:
+**Safety Rule**: If cleaning removes more than 80% of content, fall back to raw.
 
-**Take Action Section:**
-- Create Task button (icon + label)
-- Add Note button (opens AddNoteModal)
-- Link Company button (placeholder for now)
-- Set Category dropdown (placeholder)
-- Snooze dropdown (Later today / Tomorrow / Next week)
-- Complete button
-- Archive button
+**Update: `src/components/inbox/InboxContentPane.tsx`**
 
-**Suggested Actions Section:**
-- Header with sparkle icon and count
-- Placeholder cards showing AI suggestion format
-- Each card: title, confidence badge, effort estimate, Approve/Edit buttons
-- Initially shows "No suggestions yet" empty state
+- Replace inline `splitContentAtDisclaimer` with `cleanEmailContent()`
+- Display cleaned content by default
+- Update "View original email" to show full raw text/html
+- Show original sender info in header if different from stored sender
 
-**Activity Section:**
-- Header "Activity" with count
-- Collapsible list of actions taken (placeholder data structure)
-- Each entry: icon, action text, timestamp
+---
 
-**Styling:**
-- Width: ~200px fixed
-- Sticky positioning (top-24)
-- Glass background with subtle border
-- Compact button sizing (h-8, text-xs)
-- Muted section headers (uppercase, tracking-wide)
-- Dividers between sections
+### Phase 2: Attachment Storage and UI
 
-### Step 2: Create InboxContentPane Component
+**Database Migration: Create `inbox_attachments` table**
 
-**File:** `src/components/inbox/InboxContentPane.tsx`
+```sql
+CREATE TABLE public.inbox_attachments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  inbox_item_id uuid NOT NULL REFERENCES public.inbox_items(id) ON DELETE CASCADE,
+  filename text NOT NULL,
+  mime_type text NOT NULL,
+  size_bytes integer NOT NULL,
+  storage_path text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  created_by uuid NOT NULL
+);
 
-The main document viewing area:
+ALTER TABLE public.inbox_attachments ENABLE ROW LEVEL SECURITY;
 
-**Header Section:**
-- Sender avatar, name, email
-- Timestamp (relative + absolute on hover)
-- Subject as prominent title
-- Status pill (Open/Resolved/Archived)
-- Category chips (if any linked)
-- Linked company chips (clickable)
+CREATE POLICY "Users can view their own attachments"
+  ON public.inbox_attachments FOR SELECT
+  USING (auth.uid() = created_by);
 
-**Body Section:**
-- Max-width prose container for readability
-- Cleaned/parsed body content by default
-- HTML sanitization for htmlBody
-- "View original email" collapsible at bottom showing raw content
-
-**Attachments Section (placeholder):**
-- List of attachment cards
-- Each card: file icon, name, size, download button
-- PDF/image preview deferred to future phase
-
-**Linked Entities Section:**
-- Subsection for linked companies (with avatars, names)
-- Quick unlink button on hover
-- "+ Link company" button if none linked
-
-### Step 3: Create InboxDetailWorkspace Component
-
-**File:** `src/components/inbox/InboxDetailWorkspace.tsx`
-
-The container component that arranges the two columns:
-
-```tsx
-<div className="flex h-full rounded-2xl border bg-card shadow-sm overflow-hidden">
-  {/* Left: Content Column (scrollable) */}
-  <div className="flex-1 min-w-0 overflow-y-auto">
-    <InboxContentPane ... />
-  </div>
-  
-  {/* Right: Action Rail (sticky) */}
-  <div className="w-[200px] xl:w-[220px] flex-shrink-0 border-l overflow-y-auto">
-    <InboxActionRail ... />
-  </div>
-</div>
+CREATE POLICY "Service role can insert attachments"
+  ON public.inbox_attachments FOR INSERT
+  WITH CHECK (true);
 ```
 
-**Layout Details:**
-- Flex container with `h-full`
-- Left column: `flex-1 min-w-0` for flexible width, independent scroll
-- Right rail: fixed width (200-220px), border-left, independent scroll if needed
-- Container: rounded-2xl corners, subtle shadow, glass-like border
+**Database Migration: Create `inbox-attachments` storage bucket**
 
-### Step 4: Update InboxDetailDrawer
+```sql
+INSERT INTO storage.buckets (id, name, public) VALUES ('inbox-attachments', 'inbox-attachments', false);
 
-**File:** `src/components/dashboard/InboxDetailDrawer.tsx`
+CREATE POLICY "Users can read their own attachments"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'inbox-attachments' AND auth.uid()::text = (storage.foldername(name))[1]);
+```
 
-Modify embedded mode to use the new workspace:
+**Update: `supabase/functions/email-inbox-ingest/index.ts`**
 
-```tsx
-if (mode === 'embedded') {
-  return (
-    <InboxDetailWorkspace
-      item={item}
-      onClose={onClose}
-      onCreateTask={onCreateTask}
-      onMarkComplete={onMarkComplete}
-      onArchive={onArchive}
-      onSnooze={onSnooze}
-      onAddNote={onAddNote}
-    />
-  );
+Modify to handle attachments from the webhook payload:
+
+```typescript
+// After inbox_item insert, process attachments
+if (payload.attachments && Array.isArray(payload.attachments)) {
+  for (const attachment of payload.attachments) {
+    const storagePath = `${user.id}/${inboxItemId}/${attachment.filename}`;
+    
+    // Upload binary content to storage
+    const { error: uploadError } = await supabaseClient.storage
+      .from('inbox-attachments')
+      .upload(storagePath, decode(attachment.content), {
+        contentType: attachment.contentType,
+      });
+    
+    // Insert metadata record
+    if (!uploadError) {
+      await supabaseClient.from('inbox_attachments').insert({
+        inbox_item_id: inboxItemId,
+        filename: attachment.filename,
+        mime_type: attachment.contentType,
+        size_bytes: attachment.size,
+        storage_path: storagePath,
+        created_by: user.id,
+      });
+    }
+  }
 }
 ```
 
-Keep the sheet mode unchanged for mobile.
+**Create: `src/hooks/useInboxAttachments.ts`**
 
-### Step 5: Update Inbox Page
+```typescript
+interface InboxAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  storagePath: string;
+}
 
-**File:** `src/pages/Inbox.tsx`
+function useInboxAttachments(inboxItemId: string) {
+  // Fetch attachments for item
+  // Generate signed URLs for download/preview
+  return { attachments, isLoading, getSignedUrl };
+}
+```
 
-Pass additional handlers to the detail drawer:
-- `onSnooze` handler using `snooze` from `useInboxItems`
-- `onAddNote` handler to open note modal with inbox item context
+**Create: `src/components/inbox/InboxAttachmentsSection.tsx`**
 
-Add state for AddNoteModal:
-```tsx
-const [noteModalOpen, setNoteModalOpen] = useState(false);
-const [noteContext, setNoteContext] = useState<NoteContext | null>(null);
+UI component for the content pane:
+- List attachment cards (icon by mime type, filename, formatted size)
+- Download button using signed URL
+- Inline preview toggle for images (png, jpg, gif, webp) and PDFs
+- Use `<img>` for images, `<iframe>` for PDFs (with fallback)
 
-const handleAddNote = (item: InboxItem) => {
-  // Could link to inbox item if note_links supports it
-  // For now, just open the modal
-  setNoteModalOpen(true);
+**Update: `src/components/inbox/InboxContentPane.tsx`**
+
+- Add `<InboxAttachmentsSection>` between body and "View original email"
+- Pass `inboxItemId` to fetch attachments
+
+---
+
+### Phase 3A: Suggested Actions (Heuristic)
+
+**Create: `src/lib/inboxSuggestions.ts`**
+
+```typescript
+interface SuggestedAction {
+  id: string;
+  title: string;
+  effortMinutes: number | null;
+  effortBucket: 'quick' | 'medium' | 'long';
+  confidence: 'low' | 'medium' | 'high';
+  source: 'heuristic' | 'ai';
+  rationale: string;
+  dueHint?: string;
+  category?: string;
+}
+
+function extractHeuristicSuggestions(
+  subject: string, 
+  cleanedText: string
+): SuggestedAction[]
+```
+
+**Heuristic Rules**:
+
+| Pattern | Detection | Suggested Title | Confidence |
+|---------|-----------|-----------------|------------|
+| Action verbs | Lines with "send", "share", "schedule", "follow up", "intro", "review", "update", "draft", "attach", "confirm", "call", "meet" | Extract line as task | medium |
+| Numbered lists | `1.`, `2.`, etc. at line start | Each item as separate task | high |
+| Bullet points | `- `, `* `, `• ` at line start | Each item as separate task | medium |
+| Questions | Lines ending with `?` requiring action | "Respond to: [question]" | medium |
+| Deadlines | "by [date]", "before [date]", "deadline" | Extract with due hint | high |
+| Default | No matches found | "Follow up on: [subject]" | low |
+
+**Effort Estimation**:
+- Quick (5 min): Single-line items, confirmations
+- Medium (15 min): Multi-step items, reviews
+- Long (30+ min): Calls, meetings, document creation
+
+**Update: `src/components/inbox/InboxActionRail.tsx`**
+
+- Replace placeholder `suggestions` array with `useMemo` calling `extractHeuristicSuggestions`
+- Wire "Approve" button to `onCreateTask` with prefilled content
+- Wire "Edit" button to open task dialog with editable prefill
+- Add "Generate with AI" button (disabled until Phase B)
+
+---
+
+### Phase 3B: Suggested Actions (AI via Edge Function)
+
+**Create: `supabase/functions/inbox-suggest/index.ts`**
+
+Edge function using OpenAI with structured JSON output:
+
+```typescript
+// Input: { inbox_item_id } or { subject, cleanedText, sender }
+// Output: { suggested_tasks: SuggestedAction[] }
+
+const systemPrompt = `You are analyzing an email to extract actionable tasks.
+Return a JSON object with suggested_tasks array. Each task has:
+- title: clear, actionable task title (imperative verb)
+- effort_minutes: estimated time (5, 15, 30, 60)
+- due_hint: relative date hint if deadline mentioned ("tomorrow", "this week", "by Friday")
+- category: optional category ("follow-up", "meeting", "review", "send", "call")
+- confidence: "low" | "medium" | "high"
+- rationale: brief explanation of why this is a task
+
+Be conservative - only suggest genuine actionable items, not FYIs.
+Return maximum 5 suggestions. If no tasks needed, return empty array.`;
+
+// Use OpenAI with OPENAI_API_KEY (already configured)
+// Response format enforcement with JSON mode
+```
+
+**Database Migration: Optional caching table**
+
+```sql
+CREATE TABLE public.inbox_suggestions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  inbox_item_id uuid NOT NULL REFERENCES public.inbox_items(id) ON DELETE CASCADE,
+  suggestions jsonb NOT NULL,
+  generated_at timestamptz NOT NULL DEFAULT now(),
+  source text NOT NULL DEFAULT 'ai',
+  UNIQUE(inbox_item_id)
+);
+
+ALTER TABLE public.inbox_suggestions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view suggestions for their items"
+  ON public.inbox_suggestions FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM public.inbox_items 
+    WHERE id = inbox_suggestions.inbox_item_id AND created_by = auth.uid()
+  ));
+```
+
+**Create: `src/hooks/useInboxSuggestions.ts`**
+
+```typescript
+function useInboxSuggestions(inboxItemId: string) {
+  // 1. Check cache in inbox_suggestions table
+  // 2. If no cache or stale, return heuristic suggestions
+  // 3. Provide generateAISuggestions() mutation
+  return { 
+    suggestions, 
+    isLoading, 
+    isAI, 
+    generateAISuggestions,
+    refreshSuggestions 
+  };
+}
+```
+
+**Update: `src/components/inbox/InboxActionRail.tsx`**
+
+- Replace local heuristic call with `useInboxSuggestions` hook
+- Show AI badge on suggestions from AI source
+- "Generate with AI" button calls `generateAISuggestions()`
+- Loading state while generating
+- Show "Powered by AI" indicator when applicable
+
+---
+
+### Phase 4: Task Linking and Activity Feedback
+
+**Database Migration: Add `source_inbox_item_id` to tasks**
+
+```sql
+ALTER TABLE public.tasks 
+ADD COLUMN source_inbox_item_id uuid REFERENCES public.inbox_items(id) ON DELETE SET NULL;
+```
+
+**Update: `src/pages/Inbox.tsx`**
+
+Modify `handleCreateTask` to include inbox item link:
+
+```typescript
+const handleCreateTask = async (item: InboxItem, suggestionTitle?: string) => {
+  setTaskPrefill({
+    content: suggestionTitle || item.subject,
+    description: item.preview || undefined,
+    companyName: item.relatedCompanyName,
+    sourceInboxItemId: item.id, // New field
+  });
+  setIsTaskDialogOpen(true);
 };
 ```
 
-## Styling Details
+**Update: `src/hooks/useTasks.ts`**
 
-**Container:**
-- `rounded-2xl` for pane-within-cockpit feel
-- `bg-white dark:bg-slate-900` base
-- `border border-slate-200 dark:border-slate-700`
-- `shadow-sm` subtle elevation
+- Add `source_inbox_item_id` to transform and create functions
+- Track in Task interface
 
-**Section Headers:**
-- `text-[10px] font-semibold uppercase tracking-[0.12em]`
-- `text-muted-foreground`
-- `mb-2` spacing
+**Activity Trail** (Lightweight for MVP):
 
-**Action Buttons:**
-- `h-8 text-xs` compact sizing
-- Full-width in rail: `w-full justify-start`
-- Icons: `h-3.5 w-3.5 mr-2`
-- Ghost variant for secondary actions
-- Outline variant for primary actions
+For now, derive activity from related data rather than a separate audit log:
+- When rendering activity section, query tasks where `source_inbox_item_id = item.id`
+- Show "Created task: [title]" entries with timestamps
+- Future: full audit table for all actions
 
-**Dividers:**
-- `border-t border-slate-100 dark:border-slate-800`
-- `my-4` spacing between sections
+---
 
-**Content Typography:**
-- Body: `text-[13px] leading-relaxed`
-- `max-w-prose` for readability
-- Muted colors for metadata
+## File Changes Summary
 
-## Props Interface
+| File | Action | Description |
+|------|--------|-------------|
+| `src/lib/emailCleaners.ts` | CREATE | Email cleaning utilities |
+| `src/lib/inboxSuggestions.ts` | CREATE | Heuristic suggestion extraction |
+| `src/hooks/useInboxAttachments.ts` | CREATE | Attachment fetching hook |
+| `src/hooks/useInboxSuggestions.ts` | CREATE | Suggestion hook (heuristic + AI) |
+| `src/components/inbox/InboxAttachmentsSection.tsx` | CREATE | Attachment list/preview UI |
+| `src/components/inbox/InboxContentPane.tsx` | MODIFY | Use cleaners, add attachments section |
+| `src/components/inbox/InboxActionRail.tsx` | MODIFY | Wire real suggestions, approve flow |
+| `src/pages/Inbox.tsx` | MODIFY | Pass suggestion handlers, task linking |
+| `src/types/inbox.ts` | MODIFY | Add attachment types, suggestion types |
+| `supabase/functions/email-inbox-ingest/index.ts` | MODIFY | Handle attachment uploads |
+| `supabase/functions/inbox-suggest/index.ts` | CREATE | AI suggestion edge function |
+| `supabase/config.toml` | MODIFY | Add inbox-suggest function config |
 
-```typescript
-interface InboxDetailWorkspaceProps {
-  item: InboxItem;
-  onClose: () => void;
-  onCreateTask: (item: InboxItem) => void;
-  onMarkComplete: (id: string) => void;
-  onArchive: (id: string) => void;
-  onSnooze?: (id: string, until: Date) => void;
-  onAddNote?: (item: InboxItem) => void;
-}
-```
+**Migrations Required**:
+1. `inbox_attachments` table + RLS
+2. `inbox-attachments` storage bucket + RLS
+3. `inbox_suggestions` table (optional cache)
+4. `tasks.source_inbox_item_id` column
+
+---
+
+## Verification Scenarios
+
+After implementation, these scenarios should work:
+
+| # | Scenario | Expected Result |
+|---|----------|-----------------|
+| 1 | Email with legal disclaimer | Disclaimer hidden, clean body shown, "View original" shows full |
+| 2 | Forwarded email | Original sender displayed, wrapper stripped |
+| 3 | Email with PDF attachment | Attachment card shown, download works, PDF preview opens |
+| 4 | Email with action items | Heuristic suggestions appear in rail |
+| 5 | Click "Approve" on suggestion | Task created, linked to email, appears in Activity |
+| 6 | Click "Generate with AI" | AI suggestions load, replace heuristics |
+| 7 | Create task from email | Task has `source_inbox_item_id`, shows in Activity section |
+
+---
 
 ## Deferred Items
 
-1. **Attachments Preview**: File attachment listing and PDF/image preview - requires backend attachment storage (not currently in inbox_items schema)
+- **Server-side cleaning**: Initially client-side for iteration speed; migrate to Edge Function for consistency if needed
+- **Full audit log**: Activity section uses derived data; full audit table is future work
+- **Link Company flow**: Placeholder remains; requires company search modal
+- **Set Category flow**: Placeholder remains; requires inbox category system
 
-2. **AI Suggested Actions**: Placeholder UI only - actual AI suggestion engine is a separate feature
+---
 
-3. **Activity Timeline**: Placeholder structure - requires tracking actions taken on inbox items (new table or audit log)
+## Technical Notes
 
-4. **Link Company**: UI placeholder - requires modal for company search and linking mutation
+**Attachment Size Limits** (from existing memory):
+- Individual email bodies: 60KB text, 120KB HTML
+- Recommended attachment limit: 10MB each (tune based on usage)
 
-5. **Set Category**: UI placeholder - requires category system for inbox items
+**AI Rate Limiting**:
+- Cache AI suggestions in `inbox_suggestions` table
+- Only re-generate if user explicitly requests
+- Consider debounce on rapid inbox item selection
 
-## Summary
+**HTML Sanitization**:
+- Continue using `dangerouslySetInnerHTML` with pre-sanitized content
+- `sanitizeHtml()` removes scripts, styles, event handlers, data URIs
 
-This refactor introduces a two-column workspace layout for the inbox detail pane:
-- Left column for focused email reading with cleaned content
-- Right rail for quick actions and future AI suggestions
-- Glassmorphic styling consistent with Casper's design language
-- No changes to existing data fetching, filtering, or list behavior
-- Maintains mobile sheet mode unchanged
