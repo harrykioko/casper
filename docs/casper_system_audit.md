@@ -1689,16 +1689,25 @@ function useWaitingFor() {
 
 ### Implementation Roadmap
 
-#### Phase 1: Foundation (Weeks 1-3)
+#### Phase 1: Foundation (Weeks 1-3) ✅ COMPLETE
 
-| Priority | Solution | Effort | Impact |
-|----------|----------|--------|--------|
-| P0 | 2.1 Priority v2 (expand to 8 sources) | High | Critical |
-| P0 | 3.3 Snooze infrastructure | Medium | Critical |
-| P1 | 1.3 Task effort estimates | Low | High |
-| P1 | 4.1 Inline actions on priority cards | Medium | High |
+| Priority | Solution | Effort | Impact | Status |
+|----------|----------|--------|--------|--------|
+| P0 | 2.1 Priority v2 (expand to 8 sources) | High | Critical | ✅ Done |
+| P0 | 3.3 Snooze infrastructure | Medium | Critical | ✅ Done |
+| P1 | 1.3 Task effort estimates | Low | High | ✅ Done |
+| P1 | 4.1 Inline actions on priority cards | Medium | High | ✅ Done |
 
 **Milestone:** Priority panel shows all sources; snooze works reliably; effort filtering available.
+
+**Implementation Notes (January 2026):**
+- Created migration `20260128000001_phase1_effort_and_snooze.sql`
+- Added `effort_minutes`, `effort_category` columns to tasks
+- Added `snoozed_until`, `snooze_count`, `last_snoozed_at` to tasks and inbox_items
+- Created `snooze_log` table for analytics and escalation tracking
+- Created `useUnifiedPriorityV2` hook consuming 8 data sources
+- Created `useSnooze` hook with escalation tracking
+- Enhanced `PriorityItemRow` with source-specific inline actions
 
 #### Phase 2: Commitments & People (Weeks 4-6)
 

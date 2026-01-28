@@ -225,6 +225,54 @@ export const V1_PRIORITY_CONFIG: PriorityConfig = {
 };
 
 /**
+ * V2 Priority Configuration (Full Coverage)
+ *
+ * Expands v1 to include all 8 data sources:
+ * - Tasks, Inbox, Calendar (from v1)
+ * - Portfolio companies (stale = needs attention)
+ * - Pipeline companies (next_steps, close_date)
+ * - Reading list (unread items)
+ * - Nonnegotiables (habit tracking)
+ *
+ * Enhanced scoring:
+ * - 4-dimensional (urgency 30%, importance 25%, commitment 25%, recency 10%, effort 10%)
+ * - Diversity rules (max 4 items per source)
+ * - Minimum score threshold (0.2)
+ */
+export const V2_PRIORITY_CONFIG: PriorityConfig = {
+  weights: {
+    urgency: 0.30,      // 30% - Time sensitivity (deadlines, staleness)
+    importance: 0.25,   // 25% - Explicit priority, VIP status
+    recency: 0.10,      // 10% - How recently it became relevant
+    commitment: 0.25,   // 25% - Commitments score higher
+    effort: 0.10,       // 10% - Quick wins get a boost when time-constrained
+  },
+  maxItems: 12,             // v2: Show top 12 items
+  minScore: 0.2,            // v2: Filter out very low-signal items
+  maxItemsPerSource: 4,     // v2: Diversity - no source dominates
+  companyStaleThreshold: 14,
+  taskStaleThreshold: 7,
+  calendarUpcomingWindow: 48,
+  inboxUrgentWindow: 4,
+};
+
+/**
+ * EffortCategory
+ * Bucket classification for task effort
+ */
+export type EffortCategory = 'quick' | 'medium' | 'deep' | 'unknown';
+
+/**
+ * Get effort category from minutes
+ */
+export function getEffortCategory(minutes: number | null | undefined): EffortCategory {
+  if (minutes === null || minutes === undefined) return 'unknown';
+  if (minutes <= 15) return 'quick';
+  if (minutes <= 60) return 'medium';
+  return 'deep';
+}
+
+/**
  * PriorityUserFeedback
  * Track user actions on priority items for learning
  *

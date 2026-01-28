@@ -1,7 +1,7 @@
-import { 
-  AlertTriangle, 
-  Clock, 
-  AlertCircle, 
+import {
+  AlertTriangle,
+  Clock,
+  AlertCircle,
   CheckCircle,
   Mail,
   Calendar,
@@ -10,15 +10,22 @@ import {
   BookOpen,
   CheckSquare,
   MoreHorizontal,
-  Folder
+  Folder,
+  Phone,
+  Plus,
+  ExternalLink,
+  MessageSquare,
+  FileText,
+  Building2,
 } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow, addHours, addDays, setHours, setMinutes, nextMonday } from "date-fns";
 import type { PriorityItem, PriorityIconType, PrioritySourceType } from "@/types/priority";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -30,8 +37,28 @@ interface PriorityItemRowProps {
   isSelected?: boolean;
   onClick: () => void;
   onResolve: () => void;
-  onSnooze: (duration: "later_today" | "tomorrow" | "next_week") => void;
+  onSnooze: (duration: "later_today" | "tomorrow" | "next_week" | "custom", customDate?: Date) => void;
   onToggleTopPriority?: (isTop: boolean) => void;
+  // New v2 actions
+  onCreateTask?: (prefill?: { content?: string; companyId?: string }) => void;
+  onLogInteraction?: (companyId: string) => void;
+  onViewCompany?: (companyId: string) => void;
+  onOpenUrl?: (url: string) => void;
+}
+
+// Snooze time helpers
+function getSnoozeTime(duration: "later_today" | "tomorrow" | "next_week"): Date {
+  const now = new Date();
+  switch (duration) {
+    case "later_today":
+      return addHours(now, 4);
+    case "tomorrow":
+      return setMinutes(setHours(addDays(now, 1), 9), 0);
+    case "next_week":
+      return setMinutes(setHours(nextMonday(now), 9), 0);
+    default:
+      return addHours(now, 4);
+  }
 }
 
 const iconConfig: Record<
@@ -117,13 +144,27 @@ function getSourceIcon(sourceType: PrioritySourceType) {
   }
 }
 
-export function PriorityItemRow({ item, isSelected, onClick, onResolve, onSnooze, onToggleTopPriority }: PriorityItemRowProps) {
+export function PriorityItemRow({
+  item,
+  isSelected,
+  onClick,
+  onResolve,
+  onSnooze,
+  onToggleTopPriority,
+  onCreateTask,
+  onLogInteraction,
+  onViewCompany,
+  onOpenUrl,
+}: PriorityItemRowProps) {
   const config = item.iconType ? iconConfig[item.iconType] : defaultIconConfig;
   const Icon = config?.icon || defaultIconConfig.icon;
   const SourceIcon = getSourceIcon(item.sourceType);
 
   const canSnooze = item.sourceType === "task" || item.sourceType === "inbox";
   const canToggleTopPriority = item.sourceType === "task" || item.sourceType === "inbox";
+  const isCompany = item.sourceType === "portfolio_company" || item.sourceType === "pipeline_company";
+  const isCalendar = item.sourceType === "calendar_event";
+  const isReading = item.sourceType === "reading_item";
 
   return (
     <div
@@ -234,41 +275,187 @@ export function PriorityItemRow({ item, isSelected, onClick, onResolve, onSnooze
 
       {/* Actions */}
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-        {/* Top Priority Toggle */}
-        {canToggleTopPriority && onToggleTopPriority && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "h-8 w-8",
-              item.isTopPriority 
-                ? "text-amber-500 hover:text-amber-600" 
-                : "text-muted-foreground hover:text-amber-500"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleTopPriority(!item.isTopPriority);
-            }}
-            title={item.isTopPriority ? "Remove from Top Priority" : "Make Top Priority"}
-          >
-            <Star className={cn("h-4 w-4", item.isTopPriority && "fill-current")} />
-          </Button>
+        {/* Source-specific quick actions */}
+
+        {/* Company actions: Log interaction, Create task */}
+        {isCompany && onLogInteraction && item.sourceId && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-sky-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onLogInteraction(item.sourceId);
+                  toast.success("Opening interaction log...");
+                }}
+              >
+                <Phone className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Log interaction</TooltipContent>
+          </Tooltip>
         )}
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-emerald-600"
-          onClick={(e) => {
-            e.stopPropagation();
-            onResolve();
-            toast.success("Item resolved");
-          }}
-          title="Resolve"
-        >
-          <CheckCircle className="h-4 w-4" />
-        </Button>
+        {isCompany && onCreateTask && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-emerald-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCreateTask({
+                    content: `Follow up with ${item.companyName || item.title}`,
+                    companyId: item.sourceId,
+                  });
+                  toast.success("Creating task...");
+                }}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Create follow-up task</TooltipContent>
+          </Tooltip>
+        )}
 
+        {/* Calendar actions: View company context */}
+        {isCalendar && item.companyId && onViewCompany && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-violet-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewCompany(item.companyId!);
+                }}
+              >
+                <Building2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">View company</TooltipContent>
+          </Tooltip>
+        )}
+
+        {isCalendar && onCreateTask && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-emerald-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCreateTask({
+                    content: `Prep for: ${item.title}`,
+                  });
+                  toast.success("Creating prep task...");
+                }}
+              >
+                <FileText className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Create prep task</TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Inbox actions: Create task from email */}
+        {item.sourceType === "inbox" && onCreateTask && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-emerald-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCreateTask({
+                    content: `Follow up: ${item.title}`,
+                    companyId: item.companyId || undefined,
+                  });
+                  toast.success("Creating task from email...");
+                }}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Create task from email</TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Reading list actions: Open URL */}
+        {isReading && onOpenUrl && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-rose-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // The sourceId should be the reading item ID, but we need the URL
+                  // For now, trigger the onClick which should open the detail
+                  onClick();
+                }}
+              >
+                <ExternalLink className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Open article</TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Top Priority Toggle */}
+        {canToggleTopPriority && onToggleTopPriority && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-8 w-8",
+                  item.isTopPriority
+                    ? "text-amber-500 hover:text-amber-600"
+                    : "text-muted-foreground hover:text-amber-500"
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleTopPriority(!item.isTopPriority);
+                }}
+              >
+                <Star className={cn("h-4 w-4", item.isTopPriority && "fill-current")} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {item.isTopPriority ? "Remove from top priority" : "Make top priority"}
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Resolve button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-emerald-600"
+              onClick={(e) => {
+                e.stopPropagation();
+                onResolve();
+                toast.success("Item resolved");
+              }}
+            >
+              <CheckCircle className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">Mark done</TooltipContent>
+        </Tooltip>
+
+        {/* Snooze menu */}
         {canSnooze && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -281,18 +468,113 @@ export function PriorityItemRow({ item, isSelected, onClick, onResolve, onSnooze
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSnooze("later_today"); }}>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSnooze("later_today");
+                  toast.success("Snoozed until later today");
+                }}
+              >
                 <Clock className="h-4 w-4 mr-2" />
-                Snooze until later today
+                Later today
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSnooze("tomorrow"); }}>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSnooze("tomorrow");
+                  toast.success("Snoozed until tomorrow");
+                }}
+              >
                 <Clock className="h-4 w-4 mr-2" />
-                Snooze until tomorrow
+                Tomorrow morning
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onSnooze("next_week"); }}>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSnooze("next_week");
+                  toast.success("Snoozed until next week");
+                }}
+              >
                 <Clock className="h-4 w-4 mr-2" />
-                Snooze until next week
+                Next week
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {/* Additional actions based on source type */}
+              {item.sourceType === "task" && onCreateTask && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Duplicate task functionality could go here
+                    toast.info("Feature coming soon");
+                  }}
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Add note
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {/* Non-snoozeable items get a simple more menu */}
+        {!canSnooze && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              {isCompany && onLogInteraction && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onLogInteraction(item.sourceId);
+                  }}
+                >
+                  <Phone className="h-4 w-4 mr-2" />
+                  Log call/meeting
+                </DropdownMenuItem>
+              )}
+              {isCompany && onCreateTask && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCreateTask({
+                      content: `Follow up with ${item.companyName || item.title}`,
+                      companyId: item.sourceId,
+                    });
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create task
+                </DropdownMenuItem>
+              )}
+              {isCalendar && onCreateTask && (
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCreateTask({ content: `Notes from: ${item.title}` });
+                  }}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Add meeting notes
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onResolve();
+                }}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Dismiss
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
