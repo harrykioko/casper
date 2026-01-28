@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.fetch-company-logo]
 verify_jwt = false
+
+[functions.inbox-suggest]
+verify_jwt = false

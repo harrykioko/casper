@@ -285,6 +285,47 @@ export type Database = {
         }
         Relationships: []
       }
+      inbox_attachments: {
+        Row: {
+          created_at: string
+          created_by: string
+          filename: string
+          id: string
+          inbox_item_id: string
+          mime_type: string
+          size_bytes: number
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          filename: string
+          id?: string
+          inbox_item_id: string
+          mime_type: string
+          size_bytes: number
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          filename?: string
+          id?: string
+          inbox_item_id?: string
+          mime_type?: string
+          size_bytes?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_attachments_inbox_item_id_fkey"
+            columns: ["inbox_item_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inbox_items: {
         Row: {
           created_at: string
@@ -350,6 +391,38 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      inbox_suggestions: {
+        Row: {
+          generated_at: string
+          id: string
+          inbox_item_id: string
+          source: string
+          suggestions: Json
+        }
+        Insert: {
+          generated_at?: string
+          id?: string
+          inbox_item_id: string
+          source?: string
+          suggestions: Json
+        }
+        Update: {
+          generated_at?: string
+          id?: string
+          inbox_item_id?: string
+          source?: string
+          suggestions?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_suggestions_inbox_item_id_fkey"
+            columns: ["inbox_item_id"]
+            isOneToOne: true
+            referencedRelation: "inbox_items"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       nonnegotiables: {
         Row: {
@@ -897,6 +970,7 @@ export type Database = {
           project_id: string | null
           scheduled_for: string | null
           snoozed_until: string | null
+          source_inbox_item_id: string | null
           status: string | null
           updated_at: string
         }
@@ -916,6 +990,7 @@ export type Database = {
           project_id?: string | null
           scheduled_for?: string | null
           snoozed_until?: string | null
+          source_inbox_item_id?: string | null
           status?: string | null
           updated_at?: string
         }
@@ -935,6 +1010,7 @@ export type Database = {
           project_id?: string | null
           scheduled_for?: string | null
           snoozed_until?: string | null
+          source_inbox_item_id?: string | null
           status?: string | null
           updated_at?: string
         }
@@ -972,6 +1048,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_source_inbox_item_id_fkey"
+            columns: ["source_inbox_item_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_items"
             referencedColumns: ["id"]
           },
         ]

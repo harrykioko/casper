@@ -5,45 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cleanEmailContent } from "@/lib/emailCleaners";
+import { InboxAttachmentsSection } from "./InboxAttachmentsSection";
 import type { InboxItem } from "@/types/inbox";
 
 interface InboxContentPaneProps {
   item: InboxItem;
   onClose: () => void;
-}
-
-// Patterns that indicate disclaimers or forwarded content
-const DISCLAIMER_PATTERNS = [
-  "DISCLAIMER:",
-  "CONFIDENTIALITY NOTICE",
-  "This email and any attachments",
-  "---------- Forwarded message ----------",
-  "--- Original Message ---",
-  "From:",
-  "Sent:",
-  "________________________________",
-];
-
-function splitContentAtDisclaimer(content: string): { main: string; disclaimer: string | null } {
-  let splitIndex = -1;
-  
-  for (const pattern of DISCLAIMER_PATTERNS) {
-    const index = content.indexOf(pattern);
-    if (index !== -1 && (splitIndex === -1 || index < splitIndex)) {
-      if (index > 100) {
-        splitIndex = index;
-      }
-    }
-  }
-  
-  if (splitIndex === -1) {
-    return { main: content, disclaimer: null };
-  }
-  
-  return {
-    main: content.substring(0, splitIndex).trim(),
-    disclaimer: content.substring(splitIndex).trim(),
-  };
 }
 
 export function InboxContentPane({ item, onClose }: InboxContentPaneProps) {
@@ -52,16 +20,19 @@ export function InboxContentPane({ item, onClose }: InboxContentPaneProps) {
   const bodyContent = item.body || item.preview || "";
   const hasHtmlBody = !!item.htmlBody;
   
-  const { main: mainContent, disclaimer } = useMemo(() => {
-    if (hasHtmlBody) {
-      return { main: bodyContent, disclaimer: null };
-    }
-    return splitContentAtDisclaimer(bodyContent);
-  }, [bodyContent, hasHtmlBody]);
+  // Use the new email cleaner
+  const cleanedEmail = useMemo(() => {
+    return cleanEmailContent(bodyContent, item.htmlBody);
+  }, [bodyContent, item.htmlBody]);
 
   const relativeTime = formatDistanceToNow(new Date(item.receivedAt), { addSuffix: true });
   const absoluteTime = format(new Date(item.receivedAt), "MMM d, yyyy 'at' h:mm a");
   const initial = item.senderName.charAt(0).toUpperCase();
+
+  // Determine if we should show original sender info (for forwarded emails)
+  const showOriginalSender = cleanedEmail.wasForwarded && 
+    cleanedEmail.originalSender?.email && 
+    cleanedEmail.originalSender.email !== item.senderEmail;
 
   const getStatusBadge = () => {
     if (item.isDeleted) {
@@ -75,6 +46,10 @@ export function InboxContentPane({ item, onClose }: InboxContentPaneProps) {
     }
     return <Badge variant="outline" className="text-[10px] h-5">Open</Badge>;
   };
+
+  // Check if any cleaning was applied (for showing "View original" toggle)
+  const hasCleanedContent = cleanedEmail.cleaningApplied.length > 0 && 
+    !cleanedEmail.cleaningApplied.includes("fallback_too_aggressive");
 
   return (
     <div className="flex flex-col h-full">
@@ -122,6 +97,28 @@ export function InboxContentPane({ item, onClose }: InboxContentPaneProps) {
           </Tooltip>
         </div>
 
+        {/* Original sender info (for forwarded emails) */}
+        {showOriginalSender && (
+          <div className="mb-4 p-2.5 rounded-lg bg-muted/30 border border-border">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">
+              Originally from
+            </p>
+            <p className="text-xs font-medium text-foreground">
+              {cleanedEmail.originalSender?.name || cleanedEmail.originalSender?.email}
+            </p>
+            {cleanedEmail.originalSender?.name && (
+              <p className="text-[10px] text-muted-foreground">
+                {cleanedEmail.originalSender.email}
+              </p>
+            )}
+            {cleanedEmail.originalSubject && cleanedEmail.originalSubject !== item.subject && (
+              <p className="text-[10px] text-muted-foreground mt-1">
+                Subject: {cleanedEmail.originalSubject}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Subject */}
         <h1 className="text-lg font-semibold text-foreground leading-tight mb-3">
           {item.subject}
@@ -140,20 +137,25 @@ export function InboxContentPane({ item, onClose }: InboxContentPaneProps) {
 
       {/* Scrollable Body */}
       <div className="flex-1 overflow-y-auto p-5">
-        {/* Email body content */}
+        {/* Email body content - cleaned by default */}
         <div className="max-w-prose text-[13px] leading-relaxed text-foreground">
-          {hasHtmlBody ? (
+          {hasHtmlBody && cleanedEmail.cleanedHtml ? (
             <div 
               className="prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-headings:my-3"
-              dangerouslySetInnerHTML={{ __html: item.htmlBody || "" }}
+              dangerouslySetInnerHTML={{ __html: cleanedEmail.cleanedHtml }}
             />
           ) : (
-            <p className="whitespace-pre-wrap">{mainContent}</p>
+            <p className="whitespace-pre-wrap">{cleanedEmail.cleanedText}</p>
           )}
         </div>
 
-        {/* Collapsible raw/disclaimer section */}
-        {(disclaimer || hasHtmlBody) && (
+        {/* Attachments Section */}
+        <div className="mt-6">
+          <InboxAttachmentsSection inboxItemId={item.id} />
+        </div>
+
+        {/* Collapsible raw/original section */}
+        {(hasCleanedContent || hasHtmlBody) && (
           <Collapsible 
             open={isRawOpen} 
             onOpenChange={setIsRawOpen}
@@ -161,19 +163,18 @@ export function InboxContentPane({ item, onClose }: InboxContentPaneProps) {
           >
             <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
               <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isRawOpen ? 'rotate-180' : ''}`} />
-              {hasHtmlBody ? "View original email" : "View full disclaimer & thread"}
+              View original email
+              {cleanedEmail.cleaningApplied.length > 0 && (
+                <span className="text-[10px] text-muted-foreground/60">
+                  ({cleanedEmail.cleaningApplied.filter(c => c !== "html_sanitized").join(", ")})
+                </span>
+              )}
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-3">
               <div className="border-l-2 border-muted pl-4 py-2">
-                {hasHtmlBody ? (
-                  <pre className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground font-mono overflow-x-auto">
-                    {bodyContent}
-                  </pre>
-                ) : (
-                  <p className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground">
-                    {disclaimer}
-                  </p>
-                )}
+                <pre className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground font-mono overflow-x-auto">
+                  {bodyContent}
+                </pre>
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -198,9 +199,6 @@ export function InboxContentPane({ item, onClose }: InboxContentPaneProps) {
             </div>
           </div>
         )}
-
-        {/* Attachments placeholder */}
-        {/* Attachments section will be added when backend supports attachments */}
       </div>
     </div>
   );
