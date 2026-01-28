@@ -530,25 +530,40 @@ export type Database = {
       }
       inbox_suggestions: {
         Row: {
+          candidate_companies: Json | null
+          dismissed_ids: Json | null
           generated_at: string
           id: string
           inbox_item_id: string
+          intent: string | null
           source: string
           suggestions: Json
+          updated_at: string | null
+          version: number | null
         }
         Insert: {
+          candidate_companies?: Json | null
+          dismissed_ids?: Json | null
           generated_at?: string
           id?: string
           inbox_item_id: string
+          intent?: string | null
           source?: string
           suggestions: Json
+          updated_at?: string | null
+          version?: number | null
         }
         Update: {
+          candidate_companies?: Json | null
+          dismissed_ids?: Json | null
           generated_at?: string
           id?: string
           inbox_item_id?: string
+          intent?: string | null
           source?: string
           suggestions?: Json
+          updated_at?: string | null
+          version?: number | null
         }
         Relationships: [
           {
