@@ -1,6 +1,16 @@
-
-
 # Upgrade Inbox Suggestions to VC-Intent Aware Engine
+
+## Status: IMPLEMENTED
+
+**Completed:**
+- Type definitions (`src/types/inboxSuggestions.ts`)
+- Candidate company retrieval library (`src/lib/candidateCompanyRetrieval.ts`)
+- Database migration (added intent, version, dismissed_ids, candidate_companies, updated_at)
+- Edge function `inbox-suggest-v2` with OpenAI tool calling
+- Frontend hook `useInboxSuggestionsV2`
+- SuggestionCard component
+- Updated InboxActionRail with V2 suggestions
+- Documentation (`docs/inbox_suggestions_types.md`)
 
 ## Overview
 
