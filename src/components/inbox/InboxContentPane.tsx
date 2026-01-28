@@ -138,8 +138,14 @@ export function InboxContentPane({ item, onClose }: InboxContentPaneProps) {
       {/* Scrollable Body */}
       <div className="flex-1 overflow-y-auto p-5">
         {/* Email body content - cleaned by default */}
+        {/* Prefer cleaned text if HTML still contains disclaimers */}
         <div className="max-w-prose text-[13px] leading-relaxed text-foreground">
-          {hasHtmlBody && cleanedEmail.cleanedHtml ? (
+          {hasHtmlBody && cleanedEmail.cleanedHtml && !cleanedEmail.cleaningApplied.includes("html_disclaimers") && !cleanedEmail.cleaningApplied.includes("disclaimers") ? (
+            <div 
+              className="prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-headings:my-3"
+              dangerouslySetInnerHTML={{ __html: cleanedEmail.cleanedHtml }}
+            />
+          ) : cleanedEmail.cleanedHtml && cleanedEmail.cleaningApplied.includes("html_disclaimers") ? (
             <div 
               className="prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-headings:my-3"
               dangerouslySetInnerHTML={{ __html: cleanedEmail.cleanedHtml }}
@@ -163,10 +169,10 @@ export function InboxContentPane({ item, onClose }: InboxContentPaneProps) {
           >
             <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
               <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isRawOpen ? 'rotate-180' : ''}`} />
-              View original email
-              {cleanedEmail.cleaningApplied.length > 0 && (
-                <span className="text-[10px] text-muted-foreground/60">
-                  ({cleanedEmail.cleaningApplied.filter(c => c !== "html_sanitized").join(", ")})
+              {hasCleanedContent ? "View original email (cleaned)" : "View original email"}
+              {cleanedEmail.cleaningApplied.length > 0 && hasCleanedContent && (
+                <span className="text-[10px] text-muted-foreground/60 ml-1">
+                  • {cleanedEmail.cleaningApplied.filter(c => c !== "html_sanitized").join(", ")}
                 </span>
               )}
             </CollapsibleTrigger>
