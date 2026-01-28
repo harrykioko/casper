@@ -20,10 +20,10 @@ export function InboxContentPane({ item, onClose }: InboxContentPaneProps) {
   const bodyContent = item.body || item.preview || "";
   const hasHtmlBody = !!item.htmlBody;
   
-  // Use the new email cleaner
+  // Use the new email cleaner with sender name for better signature detection
   const cleanedEmail = useMemo(() => {
-    return cleanEmailContent(bodyContent, item.htmlBody);
-  }, [bodyContent, item.htmlBody]);
+    return cleanEmailContent(bodyContent, item.htmlBody, item.senderName);
+  }, [bodyContent, item.htmlBody, item.senderName]);
 
   const relativeTime = formatDistanceToNow(new Date(item.receivedAt), { addSuffix: true });
   const absoluteTime = format(new Date(item.receivedAt), "MMM d, yyyy 'at' h:mm a");

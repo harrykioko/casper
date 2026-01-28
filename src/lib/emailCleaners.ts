@@ -84,11 +84,19 @@ const INLINE_QUOTE_PATTERNS = [
 ];
 
 /**
+ * Escape special regex characters in a string
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
  * Main function to clean email content
  */
 export function cleanEmailContent(
   textBody: string | null,
-  htmlBody: string | null
+  htmlBody: string | null,
+  senderName?: string
 ): CleanedEmail {
   const cleaningApplied: string[] = [];
   let cleanedText = textBody || "";
@@ -128,9 +136,9 @@ export function cleanEmailContent(
     cleaningApplied.push("disclaimers");
   }
 
-  // Step 4: Strip signatures (only if they don't remove too much)
-  const signatureResult = stripSignatures(cleanedText);
-  if (signatureResult !== cleanedText && signatureResult.length > cleanedText.length * 0.3) {
+  // Step 4: Strip signatures (pass sender name for better detection)
+  const signatureResult = stripSignatures(cleanedText, senderName);
+  if (signatureResult !== cleanedText && signatureResult.length > cleanedText.length * 0.2) {
     cleanedText = signatureResult;
     cleaningApplied.push("signatures");
   }
@@ -358,26 +366,132 @@ export function stripDisclaimers(text: string): string {
 }
 
 /**
- * Strip email signatures
+ * Strip email signatures with enhanced Outlook detection
  */
-export function stripSignatures(text: string): string {
+export function stripSignatures(text: string, senderName?: string): string {
   let result = text;
+  const isShortEmail = result.length < 500;
 
-  // Check for common signature markers
+  // 1. Check for common signature markers first
   for (const marker of SIGNATURE_MARKERS) {
     const index = result.indexOf(marker);
-    if (index !== -1 && index > result.length * 0.3) {
-      // Only strip if marker is in latter portion of email
+    // For short emails, be more aggressive (don't require marker to be past 30%)
+    const threshold = isShortEmail ? 0.15 : 0.3;
+    if (index !== -1 && index > result.length * threshold) {
       result = result.substring(0, index).trim();
       break;
     }
   }
 
-  // Check for phone patterns at end (common in signatures)
+  // 2. NEW: Check for sender's name followed by pipe (Outlook "Name | Title" format)
+  if (senderName && senderName.length > 3) {
+    const namePattern = new RegExp(
+      `^${escapeRegex(senderName)}\\s*[|]`,
+      "im"
+    );
+    const nameMatch = result.match(namePattern);
+    if (nameMatch && nameMatch.index !== undefined) {
+      // Found sender's name with pipe - this is signature start
+      // Only strip if we have some content before it (at least 20 chars)
+      if (nameMatch.index > 20) {
+        result = result.substring(0, nameMatch.index).trim();
+        return result;
+      }
+    }
+  }
+
+  // 3. NEW: Check for C:/M: phone pattern (common Outlook cell format)
+  const cellPattern = /^[CM][:.]\s*\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}/m;
+  const cellMatch = result.match(cellPattern);
+  if (cellMatch && cellMatch.index !== undefined) {
+    // Look back for the signature start (name line)
+    const beforeCell = result.substring(0, cellMatch.index);
+    const lines = beforeCell.split(/\r?\n/);
+    
+    // Check last 3 lines for name-like pattern
+    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 3); i--) {
+      const line = lines[i].trim();
+      // Name | Title pattern
+      if (/^[A-Z][a-z]+\s+[A-Z][a-z]+\s*[|]/.test(line)) {
+        const cutIndex = result.indexOf(line);
+        if (cutIndex > 20) {
+          result = result.substring(0, cutIndex).trim();
+          return result;
+        }
+      }
+    }
+    
+    // If no name found, cut at cell line if we have enough content
+    if (cellMatch.index > 30) {
+      result = result.substring(0, cellMatch.index).trim();
+      return result;
+    }
+  }
+
+  // 4. NEW: Check for "Name | Title" pattern anywhere (even without sender name)
+  const nameTitlePattern = /^[A-Z][a-z]+\s+[A-Z][a-z]+\s*\|\s*[A-Z]/m;
+  const nameTitleMatch = result.match(nameTitlePattern);
+  if (nameTitleMatch && nameTitleMatch.index !== undefined) {
+    // Found a "Name | Title" line
+    const threshold = isShortEmail ? 20 : 50;
+    if (nameTitleMatch.index > threshold) {
+      result = result.substring(0, nameTitleMatch.index).trim();
+      return result;
+    }
+  }
+
+  // 5. Check for mailto: links (common in Outlook signatures)
+  const mailtoPattern = /<mailto:[^>]+>/;
+  const mailtoMatch = result.match(mailtoPattern);
+  if (mailtoMatch && mailtoMatch.index !== undefined) {
+    // Look back for signature start
+    const beforeMailto = result.substring(0, mailtoMatch.index);
+    const lines = beforeMailto.split(/\r?\n/);
+    
+    // Find where signature likely starts (look for name patterns)
+    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 5); i--) {
+      const line = lines[i].trim();
+      if (/^[A-Z][a-z]+\s+[A-Z][a-z]+/.test(line) && line.length < 60) {
+        const cutIndex = result.indexOf(line);
+        if (cutIndex > 20) {
+          result = result.substring(0, cutIndex).trim();
+          return result;
+        }
+      }
+    }
+  }
+
+  // 6. Check for bracketed company taglines [Company Name...]
+  const taglinePattern = /\[[A-Z][^\]]{10,}\]/;
+  const taglineMatch = result.match(taglinePattern);
+  if (taglineMatch && taglineMatch.index !== undefined) {
+    // This is often at the end of a signature, look back for start
+    const beforeTagline = result.substring(0, taglineMatch.index);
+    const lines = beforeTagline.split(/\r?\n/);
+    
+    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 6); i--) {
+      const line = lines[i].trim();
+      // Look for name or phone patterns
+      if (/^[A-Z][a-z]+\s+[A-Z][a-z]+/.test(line) || 
+          /^[CM][:.]\s*\(?\d{3}/.test(line) ||
+          /^[A-Z][a-z]+\s*\|/.test(line)) {
+        const cutIndex = result.indexOf(line);
+        if (cutIndex > 20) {
+          result = result.substring(0, cutIndex).trim();
+          return result;
+        }
+      }
+    }
+  }
+
+  // 7. Original phone pattern check with lowered thresholds for short emails
   const lines = result.split(/\r?\n/);
   let signatureStartLine = -1;
   
-  for (let i = lines.length - 1; i >= Math.max(0, lines.length - 10); i--) {
+  // For short emails, look through more lines
+  const linesToCheck = isShortEmail ? Math.min(15, lines.length) : 10;
+  
+  for (let i = lines.length - 1; i >= Math.max(0, lines.length - linesToCheck); i--) {
     const line = lines[i].trim();
     if (PHONE_PATTERN.test(line)) {
       signatureStartLine = i;
@@ -385,8 +499,10 @@ export function stripSignatures(text: string): string {
     }
   }
 
-  // If we found a phone line near the end, check if preceding lines look like a signature
-  if (signatureStartLine !== -1 && signatureStartLine > lines.length * 0.5) {
+  // If we found a phone line, check if preceding lines look like a signature
+  // Lower threshold for short emails
+  const lineThreshold = isShortEmail ? 0.2 : 0.5;
+  if (signatureStartLine !== -1 && signatureStartLine > lines.length * lineThreshold) {
     // Look back for short lines that might be name/title
     let cutLine = signatureStartLine;
     for (let i = signatureStartLine - 1; i >= Math.max(0, signatureStartLine - 5); i--) {
