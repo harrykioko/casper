@@ -1,230 +1,348 @@
 
-# Dynamic Dashboard Layout - Progressive Content Display
+# Pipeline Tab UX & Functionality Enhancements
 
-## Problem Analysis
+## Overview
 
-The current dashboard layout renders all 6 panels in fixed grid positions regardless of whether they contain data. In the screenshot:
-- **To-Do panel** shows "Nothing due today" empty state
-- **Commitments panel** shows "No open commitments" empty state
+Enhance the Pipeline tab to function as a high-signal command surface for deal flow management. This plan focuses on improving scanability, attention signaling, and flow into deeper deal work while strictly preserving existing structure, stages, and navigation patterns.
 
-These empty panels consume valuable screen real estate and create visual noise. The user wants a **progressive/dynamic layout** that only surfaces components when they have meaningful content.
+## Current State Summary
 
-## Solution Strategy
+- **5 Pipeline Stages**: New, Passed, To Share, Interesting, Pearls (plus Active sidebar)
+- **3 View Modes**: Kanban, List, Grid
+- **Existing Card Info**: Company name, round badge, sector badge, raise amount, close date, next steps preview
+- **Existing Actions**: Top of Mind toggle (star), website link, drag-to-move
+- **Existing Filters**: Search, Round dropdown, Sector dropdown
+- **Summary Tiles**: Total, Active, Passed, To Share, Interesting, Pearls, New (already clickable)
 
-Implement a "content-aware" dashboard grid that:
-1. Conditionally renders panels based on data availability
-2. Uses CSS Grid `auto-fill` or flexbox to reflow remaining panels
-3. Maintains visual hierarchy with priority panels always visible
-4. Provides subtle "get started" prompts integrated elsewhere (hero band or command palette) instead of empty state cards
+## Architecture
 
-## Panel Categories
+The implementation enhances existing components without introducing new layout paradigms:
 
-### Always Show (Core Panels)
-These panels are essential to the command center and should always render:
-- **Priority Items** - Core attention driver (shows "All caught up" when empty, which is valuable feedback)
-- **Inbox** - Communication hub (shows "Inbox zero!" when empty, which is valuable feedback)
-- **Companies** - Relationship grid (shows "No companies yet" with helpful CTA)
-- **Reading List** - Knowledge capture (shows "No unread items" with add CTA)
-
-### Conditionally Show (Hide When Empty)
-These panels add value only when populated:
-- **To-Do** - Hide when no tasks exist or all are completed
-- **Commitments** - Hide when no open commitments exist
-
-## Implementation Approach
-
-### Step 1: Calculate Content Flags
-
-Add computed booleans in `DashboardMainContent.tsx`:
-
-```typescript
-// Content visibility flags
-const hasOpenTasks = tasks.filter(t => !t.completed).length > 0;
-const hasOpenCommitments = commitments.length > 0; // Need to add useCommitments hook
+```text
++------------------------------------------------------------------------+
+|  Pipeline                    [Search] [Round▼] [Sector▼]               |
+|                              [Needs Attention] [Top of Mind] [Stale]   |
++------------------------------------------------------------------------+
+|                                                                        |
+|  New (4)                    | Interesting (3)        | Pearls (2)      |
+|  "1 stale, 2 open tasks"    | "1 closing soon"       | "All clear"     |
+|  ─────────────────────────  | ─────────────────────  | ───────────────  |
+|  ┌──────────────────────┐   | ┌────────────────────┐ | ┌──────────────┐ |
+|  │ CompanyName    [★][↗]│   | │ CompanyName   [★][↗]│ | │ CompanyName  │ |
+|  │ [Seed] [Payments]    │   | │ [Series A] [Wealth]│ | │ [Seed] [Fin] │ |
+|  │ $3M • Mar 2026       │   | │ $5M • Apr 2026     │ | │ $2M • May    │ |
+|  │ ─────────────────────│   | │ ────────────────────│ | │ ─────────────│ |
+|  │ ⚠ Stale • 2 tasks    │   | │ 📋 1 task • 3d ago │ | │ ✓ Next step  │ |
+|  └──────────────────────┘   | └────────────────────┘ | └──────────────┘ |
+|                                                                        |
++------------------------------------------------------------------------+
 ```
 
-### Step 2: Create Dynamic Grid Component
+## Implementation Steps
 
-New component `DashboardDynamicGrid.tsx` that handles:
-- Collecting visible panels as children
-- Rendering with appropriate grid columns based on count
-- Smooth transitions when panels appear/disappear
+### Step 1: Enhanced Pipeline Card Component
 
-```typescript
-// Example grid logic
-const visiblePanels = [
-  { key: 'priority', always: true },
-  { key: 'inbox', always: true },
-  { key: 'todo', visible: hasOpenTasks },
-  { key: 'companies', always: true },
-  { key: 'commitments', visible: hasOpenCommitments },
-  { key: 'reading', always: true },
-].filter(p => p.always || p.visible);
+**File: `src/components/pipeline/PipelineCard.tsx`**
 
-// Grid adapts: 2 cols when ≤4 panels, 3 cols when 5-6 panels
+Standardize card anatomy with new attention row:
+
+```
+Header Row:
+├── Company name (left)
+└── Actions (right): Star toggle, Open full page icon
+
+Metadata Row:
+├── Round badge
+└── Sector badge
+
+Deal Facts Row:
+├── Raise amount
+└── Close date
+
+Attention Row (NEW - conditional):
+├── Open tasks count (if > 0): "2 tasks" with task icon
+├── Last touch indicator: "12d ago" / "3d ago"
+├── Next step exists: small dot/chip if next_steps present
+├── Stale badge: amber "Stale" badge if no activity > 14 days
+└── Overdue indicator: red dot/badge if any linked task overdue
 ```
 
-### Step 3: Update Hero Band Stats
+**New Props & Data Requirements:**
+- Add `openTaskCount?: number` and `hasOverdueTasks?: boolean` props
+- Add `lastInteractionAt?: string` for stale/last touch calculation
+- These will be computed at the page level and passed down
 
-The hero band currently shows counts for Priority, Inbox, and To-Dos. Update to:
-- Only show To-Do stat when tasks exist
-- Add Commitments count when commitments exist
-- Dynamic stat badges based on what has content
+**Visual Changes:**
+- Slightly reduce border saturation for stage colors
+- Attention signals (stale, overdue) get stronger color emphasis
+- Increase card padding-bottom slightly for attention row
+- Add "Open full page" icon (ArrowUpRight) always visible next to star
 
-### Step 4: Alternative Access Points
+### Step 2: Create Pipeline Attention Helper Functions
 
-When panels are hidden, ensure users can still access features via:
-- **Command palette (⌘K)** - "Add task", "Add commitment" commands
-- **Hero band** - Quick action buttons for common creates
-- **Context menus** - In company cards, etc.
+**New File: `src/lib/pipeline/pipelineAttentionHelpers.ts`**
 
-## File Changes Summary
+Utility functions for computing attention signals:
+
+```typescript
+interface PipelineCardAttention {
+  isStale: boolean;              // No activity > 14 days
+  daysSinceTouch: number | null;
+  hasOverdueTasks: boolean;
+  openTaskCount: number;
+  hasNextSteps: boolean;
+  isClosingSoon: boolean;        // Close date within 14 days
+  needsAttention: boolean;       // Composite: stale OR overdue OR closing soon
+}
+
+function computeCardAttention(
+  company: PipelineCompany,
+  tasks: PipelineTask[]
+): PipelineCardAttention
+
+function computeColumnSummary(
+  companies: PipelineCompany[],
+  allTasks: PipelineTask[]
+): ColumnSummary
+```
+
+### Step 3: Aggregate Pipeline Tasks Hook
+
+**New File: `src/hooks/usePipelineTasksAggregate.ts`**
+
+Fetch all tasks linked to pipeline companies for aggregation:
+
+```typescript
+function usePipelineTasksAggregate(companyIds: string[]) {
+  // Query tasks where pipeline_company_id IN companyIds
+  // Returns map of companyId -> { openCount, hasOverdue, tasks[] }
+}
+```
+
+This hook efficiently fetches task data for all visible companies in one query rather than per-card queries.
+
+### Step 4: Enhanced Kanban Column Headers
+
+**File: `src/components/pipeline/PipelineKanbanView.tsx`**
+
+Update `KanbanColumn` component:
+
+```
+Current:
+  <h3>New</h3>
+  <p>4 companies</p>
+
+Enhanced:
+  <h3>New</h3>
+  <p>4 companies</p>
+  <p className="text-xs text-muted-foreground">1 stale • 2 open tasks</p>
+```
+
+**Column Summary Logic:**
+- Count stale companies in column
+- Count total open tasks across column
+- Count companies closing soon
+- Show most urgent signal first
+
+**Quick Controls (Column Hover):**
+- "Show needs attention only" toggle
+- Sort dropdown: Last touched, Closing soon, Raise amount
+- Apply only to that column via local state
+
+### Step 5: Enhanced Filter Bar (PipelineToolbar)
+
+**File: `src/components/pipeline/PipelineToolbar.tsx`**
+
+Add toggle-style filter pills after existing filters:
+
+```
+[Search...] [Round▼] [Sector▼]    [Needs Attention] [Top of Mind] [Stale]    [View Toggle]
+```
+
+**New Filter State:**
+```typescript
+interface PipelineFilters {
+  search: string;
+  rounds: RoundEnum[];
+  sectors: SectorEnum[];
+  // New attention filters (toggle-style)
+  needsAttention?: boolean;
+  topOfMindOnly?: boolean;
+  staleOnly?: boolean;
+}
+```
+
+**Filter Logic:**
+- `needsAttention`: Show only companies that are stale OR have overdue tasks OR closing soon
+- `topOfMindOnly`: Show only `is_top_of_mind === true`
+- `staleOnly`: Show only companies with no interaction > 14 days
+
+### Step 6: Actionable Summary Tiles
+
+**File: `src/components/pipeline/SummaryBox.tsx`**
+
+Tiles are already clickable. Enhance with sublabels:
+
+```
+Current:
+  [5] Active
+
+Enhanced:
+  [5] Active
+  2 need follow-up
+```
+
+**Sublabel Logic per Tile:**
+- Active: Count with overdue tasks or stale
+- Passed: (no sublabel needed)
+- To Share: Count stale
+- Interesting: Count with tasks
+- Pearls: Count closing soon
+- New: Count needing review (no tasks created yet)
+
+### Step 7: Inline Card Actions Menu
+
+**File: `src/components/pipeline/PipelineCard.tsx`**
+
+Add kebab menu (MoreHorizontal) on hover with quick actions:
+
+```
+[⋮] Menu Items:
+├── Add task
+├── Log note
+├── Move to... (submenu with stages)
+├── ─────────────
+└── Mark as passed
+```
+
+**Implementation:**
+- Use existing DropdownMenu pattern
+- On "Add task": Open AddTaskDialog with company pre-filled
+- On "Log note": Open quick note composer (reuse from Deal Room)
+- On "Move to": Submenu with all stages except current
+- On "Mark as passed": Direct status update with confirmation
+
+### Step 8: Enhanced List View
+
+**File: `src/components/pipeline/PipelineListView.tsx`**
+
+Add attention columns to table:
+
+```
+| Company | Round | Status | Sector | Raise | Close | Tasks | Last Touch | Actions |
+```
+
+- **Tasks column**: Open task count with overdue indicator
+- **Last Touch column**: Relative timestamp, red if stale
+- **Actions column**: Star, kebab menu, open full page
+
+### Step 9: Visual Polish Pass
+
+**Files: Multiple**
+
+- Reduce stage border saturation by 10-15% (e.g., `border-slate-400` → `border-slate-300`)
+- Attention badges use stronger colors (amber-500 for stale, red-500 for overdue)
+- Increase vertical spacing between cards: `space-y-4` → `space-y-5`
+- Reduce internal card padding slightly: `p-4` → `p-3.5`
+- Ensure consistent icon sizes (h-3.5 w-3.5 for inline, h-4 w-4 for buttons)
+
+## File Summary
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/components/dashboard/DashboardMainContent.tsx` | Modify | Add useCommitments hook, compute visibility flags, conditionally render panels |
-| `src/components/dashboard/DashboardHeroBand.tsx` | Modify | Make stats dynamic based on content availability |
-| `src/components/dashboard/DashboardDynamicGrid.tsx` | Create | Optional reusable grid wrapper with reflow logic |
+| `src/lib/pipeline/pipelineAttentionHelpers.ts` | Create | Utility functions for computing attention signals |
+| `src/hooks/usePipelineTasksAggregate.ts` | Create | Hook to fetch all pipeline tasks efficiently |
+| `src/components/pipeline/PipelineCard.tsx` | Modify | Add attention row, inline actions menu, open full page icon |
+| `src/components/pipeline/PipelineKanbanView.tsx` | Modify | Enhanced column headers with summaries and quick controls |
+| `src/components/pipeline/PipelineToolbar.tsx` | Modify | Add toggle-style attention filters |
+| `src/components/pipeline/SummaryBox.tsx` | Modify | Add sublabels to tiles |
+| `src/components/pipeline/PipelineListView.tsx` | Modify | Add tasks and last touch columns |
+| `src/components/pipeline/PipelineGridView.tsx` | Modify | Ensure cards show attention signals |
+| `src/types/pipeline.ts` | Modify | Extend PipelineFilters interface |
+| `src/pages/Pipeline.tsx` | Modify | Wire up aggregate hooks and pass attention data |
 
-## Detailed Implementation
+## Data Flow
 
-### DashboardMainContent Changes
+```text
+Pipeline.tsx
+├── usePipeline() → companies[]
+├── usePipelineTasksAggregate(companyIds) → tasksMap
+├── Compute attention for each company
+└── Pass to views
 
-```typescript
-// Add hook
-const { commitments, loading: commitmentsLoading } = useCommitments({ status: 'open' });
+PipelineKanbanView
+├── Receive companies with attention data
+├── Compute column summaries
+└── Render enhanced headers + cards
 
-// Compute visibility flags
-const hasOpenTasks = tasks.filter(t => !t.completed).length > 0;
-const hasOpenCommitments = commitments.length > 0;
-
-// In Row 1 grid (Action Panels)
-<div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
-  {/* Priority - always show */}
-  <div className="w-full min-w-[260px]">
-    <DashboardPrioritySection ... />
-  </div>
-  
-  {/* Inbox - always show */}
-  <div className="w-full min-w-[260px]">
-    <InboxPanel ... />
-  </div>
-  
-  {/* To-Do - only when tasks exist */}
-  {hasOpenTasks && (
-    <div className="w-full min-w-[260px]">
-      <ActionPanel accentColor="emerald" ... />
-    </div>
-  )}
-</div>
-
-// In Row 2 grid (Secondary Panels)
-<div className={cn(
-  "grid gap-6",
-  // Dynamic columns based on what's visible
-  !hasOpenCommitments 
-    ? "grid-cols-1 lg:grid-cols-2" // 2 panels
-    : "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3" // 3 panels
-)}>
-  {/* Companies - always show */}
-  <div className="w-full min-w-[260px]">
-    <CompaniesCommandPane ... />
-  </div>
-
-  {/* Commitments - only when open commitments exist */}
-  {hasOpenCommitments && (
-    <div className="w-full min-w-[260px]">
-      <CommitmentsPanel ... />
-    </div>
-  )}
-
-  {/* Reading List - always show */}
-  <div className={cn(
-    "w-full min-w-[260px]",
-    // Span 2 cols when commitments hidden on xl screens
-    !hasOpenCommitments && "xl:col-span-1 lg:col-span-1"
-  )}>
-    <ReadingListSection ... />
-  </div>
-</div>
+PipelineCard
+├── Receive company + attention props
+├── Render attention row conditionally
+└── Render inline actions menu
 ```
 
-### Hero Band Dynamic Stats
+## New Type Definitions
 
 ```typescript
-interface DashboardHeroBandProps {
-  userName?: string;
-  onCommandClick: () => void;
-  priorityCount: number;
-  inboxCount: number;
-  todoCount: number;
-  commitmentCount?: number; // Add optional
+// src/types/pipeline.ts additions
+
+interface PipelineCardAttention {
+  isStale: boolean;
+  daysSinceTouch: number | null;
+  hasOverdueTasks: boolean;
+  openTaskCount: number;
+  hasNextSteps: boolean;
+  isClosingSoon: boolean;
+  needsAttention: boolean;
 }
 
-// Only render stats that have content or are always relevant
-<div className="flex flex-col gap-1.5">
-  <StatBadge count={priorityCount} label="Priority" />
-  <StatBadge count={inboxCount} label="Inbox" />
-  {todoCount > 0 && <StatBadge count={todoCount} label="To-Dos" />}
-  {commitmentCount && commitmentCount > 0 && (
-    <StatBadge count={commitmentCount} label="Commitments" />
-  )}
-</div>
+interface EnhancedPipelineCompany extends PipelineCompany {
+  attention: PipelineCardAttention;
+}
+
+interface PipelineFilters {
+  search: string;
+  rounds: RoundEnum[];
+  sectors: SectorEnum[];
+  needsAttention?: boolean;
+  topOfMindOnly?: boolean;
+  staleOnly?: boolean;
+}
+
+interface ColumnSummary {
+  staleCount: number;
+  openTaskCount: number;
+  closingSoonCount: number;
+  summaryText: string; // e.g., "1 stale • 2 tasks"
+}
 ```
-
-## Visual Behavior
-
-### When All Panels Have Content (6 panels)
-```text
-Row 1: [Priority] [Inbox] [To-Do]     (3 columns)
-Row 2: [Companies] [Commitments] [Reading] (3 columns)
-```
-
-### When To-Do Empty (5 panels)
-```text
-Row 1: [Priority] [Inbox]              (2 columns, larger)
-Row 2: [Companies] [Commitments] [Reading] (3 columns)
-```
-
-### When Both To-Do and Commitments Empty (4 panels)
-```text
-Row 1: [Priority] [Inbox]              (2 columns)
-Row 2: [Companies] [Reading List]      (2 columns, each wider)
-```
-
-## Animation Considerations
-
-Use Framer Motion's `AnimatePresence` for smooth panel appearance/disappearance:
-
-```typescript
-<AnimatePresence>
-  {hasOpenTasks && (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2 }}
-      className="w-full min-w-[260px]"
-    >
-      <ToDoPanel ... />
-    </motion.div>
-  )}
-</AnimatePresence>
-```
-
-## Edge Cases
-
-1. **Loading states** - Show skeleton loaders initially, then conditionally render
-2. **Tasks loading but commitments loaded** - Wait for all data before computing visibility
-3. **User creates first task** - Panel should smoothly animate in
-4. **User completes last task** - Panel should smoothly animate out
 
 ## Acceptance Criteria
 
-1. To-Do panel only renders when `tasks.filter(t => !t.completed).length > 0`
-2. Commitments panel only renders when `commitments.length > 0`
-3. Grid layout reflows to fill available space when panels are hidden
-4. Hero band stats dynamically show/hide based on content
-5. Smooth animations when panels appear/disappear
-6. All loading states handled gracefully (don't hide panels during loading)
-7. Users can still create tasks/commitments via command palette when panels hidden
+1. **Card Attention Signals**: Cards display stale badge (amber), overdue indicator (red), task count, last touch timestamp, and next steps indicator
+2. **Column Summaries**: Each Kanban column header shows aggregated attention signals (e.g., "2 stale • 5 tasks")
+3. **Column Quick Controls**: Hover reveals "Show needs attention" toggle and sort options
+4. **Filter Bar**: Three new toggle pills (Needs Attention, Top of Mind, Stale) filter the entire view
+5. **Actionable Tiles**: Summary tiles show sublabels and filter on click
+6. **Inline Actions**: Kebab menu on card hover with Add task, Log note, Move to, Mark as passed
+7. **Open Full Page**: Always-visible icon to navigate to Deal Room
+8. **Visual Polish**: Reduced border saturation, stronger attention colors, improved spacing
+9. **List View**: Additional columns for tasks and last touch
+10. **Existing Functionality**: All current features (drag-drop, filters, modal edit) continue working
+
+## Implementation Order
+
+1. **Phase 1 - Foundation**: Create attention helpers + aggregate tasks hook
+2. **Phase 2 - Card Enhancements**: Add attention row + inline actions to PipelineCard
+3. **Phase 3 - Column Headers**: Enhanced summaries + quick controls in KanbanView
+4. **Phase 4 - Filter Bar**: Toggle-style attention filters in Toolbar
+5. **Phase 5 - Summary Tiles**: Sublabels in SummaryBox
+6. **Phase 6 - List View**: Additional columns
+7. **Phase 7 - Visual Polish**: Color and spacing adjustments
+
+## Performance Considerations
+
+- Aggregate tasks hook uses single query with `IN` clause for all company IDs
+- Attention computations are memoized at Pipeline.tsx level
+- Column summaries computed only when companies change
+- No additional API calls per card
