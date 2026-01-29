@@ -154,12 +154,17 @@ serve(async (req) => {
 
         let fileBuffer: Uint8Array | null = null;
 
-        // Option A: Base64 content
+        // Option A: Content (base64 string OR Buffer object)
         if (att.content) {
           try {
-            fileBuffer = base64ToUint8Array(att.content);
+            console.log("Processing attachment content", {
+              filename,
+              contentType: typeof att.content,
+              isBuffer: typeof att.content === 'object' && (att.content as Record<string, unknown>)?.type === 'Buffer',
+            });
+            fileBuffer = contentToUint8Array(att.content);
           } catch (decodeErr) {
-            console.error("Failed to decode base64 attachment", { filename, error: decodeErr });
+            console.error("Failed to decode attachment content", { filename, error: decodeErr });
             attachmentsFailed++;
             continue;
           }
@@ -287,22 +292,44 @@ function createSupabase() {
   return { supabaseClient };
 }
 
-// Base64 to Uint8Array
-function base64ToUint8Array(base64: string): Uint8Array {
-  // Handle data URIs
-  let cleanBase64 = base64;
-  if (base64.includes(",")) {
-    cleanBase64 = base64.split(",")[1];
+// Convert attachment content to Uint8Array - handles multiple input formats
+function contentToUint8Array(content: unknown): Uint8Array {
+  // 1. Already Uint8Array
+  if (content instanceof Uint8Array) {
+    return content;
   }
-  // Remove whitespace
-  cleanBase64 = cleanBase64.replace(/\s/g, "");
   
-  const binaryString = atob(cleanBase64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
+  // 2. Buffer-like object: {type: "Buffer", data: [...]}
+  if (typeof content === 'object' && content !== null) {
+    const obj = content as Record<string, unknown>;
+    if (obj.type === 'Buffer' && Array.isArray(obj.data)) {
+      return new Uint8Array(obj.data as number[]);
+    }
+    // Plain array of bytes
+    if (Array.isArray(content)) {
+      return new Uint8Array(content as number[]);
+    }
   }
-  return bytes;
+  
+  // 3. Base64 string
+  if (typeof content === 'string') {
+    let cleanBase64 = content;
+    // Handle data URIs
+    if (content.includes(',')) {
+      cleanBase64 = content.split(',')[1];
+    }
+    // Remove whitespace
+    cleanBase64 = cleanBase64.replace(/\s/g, '');
+    
+    const binaryString = atob(cleanBase64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+  }
+  
+  throw new Error(`Unsupported content format: ${typeof content}`);
 }
 
 // HTML → plain text with capped input

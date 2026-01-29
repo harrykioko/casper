@@ -116,9 +116,17 @@ const INLINE_QUOTE_PATTERNS = [
   /On .{10,60}, .{3,40} <.+@.+> wrote:/im,
   /On .{10,60} at .{5,20}, .+? wrote:/im,
   /\d{1,2}\/\d{1,2}\/\d{2,4}.{1,40}<.+@.+>.{0,10}wrote:/im,
-  // More patterns for various formats
+  // Gmail format: "On Tue, Jan 13, 2026 at 11:05 AM Name <email> wrote:"
+  /On \w{3}, \w{3} \d{1,2}, \d{4} at \d{1,2}:\d{2}\s*(?:AM|PM)?\s+[^<\n]+<[^>]+>\s*wrote:/im,
   /On \w{3}, \w{3} \d{1,2}, \d{4} at \d{1,2}:\d{2}\s*(?:AM|PM)?,?\s*.+?(?:<.+?>)?\s*wrote:/im,
   /On \w{3,9}, \w{3,9} \d{1,2}, \d{4},?\s*.+?(?:<.+?>)?\s*wrote:/im,
+  // Generic fallback: "On [day], [person] wrote:"
+  /On [A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2}, \d{4}.{0,60}wrote:/im,
+];
+
+// Sign-off patterns that indicate end of meaningful content
+const SIGNOFF_PATTERNS = [
+  /\n\s*(Best|Thanks|Regards|Cheers|Kind regards|Best regards|Warm regards|Many thanks),?\s*\n/i,
 ];
 
 /**
@@ -126,6 +134,38 @@ const INLINE_QUOTE_PATTERNS = [
  */
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Strip content after a sign-off like "Best,\nName" if junk follows
+ */
+function stripAfterSignOff(text: string): string {
+  // Pattern: Sign-off, newline, short name (1-3 words), then check what follows
+  const signOffPattern = /\n\s*(Best|Thanks|Regards|Cheers|Kind regards|Best regards|Warm regards|Many thanks),?\s*\n\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*\n/im;
+  const match = text.match(signOffPattern);
+  
+  if (match && match.index !== undefined) {
+    const afterSignOff = match.index + match[0].length;
+    const remainingContent = text.substring(afterSignOff);
+    
+    // Check if remaining content looks like junk (signature block, quotes, disclaimers)
+    const isJunk = 
+      remainingContent.trim().startsWith('--') ||
+      remainingContent.trim().startsWith('[http') ||
+      remainingContent.trim().startsWith('On ') ||
+      /^\s*\n\s*\n/.test(remainingContent) ||
+      /^[A-Z][a-z]+\s*\|/m.test(remainingContent) ||
+      /^[CM][:.]\s*\(?\d{3}/.test(remainingContent.trim()) ||
+      /^From:/im.test(remainingContent.trim()) ||
+      remainingContent.trim().length > 200; // Long content after sign-off is suspicious
+    
+    if (isJunk && match.index > 50) {
+      // Keep content through "Best,\nMyles" but cut the junk after
+      return text.substring(0, afterSignOff).trim();
+    }
+  }
+  
+  return text;
 }
 
 /**
@@ -187,6 +227,9 @@ export function cleanEmailContent(
     cleanedText = signatureResult;
     cleaningApplied.push("signatures");
   }
+
+  // Step 6: Strip after common sign-offs if signature junk follows
+  cleanedText = stripAfterSignOff(cleanedText);
 
   // Step 6: Clean HTML if present
   if (cleanedHtml) {
@@ -541,6 +584,15 @@ export function stripDisclaimers(text: string): string {
 export function stripSignatures(text: string, senderName?: string): string {
   let result = text;
   const isShortEmail = result.length < 500;
+
+  // 0. AGGRESSIVE: Cut at standalone -- marker (RFC signature delimiter)
+  const dashDashPattern = /\n--\s*\n/;
+  const dashMatch = result.match(dashDashPattern);
+  if (dashMatch && dashMatch.index !== undefined && dashMatch.index > 50) {
+    result = result.substring(0, dashMatch.index).trim();
+    // Early return - nothing meaningful after --
+    return result;
+  }
 
   // 1. Check for common signature markers first
   for (const marker of SIGNATURE_MARKERS) {
