@@ -34,6 +34,7 @@ export interface HarmonicCandidate {
   harmonic_id: string;
   name: string;
   domain?: string | null;
+  linkedin_url?: string | null;
   logo_url?: string | null;
   hq?: string | null;
   employee_range?: string | null;
