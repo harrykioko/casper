@@ -26,7 +26,7 @@ interface CommsTabProps {
 export function CommsTab({ company }: CommsTabProps) {
   const { linkedCommunications, loading } = useCompanyLinkedCommunications(company.primary_domain, company.id);
   const { openDrawer } = useGlobalInboxDrawer();
-  const { markAsRead, markComplete, archive, snooze, linkCompany } = useInboxItems();
+  const { markAsRead, markComplete, archive, snooze, linkCompany, unlinkCompany } = useInboxItems();
   const { createTask } = useTasks();
   const { createCompany: createPipelineCompany } = usePipeline();
   const { user } = useAuth();
@@ -155,9 +155,9 @@ export function CommsTab({ company }: CommsTabProps) {
     }
   };
 
-  const handleCompanyLinked = (companyId: string, companyName: string) => {
+  const handleCompanyLinked = (companyId: string, companyName: string, companyType: 'pipeline' | 'portfolio', companyLogoUrl?: string | null) => {
     if (linkCompanyItem) {
-      linkCompany(linkCompanyItem.id, companyId, companyName);
+      linkCompany(linkCompanyItem.id, companyId, companyName, companyType, companyLogoUrl);
       setLinkCompanyItem(null);
     }
   };
@@ -193,6 +193,7 @@ export function CommsTab({ company }: CommsTabProps) {
         onSaveAttachments: handleSaveAttachments,
         onApproveSuggestion: handleApproveSuggestion,
         onSaveAttachmentToCompany: handleSaveAttachmentToCompany,
+        onUnlinkCompany: unlinkCompany,
       });
     } finally {
       setLoadingEmailId(null);

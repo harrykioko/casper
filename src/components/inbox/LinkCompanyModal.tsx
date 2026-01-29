@@ -20,7 +20,7 @@ interface LinkCompanyModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   inboxItem: InboxItem;
-  onLinked: (companyId: string, companyName: string, companyType: 'pipeline' | 'portfolio') => void;
+  onLinked: (companyId: string, companyName: string, companyType: 'pipeline' | 'portfolio', companyLogoUrl?: string | null) => void;
 }
 
 interface UnifiedCompany {
@@ -78,7 +78,7 @@ export function LinkCompanyModal({
 
   const handleConfirm = () => {
     if (selectedCompany) {
-      onLinked(selectedCompany.id, selectedCompany.name, selectedCompany.type);
+      onLinked(selectedCompany.id, selectedCompany.name, selectedCompany.type, selectedCompany.logo);
       onOpenChange(false);
       setSearch("");
       setSelectedCompany(null);

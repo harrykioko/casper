@@ -33,7 +33,7 @@ interface InboxPanelProps {
 export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze, linkCompany } = useInboxItems();
+  const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze, linkCompany, unlinkCompany } = useInboxItems();
   const { createTask } = useTasks();
   const { createCompany: createPipelineCompany } = usePipeline();
   const { openDrawer } = useGlobalInboxDrawer();
@@ -62,6 +62,7 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
       onSaveAttachments: handleSaveAttachments,
       onApproveSuggestion: handleApproveSuggestion,
       onSaveAttachmentToCompany: handleSaveAttachmentToCompany,
+      onUnlinkCompany: unlinkCompany,
     });
   };
 
@@ -170,9 +171,9 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
     }
   };
 
-  const handleCompanyLinked = (companyId: string, companyName: string) => {
+  const handleCompanyLinked = (companyId: string, companyName: string, companyType: 'pipeline' | 'portfolio', companyLogoUrl?: string | null) => {
     if (linkCompanyItem) {
-      linkCompany(linkCompanyItem.id, companyId, companyName);
+      linkCompany(linkCompanyItem.id, companyId, companyName, companyType, companyLogoUrl);
       setLinkCompanyItem(null);
     }
   };
