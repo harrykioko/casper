@@ -1,405 +1,341 @@
 
+# Fix Inbox Email Cleaning and Add Attachment Ingestion
 
-# Save/Link Attachments to Company - Implementation Plan
+## Problem Summary
 
-## Problem Statement
+Two issues have been identified in the inbox system based on the Myles Patel email:
 
-Currently, when users want to save an attachment from an inbox item to a company, they must first create a task. However, there are scenarios where users want to directly associate an attachment with a company (e.g., saving a pitch deck, memo, or screenshot) without creating a task first.
+### Issue 1: Email Content Not Being Cleaned Properly
+The displayed email shows:
+- Harrison Kioko's signature (the forwarder) at the TOP instead of being stripped
+- Google Calendar event metadata, RSVP buttons, and invite details
+- Duplicate DISCLAIMER blocks at the bottom
+- Quoted reply threads ("On Tue, Jan 13, 2026...wrote:")
 
-The infrastructure already exists:
-- `pipeline_attachments` table for pipeline company files
-- `pipeline-attachments` storage bucket  
-- `usePipelineAttachments` hook with `uploadAttachment` function
-- "Link Company" button in InboxActionRail (currently disabled)
+**Root Cause**: The email cleaning logic in `src/lib/emailCleaners.ts`:
+1. Strips content AFTER the forwarded marker but doesn't fully remove content BEFORE it (the forwarder's signature)
+2. Lacks patterns for Google Calendar content blocks
+3. Doesn't detect and strip quoted reply threads early enough
+4. Isn't aggressive enough with disclaimer removal for duplicated blocks
+
+### Issue 2: No Attachments Being Stored
+The email says "I've gone ahead and attached our deck and some demos" but no attachments appear because:
+- The `email-inbox-ingest` edge function has NO attachment handling code
+- It doesn't parse the `attachments` array from the webhook payload
+- It doesn't upload files to the `inbox-attachments` Supabase Storage bucket
+- It doesn't create records in the `inbox_attachments` table
+
+**Root Cause**: Attachment processing was never implemented in the edge function.
+
+---
 
 ## Solution Architecture
 
-Enable users to:
-1. Link an inbox item to a company (pipeline or portfolio)
-2. Save specific attachments from an inbox item directly to a company's files
-
 ```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Inbox Action Rail                             │
-│  ─────────────────────────────────────────────────────────────────   │
-│                                                                       │
-│  [Create Task]  ← existing (includes attachments via source link)    │
-│  [Add Note]     ← existing                                           │
-│  [Link Company] ← NEW: Opens company picker modal                    │
-│  [Save Files]   ← NEW: Opens attachment picker to save to company    │
-│                                                                       │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-              ┌───────────────────────────────────┐
-              │   LinkCompanyModal / SaveFilesModal│
-              │   ─────────────────────────────────│
-              │   • Search/select pipeline company │
-              │   • Search/select portfolio company│
-              │   • (Optional) Select attachments  │
-              │   • Confirm action                 │
-              └───────────────────────────────────┘
-                              │
-          ┌───────────────────┼───────────────────┐
-          │                   │                   │
-          ▼                   ▼                   ▼
-┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│  inbox_items    │  │pipeline_attachs │  │  (Future)       │
-│  ───────────    │  │  ──────────────  │  │ company_attachs │
-│  related_company│  │  Copy from inbox│  │  for portfolio  │
-│  _id update     │  │  to pipeline    │  │                 │
-└─────────────────┘  └─────────────────┘  └─────────────────┘
+Forward Email Webhook
+        │
+        ▼
+┌───────────────────────────────────────┐
+│   email-inbox-ingest (Edge Function)  │
+│   ─────────────────────────────────── │
+│   1. Parse email fields               │
+│   2. Parse attachments array   ← NEW  │
+│   3. Upload to Storage bucket  ← NEW  │
+│   4. Insert inbox_items record        │
+│   5. Insert inbox_attachments  ← NEW  │
+└───────────────────────────────────────┘
+        │
+        ▼
+┌───────────────────────────────────────┐
+│   Frontend (InboxContentPane.tsx)     │
+│   ─────────────────────────────────── │
+│   1. Call cleanEmailContent()         │
+│   2. Enhanced cleaning rules   ← FIX  │
+│   3. Display cleaned content          │
+│   4. InboxAttachmentsSection renders  │
+└───────────────────────────────────────┘
 ```
 
-## Implementation Phases
+---
 
-### Phase 1: Link Company to Inbox Item
+## Phase 1: Enhance Email Content Cleaning
 
-Enable the "Link Company" action to associate an inbox item with a pipeline or portfolio company.
+### File: `src/lib/emailCleaners.ts`
 
-**New Component: `src/components/inbox/LinkCompanyModal.tsx`**
+#### 1.1 Add Google Calendar Content Patterns
 
-A modal that:
-- Shows a combined searchable list of pipeline and portfolio companies
-- Allows selecting one company to link
-- Updates the inbox item's `related_company_id` and `related_company_name`
+Add new patterns to detect and strip Google Calendar content:
 
 ```typescript
-interface LinkCompanyModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  inboxItem: InboxItem;
-  onLinked: (companyId: string, companyName: string, companyType: 'pipeline' | 'portfolio') => void;
+const CALENDAR_PATTERNS = [
+  "Invitation from Google Calendar",
+  "You are receiving this email because you are an attendee",
+  "Forwarding this invitation could allow any recipient",
+  "Join with Google Meet",
+  "View all guest info",
+  "Reply for ",
+  "More options<https://calendar.google.com",
+  "Yes<https://calendar.google.com/calendar/event?action=RESPOND",
+  "No<https://calendar.google.com/calendar/event?action=RESPOND",
+  "Maybe<https://calendar.google.com/calendar/event?action=RESPOND",
+];
+```
+
+#### 1.2 Enhance Forwarded Wrapper Stripping
+
+Currently the function strips content AFTER the forwarded marker. However, content BEFORE the marker (forwarder's signature) also needs to be stripped.
+
+**Current behavior**: Keeps content before "---------- Forwarded message ----------"
+**Needed behavior**: Discard content before the marker entirely
+
+Update `stripForwardedWrapper()` to:
+1. Find the forwarded marker
+2. Look at content BEFORE the marker
+3. If the content before is less than ~200 chars OR matches signature patterns, discard it completely
+
+#### 1.3 Add Quoted Reply Thread Stripping
+
+The `stripInlineQuotes` function exists but needs additional patterns for:
+- `On [date], [name] <email> wrote:` patterns
+- Horizontal rule blocks (`________________________________`)
+- Nested reply chains with `From:` / `Sent:` / `To:` headers
+
+#### 1.4 More Aggressive Disclaimer Removal
+
+The current logic stops at the FIRST disclaimer. For emails with DUPLICATE disclaimers:
+1. Find ALL disclaimer occurrences
+2. Strip from the EARLIEST one that appears after meaningful content
+
+#### 1.5 Strip Calendar Event Blocks
+
+Add a new function `stripCalendarContent()` that removes:
+- Lines starting with `Yes<`, `No<`, `Maybe<` (calendar RSVP links)
+- `When:` / `Where:` / `Guests:` metadata blocks
+- `This event has been updated` / `Changed:` lines
+- Content between "Join with Google Meet" and end of calendar block
+
+---
+
+## Phase 2: Add Attachment Handling to Edge Function
+
+### File: `supabase/functions/email-inbox-ingest/index.ts`
+
+#### 2.1 Parse Attachments from Webhook Payload
+
+Forward Email webhooks include attachments in the payload. Common structures:
+
+```typescript
+// Option A: Base64 embedded
+payload.attachments = [
+  {
+    filename: "deck.pdf",
+    contentType: "application/pdf",
+    content: "base64-encoded-string...",
+    size: 12345
+  }
+]
+
+// Option B: URL references
+payload.attachments = [
+  {
+    filename: "deck.pdf",
+    contentType: "application/pdf",
+    url: "https://...",
+    size: 12345
+  }
+]
+```
+
+#### 2.2 Upload Attachments to Supabase Storage
+
+For each attachment:
+1. Generate a unique path: `{user_id}/{inbox_item_id}/{uuid}.{ext}`
+2. Decode base64 content (or fetch from URL)
+3. Upload to `inbox-attachments` bucket
+4. Create `inbox_attachments` record
+
+```typescript
+// Pseudocode for attachment handling
+const attachments = payload.attachments || [];
+
+for (const att of attachments) {
+  // Validate size (max 10MB)
+  if (att.size > 10 * 1024 * 1024) {
+    console.warn("Skipping large attachment", att.filename);
+    continue;
+  }
+
+  // Decode content
+  let fileBuffer: Uint8Array;
+  if (att.content) {
+    // Base64 encoded
+    fileBuffer = base64Decode(att.content);
+  } else if (att.url) {
+    // Fetch from URL
+    const response = await fetch(att.url);
+    fileBuffer = new Uint8Array(await response.arrayBuffer());
+  } else {
+    continue;
+  }
+
+  // Generate storage path
+  const ext = att.filename.split('.').pop() || '';
+  const storagePath = `${user.id}/${inboxItemId}/${crypto.randomUUID()}${ext ? `.${ext}` : ''}`;
+
+  // Upload to bucket
+  const { error: uploadError } = await supabaseClient.storage
+    .from("inbox-attachments")
+    .upload(storagePath, fileBuffer, {
+      contentType: att.contentType || "application/octet-stream",
+    });
+
+  if (uploadError) {
+    console.error("Attachment upload failed", uploadError);
+    continue;
+  }
+
+  // Create database record
+  await supabaseClient.from("inbox_attachments").insert({
+    inbox_item_id: inboxItemId,
+    filename: att.filename,
+    mime_type: att.contentType,
+    size_bytes: att.size,
+    storage_path: storagePath,
+    created_by: user.id,
+  });
 }
 ```
 
-**Update: `src/hooks/useInboxItems.ts`**
+#### 2.3 Return Inbox Item ID from Insert
 
-Add mutation for linking company:
-
-```typescript
-const linkCompanyMutation = useMutation({
-  mutationFn: async ({ 
-    id, 
-    companyId, 
-    companyName 
-  }: { 
-    id: string; 
-    companyId: string; 
-    companyName: string;
-  }) => {
-    const { error } = await supabase
-      .from("inbox_items")
-      .update({ 
-        related_company_id: companyId,
-        related_company_name: companyName 
-      })
-      .eq("id", id);
-    if (error) throw error;
-  },
-  onSuccess: () => {
-    queryClient.invalidateQueries({ queryKey: ["inbox_items"] });
-    toast.success("Company linked");
-  },
-});
-```
-
-### Phase 2: Save Attachments to Company
-
-Enable saving inbox attachments directly to a company's files (pipeline first, portfolio later).
-
-**New Component: `src/components/inbox/SaveAttachmentsModal.tsx`**
-
-A two-step modal:
-1. Step 1: Select which attachments to save (with checkboxes)
-2. Step 2: Select destination company (or use already-linked company)
+Currently the function doesn't capture the inserted inbox item's ID. Update to use `.select().single()` to get the ID for attachment linking:
 
 ```typescript
-interface SaveAttachmentsModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  inboxItemId: string;
-  linkedCompanyId?: string;
-  linkedCompanyName?: string;
-  linkedCompanyType?: 'pipeline' | 'portfolio';
-}
+const { data: inboxItem, error: insertError } = await supabaseClient
+  .from("inbox_items")
+  .insert(inboxItemData)
+  .select("id")
+  .single();
 ```
 
-**New Helper: `src/lib/inbox/copyAttachmentToCompany.ts`**
+---
 
-Function to copy an inbox attachment to a pipeline company:
+## Phase 3: Update InboxContentPane Display Logic
+
+### File: `src/components/inbox/InboxContentPane.tsx`
+
+#### 3.1 Prefer Cleaned Text Over HTML When Heavily Cleaned
+
+If the cleaning process removed significant content (signatures, disclaimers, calendar blocks), prefer showing the cleaned plain text instead of trying to clean HTML which may still contain styled versions of the removed content.
 
 ```typescript
-async function copyInboxAttachmentToPipeline(
-  inboxAttachment: InboxAttachment,
-  pipelineCompanyId: string,
-  userId: string
-): Promise<PipelineAttachment | null> {
-  // 1. Get signed URL for source file
-  const sourceUrl = await getSignedUrl('inbox-attachments', inboxAttachment.storagePath);
-  
-  // 2. Download the file content
-  const response = await fetch(sourceUrl);
-  const blob = await response.blob();
-  
-  // 3. Upload to pipeline-attachments bucket
-  const newPath = `${pipelineCompanyId}/${crypto.randomUUID()}.${ext}`;
-  await supabase.storage.from('pipeline-attachments').upload(newPath, blob);
-  
-  // 4. Create pipeline_attachments record
-  const { data } = await supabase.from('pipeline_attachments').insert({
-    pipeline_company_id: pipelineCompanyId,
-    created_by: userId,
-    file_name: inboxAttachment.filename,
-    storage_path: newPath,
-    file_type: inboxAttachment.mimeType,
-    file_size: inboxAttachment.sizeBytes,
-  }).select().single();
-  
-  return data;
-}
+// Current logic is complex - simplify to:
+// If significant cleaning was done, prefer cleaned text
+const shouldUseText = cleanedEmail.cleaningApplied.length >= 2;
 ```
 
-### Phase 3: Wire Up InboxActionRail
-
-**Update: `src/components/inbox/InboxActionRail.tsx`**
-
-- Enable the "Link Company" button
-- Add "Save Attachments" button (shown when attachments exist)
-- Add appropriate callbacks
-
-```typescript
-interface InboxActionRailProps {
-  item: InboxItem;
-  onCreateTask: (item: InboxItem, suggestionTitle?: string) => void;
-  onMarkComplete: (id: string) => void;
-  onArchive: (id: string) => void;
-  onSnooze?: (id: string, until: Date) => void;
-  onAddNote?: (item: InboxItem) => void;
-  onLinkCompany?: (item: InboxItem) => void;        // NEW
-  onSaveAttachments?: (item: InboxItem) => void;    // NEW
-  attachmentCount?: number;                          // NEW
-}
-```
-
-### Phase 4: Wire Up Parent Components
-
-**Update: `src/components/inbox/InboxDetailWorkspace.tsx`**
-
-Pass new handlers through:
-
-```typescript
-interface InboxDetailWorkspaceProps {
-  // ...existing
-  onLinkCompany?: (item: InboxItem) => void;
-  onSaveAttachments?: (item: InboxItem) => void;
-  attachmentCount?: number;
-}
-```
-
-**Update: `src/pages/Inbox.tsx`**
-
-Add state and handlers for the new modals:
-
-```typescript
-// Modal state
-const [linkCompanyItem, setLinkCompanyItem] = useState<InboxItem | null>(null);
-const [saveAttachmentsItem, setSaveAttachmentsItem] = useState<InboxItem | null>(null);
-
-// Handlers
-const handleLinkCompany = (item: InboxItem) => {
-  setLinkCompanyItem(item);
-};
-
-const handleSaveAttachments = (item: InboxItem) => {
-  setSaveAttachmentsItem(item);
-};
-
-// Add mutations from useInboxItems
-const { linkCompany } = useInboxItems();
-```
+---
 
 ## File Changes Summary
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/components/inbox/LinkCompanyModal.tsx` | Create | Company picker modal for linking |
-| `src/components/inbox/SaveAttachmentsModal.tsx` | Create | Attachment picker + company selector modal |
-| `src/lib/inbox/copyAttachmentToCompany.ts` | Create | Helper to copy files between buckets |
-| `src/hooks/useInboxItems.ts` | Modify | Add `linkCompany` mutation |
-| `src/components/inbox/InboxActionRail.tsx` | Modify | Enable Link Company, add Save Attachments |
-| `src/components/inbox/InboxDetailWorkspace.tsx` | Modify | Pass new handlers |
-| `src/pages/Inbox.tsx` | Modify | Add modal state and handlers |
+| `src/lib/emailCleaners.ts` | Modify | Add calendar patterns, enhance forwarder signature stripping, improve quote detection |
+| `supabase/functions/email-inbox-ingest/index.ts` | Modify | Add attachment parsing, upload to storage, create inbox_attachments records |
+| `src/components/inbox/InboxContentPane.tsx` | Modify | Simplify display logic to prefer cleaned text when significant cleaning occurred |
 
-## Component Details
+---
 
-### LinkCompanyModal
+## Technical Details
 
-```typescript
-// Fetches both pipeline and portfolio companies
-const { companies: pipelineCompanies } = usePipeline();
-const { companies: portfolioCompanies } = usePortfolioCompanies();
+### Email Cleaning Enhancement Details
 
-// Combined and searchable
-const allCompanies = useMemo(() => [
-  ...pipelineCompanies.map(c => ({ 
-    id: c.id, 
-    name: c.company_name, 
-    type: 'pipeline' as const,
-    logo: c.logo_url 
-  })),
-  ...portfolioCompanies.map(c => ({ 
-    id: c.id, 
-    name: c.name, 
-    type: 'portfolio' as const,
-    logo: c.logo_url 
-  })),
-], [pipelineCompanies, portfolioCompanies]);
-```
+**New Pattern Categories:**
 
-### SaveAttachmentsModal
+1. **Calendar Content** (strip entire blocks):
+   - `Invitation from Google Calendar`
+   - RSVP lines: `Yes<https://`, `No<https://`, `Maybe<https://`
+   - `View all guest info`, `More options`
+   - Event metadata: `When:`, `Where:`, `Guests:`
 
-```typescript
-// If company already linked, use it
-// Otherwise, show company picker first
+2. **Forwarder Signature** (strip before marker):
+   - If content before `---------- Forwarded message ----------` is < 300 chars
+   - OR contains signature patterns (phone numbers, email addresses, company logos)
+   - Discard it entirely
 
-// Attachment selection
-const { attachments } = useInboxAttachments(inboxItemId);
-const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+3. **Quoted Replies** (more patterns):
+   - `On [weekday], [month] [day], [year] at [time] [name] <email> wrote:`
+   - Horizontal lines: `________________________________`
+   - Reply headers: `From:` / `Sent:` / `To:` / `Subject:` blocks after main content
 
-// Save action
-const handleSave = async () => {
-  for (const id of selectedIds) {
-    const attachment = attachments.find(a => a.id === id);
-    if (attachment) {
-      await copyInboxAttachmentToPipeline(attachment, companyId, userId);
+### Attachment Handling Requirements
+
+1. **Size Limits**: Skip attachments > 10MB
+2. **Supported Types**: All types (PDF, images, documents, etc.)
+3. **Storage Path**: `{user_id}/{inbox_item_id}/{uuid}.{ext}`
+4. **Error Handling**: Continue processing other attachments if one fails
+5. **Logging**: Log successful uploads and failures
+
+### Forward Email Webhook Payload
+
+The webhook payload likely includes:
+```json
+{
+  "from": { "address": "...", "name": "..." },
+  "to": { "address": "...", "name": "..." },
+  "subject": "...",
+  "text": "...",
+  "html": "...",
+  "attachments": [
+    {
+      "filename": "deck.pdf",
+      "contentType": "application/pdf",
+      "content": "base64...",
+      "size": 12345
     }
-  }
-  toast.success(`Saved ${selectedIds.size} file(s) to ${companyName}`);
-};
+  ]
+}
 ```
 
-## UI/UX Flow
+If attachments come as URLs instead of base64, fetch them inline.
 
-### Flow 1: Link Company
-1. User clicks "Link Company" in action rail
-2. LinkCompanyModal opens with searchable company list
-3. User selects a company
-4. Modal closes, inbox item now shows linked company badge
-5. Future emails from same sender auto-suggest this company
-
-### Flow 2: Save Attachments (with linked company)
-1. User views inbox item that has attachments and linked company
-2. User clicks "Save Files" → opens SaveAttachmentsModal
-3. Modal shows checkboxes for each attachment, pre-selected company
-4. User confirms → files copied to company's Files tab
-5. Toast confirms success
-
-### Flow 3: Save Attachments (without linked company)
-1. User views inbox item with attachments but no linked company
-2. User clicks "Save Files"
-3. Modal Step 1: Select company (inline company picker)
-4. Modal Step 2: Select which attachments
-5. User confirms → files copied, company also linked to inbox item
-6. Toast confirms success
-
-## Visual Design
-
-### Action Rail Updates
-
-```text
-Take Action
-───────────────────────
-[🗹] Create Task
-    Will include email attachments
-
-[📝] Add Note
-
-[🏢] Link Company          ← NOW ENABLED
-    Currently linked: [Acme Corp]  ← shows if linked
-
-[💾] Save to Company       ← NEW (only if attachments exist)
-    3 attachments available
-───────────────────────
-```
-
-### LinkCompanyModal Layout
-
-```text
-┌────────────────────────────────────────┐
-│  Link to Company                    [×]│
-├────────────────────────────────────────┤
-│  [🔍 Search companies...]              │
-│                                        │
-│  Pipeline                              │
-│  ┌────────────────────────────────┐   │
-│  │ 🔷 Acme Corp       [Series A]  │   │
-│  │ 🔷 Beta Ventures   [Seed]      │   │
-│  └────────────────────────────────┘   │
-│                                        │
-│  Portfolio                             │
-│  ┌────────────────────────────────┐   │
-│  │ 🟢 Alpha Inc       [Active]    │   │
-│  │ 🟢 Gamma Ltd       [Active]    │   │
-│  └────────────────────────────────┘   │
-│                                        │
-│          [Cancel]  [Link Company]      │
-└────────────────────────────────────────┘
-```
-
-### SaveAttachmentsModal Layout
-
-```text
-┌────────────────────────────────────────┐
-│  Save Attachments to Acme Corp      [×]│
-├────────────────────────────────────────┤
-│  Select files to save:                 │
-│                                        │
-│  [✓] 📄 pitch_deck.pdf      2.4 MB    │
-│  [✓] 🖼 screenshot.png      340 KB    │
-│  [ ] 📄 notes.txt           12 KB     │
-│                                        │
-│  Saving to: [Acme Corp ▼]  ← dropdown  │
-│                                        │
-│        [Cancel]  [Save 2 Files]        │
-└────────────────────────────────────────┘
-```
-
-## Future Considerations
-
-### Portfolio Company Attachments
-
-Currently only pipeline companies have an attachments table. To support portfolio:
-1. Create `company_attachments` table (mirrors `pipeline_attachments`)
-2. Create `company-attachments` storage bucket
-3. Add `useCompanyAttachments` hook
-4. Update `copyAttachmentToCompany` to handle both types
-
-This can be added in a follow-up phase once the pipeline flow is validated.
-
-### Attachment Source Tracking
-
-Consider adding an optional `source_inbox_attachment_id` column to `pipeline_attachments` to track provenance. This would allow showing "Saved from email: [subject]" in the Files tab.
-
-## Acceptance Criteria
-
-1. "Link Company" button in InboxActionRail is functional
-2. LinkCompanyModal shows searchable list of pipeline and portfolio companies
-3. Linking updates `related_company_id` and `related_company_name` on inbox item
-4. "Save to Company" button appears when inbox item has attachments
-5. SaveAttachmentsModal allows selecting specific attachments
-6. Selected attachments are copied to the company's Files (pipeline_attachments)
-7. Success toasts confirm actions
-8. Linked company badge shows in action rail after linking
-9. All existing functionality (Create Task, Archive, Snooze) continues working
+---
 
 ## Implementation Order
 
-1. **Phase 1**: Add `linkCompany` mutation to useInboxItems
-2. **Phase 2**: Create LinkCompanyModal component
-3. **Phase 3**: Wire Link Company action in InboxActionRail and Inbox.tsx
-4. **Phase 4**: Create copyAttachmentToCompany helper
-5. **Phase 5**: Create SaveAttachmentsModal component
-6. **Phase 6**: Wire Save Attachments action in InboxActionRail and Inbox.tsx
-7. **Phase 7**: Add visual indicators (linked company badge, attachment count)
+1. **Phase 1**: Email cleaning enhancements (frontend, immediate impact)
+   - Add calendar content patterns
+   - Improve forwarder signature stripping
+   - Enhance quoted reply detection
+   - More aggressive disclaimer removal
 
+2. **Phase 2**: Attachment ingestion (backend)
+   - Update edge function to parse attachments
+   - Upload to Supabase Storage
+   - Create inbox_attachments records
+   - Deploy and test with a real email
+
+3. **Phase 3**: Display logic cleanup
+   - Simplify InboxContentPane text vs HTML decision
+
+---
+
+## Acceptance Criteria
+
+1. **Email Content**: The Myles Patel email displays only the main message body ("Hey Harry..." through "Thanks, and talk soon!") without:
+   - Harrison Kioko's signature at the top
+   - Google Calendar event details
+   - Quoted reply thread
+   - DISCLAIMER blocks
+
+2. **Attachments**: When an email with attachments arrives, they:
+   - Are uploaded to `inbox-attachments` storage bucket
+   - Have records created in `inbox_attachments` table
+   - Display in InboxAttachmentsSection
+   - Can be downloaded/previewed
+
+3. **Existing Functionality**: All existing inbox features continue working:
+   - Create Task (with attachment linking)
+   - Link Company
+   - Save to Company
+   - Archive/Complete/Snooze
