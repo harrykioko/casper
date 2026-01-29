@@ -1,226 +1,405 @@
 
-# Accept and Link Attachments - Implementation Plan
 
-## Problem Analysis
+# Save/Link Attachments to Company - Implementation Plan
 
-Currently, when a task is created from an inbox item:
-1. The `TaskPrefillOptions` includes `sourceInboxItemId` (line 181 in Inbox.tsx)
-2. But when the task is actually created, only `content` is passed: `createTask({ content })` (line 381)
-3. The `source_inbox_item_id` column exists on the tasks table but is never populated
-4. Inbox attachments are stored in `inbox_attachments` but have no way to be accessed from tasks
+## Problem Statement
 
-Users cannot currently access email attachments from tasks that were created from inbox items, even though the infrastructure partially exists.
+Currently, when users want to save an attachment from an inbox item to a company, they must first create a task. However, there are scenarios where users want to directly associate an attachment with a company (e.g., saving a pitch deck, memo, or screenshot) without creating a task first.
+
+The infrastructure already exists:
+- `pipeline_attachments` table for pipeline company files
+- `pipeline-attachments` storage bucket  
+- `usePipelineAttachments` hook with `uploadAttachment` function
+- "Link Company" button in InboxActionRail (currently disabled)
 
 ## Solution Architecture
 
-Implement a two-phase approach:
-1. **Phase 1 - Wiring**: Connect the `source_inbox_item_id` when creating tasks from inbox items
-2. **Phase 2 - Display & Linking**: Show inbox attachments on tasks that originated from inbox items, and allow "accepting" (copying/linking) attachments to tasks
+Enable users to:
+1. Link an inbox item to a company (pipeline or portfolio)
+2. Save specific attachments from an inbox item directly to a company's files
 
 ```text
-┌─────────────────────┐         ┌─────────────────────┐
-│   Inbox Item        │         │      Task           │
-│   ─────────────     │         │   ───────────       │
-│   • subject         │ creates │   • content         │
-│   • attachments[]   │────────▶│   • source_inbox_   │
-│                     │         │     item_id ────────┼───┐
-└─────────────────────┘         └─────────────────────┘   │
-         │                                                │
-         │ has                                   references
-         ▼                                                │
-┌─────────────────────┐                                   │
-│ inbox_attachments   │◀──────────────────────────────────┘
-│   ─────────────     │   (can fetch attachments via FK)
-│   • filename        │
-│   • storage_path    │
-└─────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Inbox Action Rail                             │
+│  ─────────────────────────────────────────────────────────────────   │
+│                                                                       │
+│  [Create Task]  ← existing (includes attachments via source link)    │
+│  [Add Note]     ← existing                                           │
+│  [Link Company] ← NEW: Opens company picker modal                    │
+│  [Save Files]   ← NEW: Opens attachment picker to save to company    │
+│                                                                       │
+└─────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+              ┌───────────────────────────────────┐
+              │   LinkCompanyModal / SaveFilesModal│
+              │   ─────────────────────────────────│
+              │   • Search/select pipeline company │
+              │   • Search/select portfolio company│
+              │   • (Optional) Select attachments  │
+              │   • Confirm action                 │
+              └───────────────────────────────────┘
+                              │
+          ┌───────────────────┼───────────────────┐
+          │                   │                   │
+          ▼                   ▼                   ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│  inbox_items    │  │pipeline_attachs │  │  (Future)       │
+│  ───────────    │  │  ──────────────  │  │ company_attachs │
+│  related_company│  │  Copy from inbox│  │  for portfolio  │
+│  _id update     │  │  to pipeline    │  │                 │
+└─────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
-## Phase 1: Wire `source_inbox_item_id` to Task Creation
+## Implementation Phases
 
-### 1.1 Update AddTaskDialog to Pass Full Task Data
+### Phase 1: Link Company to Inbox Item
 
-**File: `src/components/modals/AddTaskDialog.tsx`**
+Enable the "Link Company" action to associate an inbox item with a pipeline or portfolio company.
 
-Update the `onAddTask` callback to include the full prefill data:
+**New Component: `src/components/inbox/LinkCompanyModal.tsx`**
+
+A modal that:
+- Shows a combined searchable list of pipeline and portfolio companies
+- Allows selecting one company to link
+- Updates the inbox item's `related_company_id` and `related_company_name`
 
 ```typescript
-interface AddTaskDialogProps {
+interface LinkCompanyModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddTask: (taskData: {
-    content: string;
-    description?: string;
-    source_inbox_item_id?: string;
-    company_id?: string;
-    pipeline_company_id?: string;
-  }) => void;
-  prefill?: TaskPrefillOptions;
+  inboxItem: InboxItem;
+  onLinked: (companyId: string, companyName: string, companyType: 'pipeline' | 'portfolio') => void;
 }
 ```
 
-Update `handleSubmit` to include the source link:
+**Update: `src/hooks/useInboxItems.ts`**
+
+Add mutation for linking company:
+
 ```typescript
-const handleSubmit = async (e: React.FormEvent) => {
-  // ...
-  onAddTask({
-    content: taskContent,
-    // Include source_inbox_item_id from prefill
-    source_inbox_item_id: prefill?.sourceInboxItemId,
-  });
+const linkCompanyMutation = useMutation({
+  mutationFn: async ({ 
+    id, 
+    companyId, 
+    companyName 
+  }: { 
+    id: string; 
+    companyId: string; 
+    companyName: string;
+  }) => {
+    const { error } = await supabase
+      .from("inbox_items")
+      .update({ 
+        related_company_id: companyId,
+        related_company_name: companyName 
+      })
+      .eq("id", id);
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["inbox_items"] });
+    toast.success("Company linked");
+  },
+});
+```
+
+### Phase 2: Save Attachments to Company
+
+Enable saving inbox attachments directly to a company's files (pipeline first, portfolio later).
+
+**New Component: `src/components/inbox/SaveAttachmentsModal.tsx`**
+
+A two-step modal:
+1. Step 1: Select which attachments to save (with checkboxes)
+2. Step 2: Select destination company (or use already-linked company)
+
+```typescript
+interface SaveAttachmentsModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  inboxItemId: string;
+  linkedCompanyId?: string;
+  linkedCompanyName?: string;
+  linkedCompanyType?: 'pipeline' | 'portfolio';
+}
+```
+
+**New Helper: `src/lib/inbox/copyAttachmentToCompany.ts`**
+
+Function to copy an inbox attachment to a pipeline company:
+
+```typescript
+async function copyInboxAttachmentToPipeline(
+  inboxAttachment: InboxAttachment,
+  pipelineCompanyId: string,
+  userId: string
+): Promise<PipelineAttachment | null> {
+  // 1. Get signed URL for source file
+  const sourceUrl = await getSignedUrl('inbox-attachments', inboxAttachment.storagePath);
+  
+  // 2. Download the file content
+  const response = await fetch(sourceUrl);
+  const blob = await response.blob();
+  
+  // 3. Upload to pipeline-attachments bucket
+  const newPath = `${pipelineCompanyId}/${crypto.randomUUID()}.${ext}`;
+  await supabase.storage.from('pipeline-attachments').upload(newPath, blob);
+  
+  // 4. Create pipeline_attachments record
+  const { data } = await supabase.from('pipeline_attachments').insert({
+    pipeline_company_id: pipelineCompanyId,
+    created_by: userId,
+    file_name: inboxAttachment.filename,
+    storage_path: newPath,
+    file_type: inboxAttachment.mimeType,
+    file_size: inboxAttachment.sizeBytes,
+  }).select().single();
+  
+  return data;
+}
+```
+
+### Phase 3: Wire Up InboxActionRail
+
+**Update: `src/components/inbox/InboxActionRail.tsx`**
+
+- Enable the "Link Company" button
+- Add "Save Attachments" button (shown when attachments exist)
+- Add appropriate callbacks
+
+```typescript
+interface InboxActionRailProps {
+  item: InboxItem;
+  onCreateTask: (item: InboxItem, suggestionTitle?: string) => void;
+  onMarkComplete: (id: string) => void;
+  onArchive: (id: string) => void;
+  onSnooze?: (id: string, until: Date) => void;
+  onAddNote?: (item: InboxItem) => void;
+  onLinkCompany?: (item: InboxItem) => void;        // NEW
+  onSaveAttachments?: (item: InboxItem) => void;    // NEW
+  attachmentCount?: number;                          // NEW
+}
+```
+
+### Phase 4: Wire Up Parent Components
+
+**Update: `src/components/inbox/InboxDetailWorkspace.tsx`**
+
+Pass new handlers through:
+
+```typescript
+interface InboxDetailWorkspaceProps {
+  // ...existing
+  onLinkCompany?: (item: InboxItem) => void;
+  onSaveAttachments?: (item: InboxItem) => void;
+  attachmentCount?: number;
+}
+```
+
+**Update: `src/pages/Inbox.tsx`**
+
+Add state and handlers for the new modals:
+
+```typescript
+// Modal state
+const [linkCompanyItem, setLinkCompanyItem] = useState<InboxItem | null>(null);
+const [saveAttachmentsItem, setSaveAttachmentsItem] = useState<InboxItem | null>(null);
+
+// Handlers
+const handleLinkCompany = (item: InboxItem) => {
+  setLinkCompanyItem(item);
 };
+
+const handleSaveAttachments = (item: InboxItem) => {
+  setSaveAttachmentsItem(item);
+};
+
+// Add mutations from useInboxItems
+const { linkCompany } = useInboxItems();
 ```
-
-### 1.2 Update Inbox.tsx to Handle Full Task Data
-
-**File: `src/pages/Inbox.tsx`**
-
-Change line 381 from:
-```typescript
-onAddTask={(content) => createTask({ content })}
-```
-
-To:
-```typescript
-onAddTask={(taskData) => createTask(taskData)}
-```
-
-## Phase 2: Display Linked Attachments on Tasks
-
-### 2.1 Create Hook to Fetch Attachments for Task
-
-**New File: `src/hooks/useTaskAttachments.ts`**
-
-A hook that fetches attachments linked to a task via its `source_inbox_item_id`:
-
-```typescript
-export function useTaskAttachments(taskId: string | undefined) {
-  // 1. Fetch the task to get source_inbox_item_id
-  // 2. If source_inbox_item_id exists, fetch inbox_attachments
-  // 3. Return attachments with getSignedUrl helper
-}
-```
-
-### 2.2 Add Attachments Section to TaskDetailsDialog
-
-**File: `src/components/modals/TaskDetailsDialog.tsx`**
-
-Add a collapsible "Attachments" section that:
-- Shows attachments from the source inbox item (if any)
-- Allows previewing/downloading attachments
-- Reuses existing `AttachmentCard` and `AttachmentPreview` patterns
-
-### 2.3 Create Polymorphic Attachment Links Table (Future Enhancement)
-
-For full attachment portability across entities (tasks, notes, projects), a polymorphic `attachment_links` table could be added:
-
-```sql
-CREATE TABLE attachment_links (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  attachment_source_type TEXT NOT NULL, -- 'inbox' | 'pipeline' | 'project'
-  attachment_source_id uuid NOT NULL,
-  target_type TEXT NOT NULL, -- 'task' | 'note' | 'project' | 'company'
-  target_id uuid NOT NULL,
-  created_by uuid REFERENCES auth.users(id),
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-```
-
-**Note**: For MVP, we can achieve attachment viewing via the FK relationship (task → inbox_item → inbox_attachments) without needing a new linking table.
-
-## Phase 3: UI for "Accept" Action
-
-### 3.1 Add Attachment Actions in InboxActionRail
-
-**File: `src/components/inbox/InboxActionRail.tsx`**
-
-Add "Link Attachments" action that:
-- Shows when the inbox item has attachments
-- Opens a picker to select which attachments to link
-- Creates task with selected attachment references
-
-### 3.2 Attachment Indicator on Inbox Items
-
-**File: `src/components/inbox/InboxItemRow.tsx`**
-
-Add a small attachment icon/count indicator when an inbox item has attachments.
 
 ## File Changes Summary
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/components/modals/AddTaskDialog.tsx` | Modify | Accept full task data including source_inbox_item_id |
-| `src/pages/Inbox.tsx` | Modify | Pass full task data to createTask, not just content |
-| `src/hooks/useTasks.ts` | Verify | Ensure source_inbox_item_id is passed to database |
-| `src/hooks/useTaskAttachments.ts` | Create | Hook to fetch attachments for a task via source inbox item |
-| `src/components/modals/TaskDetailsDialog.tsx` | Modify | Add attachments section showing source attachments |
-| `src/components/inbox/InboxItemRow.tsx` | Modify | Add attachment count indicator |
-| `src/components/inbox/InboxActionRail.tsx` | Modify | Add attachment linking awareness |
+| `src/components/inbox/LinkCompanyModal.tsx` | Create | Company picker modal for linking |
+| `src/components/inbox/SaveAttachmentsModal.tsx` | Create | Attachment picker + company selector modal |
+| `src/lib/inbox/copyAttachmentToCompany.ts` | Create | Helper to copy files between buckets |
+| `src/hooks/useInboxItems.ts` | Modify | Add `linkCompany` mutation |
+| `src/components/inbox/InboxActionRail.tsx` | Modify | Enable Link Company, add Save Attachments |
+| `src/components/inbox/InboxDetailWorkspace.tsx` | Modify | Pass new handlers |
+| `src/pages/Inbox.tsx` | Modify | Add modal state and handlers |
 
-## Implementation Order
+## Component Details
 
-1. **Phase 1 - Wiring** (Foundation)
-   - Update AddTaskDialog to pass source_inbox_item_id
-   - Update Inbox.tsx to pass full task data to createTask
-   - Verify useTasks.ts handles source_inbox_item_id
-
-2. **Phase 2 - Display**
-   - Create useTaskAttachments hook
-   - Add TaskAttachmentsSection component
-   - Integrate into TaskDetailsDialog
-
-3. **Phase 3 - Polish**
-   - Add attachment indicator to InboxItemRow
-   - Add "includes attachments" awareness to InboxActionRail
-   - Show attachment count in task creation confirmation
-
-## Technical Details
-
-### Database Query for Task Attachments
-
-When viewing a task, fetch attachments via the source inbox item:
+### LinkCompanyModal
 
 ```typescript
-// In useTaskAttachments hook
-const { data: task } = await supabase
-  .from('tasks')
-  .select('source_inbox_item_id')
-  .eq('id', taskId)
-  .single();
+// Fetches both pipeline and portfolio companies
+const { companies: pipelineCompanies } = usePipeline();
+const { companies: portfolioCompanies } = usePortfolioCompanies();
 
-if (task?.source_inbox_item_id) {
-  const { data: attachments } = await supabase
-    .from('inbox_attachments')
-    .select('*')
-    .eq('inbox_item_id', task.source_inbox_item_id);
-}
+// Combined and searchable
+const allCompanies = useMemo(() => [
+  ...pipelineCompanies.map(c => ({ 
+    id: c.id, 
+    name: c.company_name, 
+    type: 'pipeline' as const,
+    logo: c.logo_url 
+  })),
+  ...portfolioCompanies.map(c => ({ 
+    id: c.id, 
+    name: c.name, 
+    type: 'portfolio' as const,
+    logo: c.logo_url 
+  })),
+], [pipelineCompanies, portfolioCompanies]);
 ```
 
-### Signed URL Generation
-
-Reuse the existing `getSignedUrl` pattern from `useInboxAttachments`:
+### SaveAttachmentsModal
 
 ```typescript
-const getSignedUrl = async (storagePath: string) => {
-  const { data } = await supabase.storage
-    .from('inbox-attachments')
-    .createSignedUrl(storagePath, 3600);
-  return data?.signedUrl;
+// If company already linked, use it
+// Otherwise, show company picker first
+
+// Attachment selection
+const { attachments } = useInboxAttachments(inboxItemId);
+const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+// Save action
+const handleSave = async () => {
+  for (const id of selectedIds) {
+    const attachment = attachments.find(a => a.id === id);
+    if (attachment) {
+      await copyInboxAttachmentToPipeline(attachment, companyId, userId);
+    }
+  }
+  toast.success(`Saved ${selectedIds.size} file(s) to ${companyName}`);
 };
 ```
 
-### Component Reuse
+## UI/UX Flow
 
-Reuse existing attachment display components:
-- `AttachmentCard` from InboxAttachmentsSection
-- `AttachmentPreview` for inline preview
-- `formatFileSize`, `getFileIcon`, `canPreviewInline` helpers
+### Flow 1: Link Company
+1. User clicks "Link Company" in action rail
+2. LinkCompanyModal opens with searchable company list
+3. User selects a company
+4. Modal closes, inbox item now shows linked company badge
+5. Future emails from same sender auto-suggest this company
+
+### Flow 2: Save Attachments (with linked company)
+1. User views inbox item that has attachments and linked company
+2. User clicks "Save Files" → opens SaveAttachmentsModal
+3. Modal shows checkboxes for each attachment, pre-selected company
+4. User confirms → files copied to company's Files tab
+5. Toast confirms success
+
+### Flow 3: Save Attachments (without linked company)
+1. User views inbox item with attachments but no linked company
+2. User clicks "Save Files"
+3. Modal Step 1: Select company (inline company picker)
+4. Modal Step 2: Select which attachments
+5. User confirms → files copied, company also linked to inbox item
+6. Toast confirms success
+
+## Visual Design
+
+### Action Rail Updates
+
+```text
+Take Action
+───────────────────────
+[🗹] Create Task
+    Will include email attachments
+
+[📝] Add Note
+
+[🏢] Link Company          ← NOW ENABLED
+    Currently linked: [Acme Corp]  ← shows if linked
+
+[💾] Save to Company       ← NEW (only if attachments exist)
+    3 attachments available
+───────────────────────
+```
+
+### LinkCompanyModal Layout
+
+```text
+┌────────────────────────────────────────┐
+│  Link to Company                    [×]│
+├────────────────────────────────────────┤
+│  [🔍 Search companies...]              │
+│                                        │
+│  Pipeline                              │
+│  ┌────────────────────────────────┐   │
+│  │ 🔷 Acme Corp       [Series A]  │   │
+│  │ 🔷 Beta Ventures   [Seed]      │   │
+│  └────────────────────────────────┘   │
+│                                        │
+│  Portfolio                             │
+│  ┌────────────────────────────────┐   │
+│  │ 🟢 Alpha Inc       [Active]    │   │
+│  │ 🟢 Gamma Ltd       [Active]    │   │
+│  └────────────────────────────────┘   │
+│                                        │
+│          [Cancel]  [Link Company]      │
+└────────────────────────────────────────┘
+```
+
+### SaveAttachmentsModal Layout
+
+```text
+┌────────────────────────────────────────┐
+│  Save Attachments to Acme Corp      [×]│
+├────────────────────────────────────────┤
+│  Select files to save:                 │
+│                                        │
+│  [✓] 📄 pitch_deck.pdf      2.4 MB    │
+│  [✓] 🖼 screenshot.png      340 KB    │
+│  [ ] 📄 notes.txt           12 KB     │
+│                                        │
+│  Saving to: [Acme Corp ▼]  ← dropdown  │
+│                                        │
+│        [Cancel]  [Save 2 Files]        │
+└────────────────────────────────────────┘
+```
+
+## Future Considerations
+
+### Portfolio Company Attachments
+
+Currently only pipeline companies have an attachments table. To support portfolio:
+1. Create `company_attachments` table (mirrors `pipeline_attachments`)
+2. Create `company-attachments` storage bucket
+3. Add `useCompanyAttachments` hook
+4. Update `copyAttachmentToCompany` to handle both types
+
+This can be added in a follow-up phase once the pipeline flow is validated.
+
+### Attachment Source Tracking
+
+Consider adding an optional `source_inbox_attachment_id` column to `pipeline_attachments` to track provenance. This would allow showing "Saved from email: [subject]" in the Files tab.
 
 ## Acceptance Criteria
 
-1. When creating a task from an inbox item, `source_inbox_item_id` is saved to the database
-2. TaskDetailsDialog shows "Source Attachments" section when task has source inbox item
-3. Users can preview and download attachments from the task view
-4. InboxItemRow shows attachment count indicator when attachments exist
-5. InboxActionRail indicates when task will include attachments
-6. Existing inbox attachment functionality continues to work unchanged
+1. "Link Company" button in InboxActionRail is functional
+2. LinkCompanyModal shows searchable list of pipeline and portfolio companies
+3. Linking updates `related_company_id` and `related_company_name` on inbox item
+4. "Save to Company" button appears when inbox item has attachments
+5. SaveAttachmentsModal allows selecting specific attachments
+6. Selected attachments are copied to the company's Files (pipeline_attachments)
+7. Success toasts confirm actions
+8. Linked company badge shows in action rail after linking
+9. All existing functionality (Create Task, Archive, Snooze) continues working
+
+## Implementation Order
+
+1. **Phase 1**: Add `linkCompany` mutation to useInboxItems
+2. **Phase 2**: Create LinkCompanyModal component
+3. **Phase 3**: Wire Link Company action in InboxActionRail and Inbox.tsx
+4. **Phase 4**: Create copyAttachmentToCompany helper
+5. **Phase 5**: Create SaveAttachmentsModal component
+6. **Phase 6**: Wire Save Attachments action in InboxActionRail and Inbox.tsx
+7. **Phase 7**: Add visual indicators (linked company badge, attachment count)
+
