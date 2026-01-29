@@ -1,273 +1,189 @@
 
+# Fix Email Content Cleaning for Calendar Invite Emails
 
-# Fix Inbox Email Cleaning and Attachment Processing
+## Problem Analysis
 
-## Problem Summary
+The screenshot shows the email content is completely wrong - displaying calendar metadata (Location, Guests, Yes/No/Maybe links, Disclaimers) instead of the actual message body.
 
-Based on the screenshots and investigation, there are two distinct issues:
+### Root Cause
 
-### Issue 1: Attachment Processing Fails
-The edge function logs show:
+Looking at the raw `text_body` from the database, the email structure is:
+
 ```
-TypeError: base64.includes is not a function
-  at base64ToUint8Array
+Lines 1-18:    Forwarder's signature (Harrison Kioko)
+Line 20:       ---------- Forwarded message ----------  
+Lines 21-25:   Forwarded headers (From:/Date:/Subject:/To:)
+Lines 26-44:   **ACTUAL MESSAGE BODY** (Hey Harry... Best, Myles)
+Lines 46-52:   Myles's signature block (--\nimage\nMyles Patel\n224-655-9835)
+Lines 55-58:   Quoted reply (On Tue, Jan 13...wrote:)
+Lines 60-67:   Reply headers (From:/Sent:/To:/Subject:/When:/Where:)
+Lines 68-99:   Calendar update details (This event has been updated...)
+Lines 101-120: Calendar metadata (When/Location/Guests/View all guest info/Yes/No/Maybe/Invitation from Google Calendar...)
+Lines 122-124: DUPLICATE DISCLAIMER blocks
 ```
 
-**Root Cause**: The `att.content` field from Forward Email is NOT a base64 string - it's a Buffer object (e.g., `{type: "Buffer", data: [72, 101, 108, 108, 111, ...]}`). The current code tries to call `.includes()` on this object, which fails.
+**The actual desired output is lines 26-44 only.**
 
-### Issue 2: Email Content Not Cleaned
-The displayed email still shows:
-- Myles Patel's signature block after "Best, Myles"
-- Quoted reply "On Tue, Jan 13, 2026 at 11:05 AM..."
-- Reply header block (From:/Sent:/To:/Subject:/When:/Where:)
-- Google Meet calendar content
+The current cleaning is failing because:
 
-**Root Cause**: The cleaning patterns exist but aren't aggressive enough. Specifically:
-1. The `--` signature marker detection works but the signature content AFTER it isn't being cut
-2. The inline quote pattern `On Tue, Jan 13...wrote:` should match but may not be matching the exact format
-3. The calendar content after "Where: Google; https://meet.google.com" isn't being stripped
+1. **`stripSignatures` cuts at `--` (line 46)** - This works but returns too late
+2. **The calendar content appears AFTER the signature** - So signature stripping should handle it
+3. **BUT: The displayed content shows lines 101+ (calendar metadata)** - This means the cleaning output is wrong
+
+After tracing through, the issue is:
+- `stripForwardedWrapper` correctly extracts content after the marker
+- `stripCalendarContent` checks each line but the exit logic `inCalendarBlock` exits on "substantive content" - the calendar lines like "Location" and "Google" are short and may not trigger the block
+- Calendar patterns like `Location\nGoogle\nView map` don't match the existing patterns which look for `Where:` with a colon
+
+### Solution
+
+The fix needs to be more aggressive:
+
+1. **Strip at `--` signature delimiter FIRST** - This will cut everything after "Best,\nMyles"
+2. **Add more calendar metadata patterns** - `Location\n` (without colon), `Guests\n`, `When\n` as line starters
+3. **Treat calendar links as hard stops** - Any line with `calendar.google.com/calendar/event?action=` should trigger cutting everything from that point forward
+4. **Aggressive "block detection"** - If we see calendar content, cut from earliest match point rather than line-by-line filtering
 
 ---
 
-## Solution
+## File Changes
 
-### Part 1: Fix Attachment Buffer Handling
+### 1. `src/lib/emailCleaners.ts`
 
-**File: `supabase/functions/email-inbox-ingest/index.ts`**
+#### A. Add Early Calendar Block Detection
 
-The `base64ToUint8Array` function must handle multiple input formats:
-
-```typescript
-function base64ToUint8Array(content: unknown): Uint8Array {
-  // If already Uint8Array
-  if (content instanceof Uint8Array) {
-    return content;
-  }
-  
-  // If it's a Buffer-like object with data array
-  if (typeof content === 'object' && content !== null) {
-    const obj = content as Record<string, unknown>;
-    
-    // Handle {type: "Buffer", data: [...]} format
-    if (obj.type === 'Buffer' && Array.isArray(obj.data)) {
-      return new Uint8Array(obj.data as number[]);
-    }
-    
-    // Handle plain array
-    if (Array.isArray(content)) {
-      return new Uint8Array(content as number[]);
-    }
-  }
-  
-  // If it's a base64 string
-  if (typeof content === 'string') {
-    let cleanBase64 = content;
-    // Handle data URIs
-    if (content.includes(',')) {
-      cleanBase64 = content.split(',')[1];
-    }
-    cleanBase64 = cleanBase64.replace(/\s/g, '');
-    
-    const binaryString = atob(cleanBase64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-  }
-  
-  throw new Error(`Unsupported content format: ${typeof content}`);
-}
-```
-
-Also update the attachment processing to log the content type for debugging:
+Add aggressive detection that finds the EARLIEST calendar marker and cuts from there:
 
 ```typescript
-if (att.content) {
-  console.log("Processing attachment content", {
-    filename,
-    contentType: typeof att.content,
-    isBuffer: typeof att.content === 'object' && att.content?.type === 'Buffer',
-  });
-  // ...
-}
-```
-
-### Part 2: Fix Email Cleaning Patterns
-
-**File: `src/lib/emailCleaners.ts`**
-
-#### 2.1 Enhanced Signature Detection
-
-The `--` signature marker is found but content after isn't being cut. Strengthen the `stripSignatures` function:
-
-```typescript
-// In SIGNATURE_MARKERS array - ensure we catch standalone --
-const SIGNATURE_MARKERS = [
-  "\n--\n",      // Standalone
-  "\n-- \n",     // With trailing space
-  "\n\n--\n",    // With preceding blank
-  // ...existing
-];
-
-// Also add: After finding --, cut AGGRESSIVELY
-// Current code continues looking for patterns after --, but should cut there
-```
-
-#### 2.2 More Aggressive Quote Stripping
-
-The current pattern may not match "On Tue, Jan 13, 2026 at 11:05 AM Harrison Kioko...wrote:". Add explicit patterns:
-
-```typescript
-const INLINE_QUOTE_PATTERNS = [
-  // Existing patterns...
-  // Add: Gmail's common format
-  /On \w{3}, \w{3} \d{1,2}, \d{4} at \d{1,2}:\d{2}\s*[AP]M\s+[^<]+<[^>]+>\s*wrote:/im,
+// NEW: Early-cut patterns for calendar blocks - cut from first match
+const CALENDAR_BLOCK_STARTERS = [
+  "This event has been updated",
+  "This event has been changed", 
+  "Join with Google Meet",
+  "calendar.google.com/calendar/event?action=",
+  "View all guest info<https://calendar",
+  "Reply for ",
+  "Invitation from Google Calendar",
 ];
 ```
 
-#### 2.3 Strip After "Best," or Sign-off
-
-Add detection for common sign-offs that indicate end of meaningful content:
+In `cleanEmailContent()`, add a new step BEFORE existing calendar cleaning:
 
 ```typescript
-const SIGNOFF_PATTERNS = [
-  /^Best,?\s*$/im,
-  /^Thanks,?\s*$/im,
-  /^Regards,?\s*$/im,
-  /^Cheers,?\s*$/im,
-  /^Best regards,?\s*$/im,
+// Step 1.5: Early calendar block cut - find first calendar block starter and cut
+for (const starter of CALENDAR_BLOCK_STARTERS) {
+  const idx = cleanedText.toLowerCase().indexOf(starter.toLowerCase());
+  if (idx !== -1 && idx > 50) {
+    cleanedText = cleanedText.substring(0, idx).trim();
+    cleaningApplied.push("calendar_block_cut");
+    break;
+  }
+}
+```
+
+#### B. Enhance Calendar Metadata Patterns
+
+Update `CALENDAR_METADATA_PATTERNS` to catch headerless variants:
+
+```typescript
+const CALENDAR_METADATA_PATTERNS = [
+  /^When:\s*.+$/im,
+  /^Where:\s*.+$/im,
+  /^Guests:\s*.+$/im,
+  /^Calendar:\s*.+$/im,
+  /^Who:\s*.+$/im,
+  /^Video call:\s*.+$/im,
+  // NEW: Standalone labels (no colon)
+  /^When$/im,
+  /^Where$/im,
+  /^Location$/im,
+  /^Guests$/im,
+  /^Description$/im,
 ];
-
-// In cleanEmailContent after signature stripping:
-// Look for signoff followed by short name, then cut after that
 ```
 
-#### 2.4 Fix Processing Order
+#### C. Add Calendar Link Detection in `stripCalendarContent`
 
-The current order is:
-1. Strip forwarded wrapper ✓
-2. Strip calendar content - patterns not matching
-3. Strip inline quotes - patterns not matching
-4. Strip disclaimers ✓
-5. Strip signatures - `--` found but not cutting
-
-**Recommended changes**:
-- Strip signatures BEFORE inline quotes (the `--` marks a clear boundary)
-- When `--` is found, cut EVERYTHING after it (don't look for more patterns)
-- Add "Best,\nName" as a signature anchor
-
----
-
-## Implementation Details
-
-### Edge Function Changes
+Add pattern matching for long calendar URLs:
 
 ```typescript
-// Line ~290 - Replace base64ToUint8Array function
-function base64ToUint8Array(content: unknown): Uint8Array {
-  // 1. Already Uint8Array
-  if (content instanceof Uint8Array) {
-    return content;
+// In stripCalendarContent, add to isCalendarLine check:
+const isCalendarLine = 
+  // ...existing checks...
+  /action=RESPOND&eid=/i.test(lineTrimmed) ||
+  /action=VIEW&eid=/i.test(lineTrimmed) ||
+  /^Reply for /i.test(lineTrimmed) ||
+  /^View map</i.test(lineTrimmed) ||
+  /^View all guest info</i.test(lineTrimmed) ||
+  /^More phone numbers</i.test(lineTrimmed) ||
+  /^Join by phone/i.test(lineTrimmed) ||
+  /^Meeting link/i.test(lineTrimmed) ||
+  /^PIN:/i.test(lineTrimmed);
+```
+
+#### D. Add Aggressive Calendar Block Cutting
+
+Add a new function that finds calendar blocks and cuts everything from first occurrence:
+
+```typescript
+function cutAtCalendarBlock(text: string): string {
+  // Find the earliest calendar block indicator
+  const calendarIndicators = [
+    "This event has been updated",
+    "This event has been changed",
+    "Join with Google Meet<",
+    "View all guest info<https://calendar",
+    "Invitation from Google Calendar",
+    "Reply for ",
+    "\nWhen\n",  // Standalone "When" line
+    "\nLocation\n", // Standalone "Location" line
+    "\nGuests\n", // Standalone "Guests" line
+    "Yes<https://calendar.google.com",
+    "No<https://calendar.google.com", 
+    "Maybe<https://calendar.google.com",
+    "More options<https://calendar.google.com",
+    "action=RESPOND&eid=",
+    "action=VIEW&eid=",
+  ];
+  
+  let earliestIndex = text.length;
+  for (const indicator of calendarIndicators) {
+    const idx = text.toLowerCase().indexOf(indicator.toLowerCase());
+    if (idx !== -1 && idx > 50 && idx < earliestIndex) {
+      earliestIndex = idx;
+    }
   }
   
-  // 2. Buffer object: {type: "Buffer", data: [...]}
-  if (typeof content === 'object' && content !== null) {
-    const obj = content as Record<string, unknown>;
-    if (obj.type === 'Buffer' && Array.isArray(obj.data)) {
-      return new Uint8Array(obj.data as number[]);
-    }
-    if (Array.isArray(content)) {
-      return new Uint8Array(content as number[]);
-    }
+  if (earliestIndex < text.length) {
+    return text.substring(0, earliestIndex).trim();
   }
-  
-  // 3. Base64 string
-  if (typeof content === 'string') {
-    let cleanBase64 = content;
-    if (content.includes(',')) {
-      cleanBase64 = content.split(',')[1];
-    }
-    cleanBase64 = cleanBase64.replace(/\s/g, '');
-    const binaryString = atob(cleanBase64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
-  }
-  
-  throw new Error(`Unsupported content type: ${typeof content}`);
+  return text;
 }
 ```
 
-### Email Cleaner Changes
+Call this function EARLY in the cleaning pipeline (after forwarded wrapper but before other cleaning).
 
-**Enhanced stripSignatures function** - When `--` is found (double dash on its own line), cut everything after it including the line itself:
+#### E. Fix Processing Order
 
-```typescript
-// Find standalone -- or --\n pattern and cut there
-const dashDashPattern = /\n--\s*\n/;
-const dashMatch = result.match(dashDashPattern);
-if (dashMatch && dashMatch.index !== undefined && dashMatch.index > 50) {
-  result = result.substring(0, dashMatch.index).trim();
-  return result; // Early return - nothing useful after --
-}
-```
-
-**Enhanced stripInlineQuotes function** - Add the exact Gmail format pattern:
+Update `cleanEmailContent()` to use this order:
 
 ```typescript
-// Add to INLINE_QUOTE_PATTERNS
-/On \w{3}, \w{3} \d{1,2}, \d{4} at \d{1,2}:\d{2}\s*(?:AM|PM)\s+.+?wrote:/im,
-
-// Also detect horizontal rule + From: pattern
-const horizRuleFromPattern = /\n_{20,}\n+From:/im;
+// Step 1: Extract and strip forwarded wrapper
+// Step 2: Cut at calendar block (NEW - aggressive early cut)
+// Step 3: Strip at signature delimiter (--)
+// Step 4: Strip after sign-off (Best,\nName)
+// Step 5: Strip inline quotes  
+// Step 6: Strip disclaimers
+// Step 7: Strip remaining signatures
 ```
 
-**New sign-off anchor detection**:
-
-```typescript
-// After all other cleaning, look for sign-off patterns
-const signOffPattern = /\n\s*(Best|Thanks|Regards|Cheers),?\s*\n\s*([A-Z][a-z]+)/m;
-const signOffMatch = result.match(signOffPattern);
-if (signOffMatch && signOffMatch.index !== undefined) {
-  // Keep content through "Best,\nMyles" but nothing after
-  const afterSignOff = signOffMatch.index + signOffMatch[0].length;
-  // Check if there's junk after the name (signature block)
-  const remainingContent = result.substring(afterSignOff);
-  if (remainingContent.trim().startsWith('--') || 
-      remainingContent.trim().startsWith('[http') ||
-      /^\s*\n\s*\n/.test(remainingContent)) {
-    result = result.substring(0, afterSignOff).trim();
-  }
-}
-```
+This ensures we cut calendar content BEFORE signature stripping, so the `--` cut happens on the main body, not after calendar junk.
 
 ---
 
-## File Changes Summary
+## Expected Result
 
-| File | Change |
-|------|--------|
-| `supabase/functions/email-inbox-ingest/index.ts` | Fix `base64ToUint8Array` to handle Buffer objects, add logging |
-| `src/lib/emailCleaners.ts` | Enhance signature stripping (cut at `--`), add Gmail quote pattern, add sign-off detection |
-
----
-
-## Testing
-
-After implementation:
-1. Forward a new test email to trigger edge function with attachment
-2. Verify `inbox_attachments` table has a record
-3. Verify the InboxAttachmentsSection shows the file
-4. Verify cleaned email shows only core content
-
----
-
-## Expected Cleaned Output
-
-For the Myles Patel email, the cleaned text should be:
+After these changes, the Myles Patel email should display:
 
 ```
 Hey Harry,
@@ -287,5 +203,33 @@ Best,
 Myles
 ```
 
-Everything after "Best,\nMyles" (the signature block, quoted replies, calendar content, disclaimers) should be stripped.
+Everything after "Best,\nMyles" (signature block, quoted replies, calendar update, disclaimers) will be stripped.
 
+---
+
+## Technical Implementation
+
+### Changes to `src/lib/emailCleaners.ts`
+
+1. Add `CALENDAR_BLOCK_STARTERS` constant (hard-cut triggers)
+2. Add `cutAtCalendarBlock()` function
+3. Update `CALENDAR_METADATA_PATTERNS` with standalone labels
+4. Update `stripCalendarContent()` with more URL patterns
+5. Reorder steps in `cleanEmailContent()`:
+   - Move calendar block cutting to happen immediately after forwarded wrapper extraction
+   - Move signature stripping (`--`) before inline quote stripping
+
+### No changes needed to:
+- `InboxContentPane.tsx` - display logic already prefers cleaned text when cleaning was applied
+- Edge function - attachment handling is working correctly
+
+---
+
+## Acceptance Criteria
+
+1. The Myles Patel "30 Min Meeting" email displays only the core message body
+2. No calendar metadata (Location, Guests, Yes/No/Maybe, View all guest info) appears
+3. No disclaimer blocks appear  
+4. No quoted reply threads appear
+5. Myles's signature block after `--` is stripped
+6. All existing emails continue to clean correctly (no regression)
