@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, CheckCircle2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Task } from "@/hooks/useTasks";
 import { ReadingItem } from "@/types/readingItem";
 import { TaskPrefillOptions } from "@/types/inbox";
@@ -28,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePriorityItems } from "@/hooks/usePriorityItems";
 import { useUserProfile } from "@/hooks/useUserProfile";
+import { useCommitments } from "@/hooks/useCommitments";
 import { cn } from "@/lib/utils";
 
 interface DashboardMainContentProps {
@@ -68,6 +70,7 @@ export function DashboardMainContent({
   const { user } = useAuth();
   const { profile } = useUserProfile();
   const { totalCount: priorityCount } = usePriorityItems();
+  const { commitments, loading: commitmentsLoading } = useCommitments({ status: 'open' });
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showCreatePrompt, setShowCreatePrompt] = useState(false);
   const [showAddLink, setShowAddLink] = useState(false);
@@ -124,11 +127,21 @@ export function DashboardMainContent({
 
   const userName = profile?.full_name || user?.email;
   
-  // Calculate counts for hero band and To-Do panel
-  const completedToday = tasks.filter(t => t.completed).length;
-  const totalTasks = tasks.length;
+  // Calculate counts for hero band
   const todoCount = tasks.filter(t => !t.completed).length;
+  const commitmentCount = commitments.length;
   const inboxCount = 3; // Mock inbox count
+
+  // Content visibility flags - hide panels when empty
+  const hasOpenTasks = todoCount > 0;
+  const hasOpenCommitments = commitmentCount > 0;
+
+  // Animation variants for panels
+  const panelVariants = {
+    hidden: { opacity: 0, scale: 0.95 },
+    visible: { opacity: 1, scale: 1 },
+    exit: { opacity: 0, scale: 0.95 }
+  };
 
   return (
     <div className={cn("min-w-0", className)}>
@@ -138,14 +151,20 @@ export function DashboardMainContent({
         onCommandClick={openCommandModal}
         priorityCount={priorityCount}
         inboxCount={inboxCount}
-        todoCount={todoCount}
+        todoCount={hasOpenTasks ? todoCount : undefined}
+        commitmentCount={hasOpenCommitments ? commitmentCount : undefined}
       />
 
       {/* Main Content Area - Responsive Grid */}
       <div className="px-4 sm:px-6 lg:px-8 pb-8">
         
-        {/* Row 1: Action Panels - responsive: 2 cols on lg, 3 cols on xl */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
+        {/* Row 1: Action Panels - dynamic columns based on content */}
+        <div className={cn(
+          "grid gap-6 mb-6",
+          hasOpenTasks 
+            ? "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3" 
+            : "grid-cols-1 lg:grid-cols-2"
+        )}>
           <div className="w-full min-w-[260px]">
             <DashboardPrioritySection 
               onCompanyClick={openCommandPaneByEntityType}
@@ -157,54 +176,70 @@ export function DashboardMainContent({
             <InboxPanel onOpenTaskCreate={handleOpenTaskCreate} />
           </div>
           
-          <div className="w-full min-w-[260px]">
-            {/* To-Do Panel */}
-            <ActionPanel accentColor="emerald" className="h-full">
-              <ActionPanelHeader
-                icon={<CheckCircle2 className="h-4 w-4" />}
-                title="To-Do"
-                subtitle={`${completedToday}/${totalTasks} done today`}
-                badge={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-full px-4 h-7 text-[11px] font-medium bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
-                    onClick={() => handleOpenTaskCreate()}
-                  >
-                    <Plus className="mr-1 h-3 w-3" /> New task
-                  </Button>
-                }
-                accentColor="emerald"
-              />
-              
-              <ActionPanelListArea accentColor="emerald" className="overflow-y-auto max-h-[280px]">
-                <TaskInput onAddTask={onAddTask} variant="glass" />
-                <div className="mt-2">
-                  <TodayTasksSection
-                    tasks={tasks}
-                    onTaskComplete={onTaskComplete}
-                    onTaskDelete={onTaskDelete}
-                    onTaskClick={handleTaskClick}
-                    onUpdateTask={onUpdateTask}
-                    compact
+          {/* To-Do Panel - only show when tasks exist */}
+          <AnimatePresence>
+            {hasOpenTasks && (
+              <motion.div
+                variants={panelVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                transition={{ duration: 0.2 }}
+                className="w-full min-w-[260px]"
+              >
+                <ActionPanel accentColor="emerald" className="h-full">
+                  <ActionPanelHeader
+                    icon={<CheckCircle2 className="h-4 w-4" />}
+                    title="To-Do"
+                    subtitle={`${tasks.filter(t => t.completed).length}/${tasks.length} done today`}
+                    badge={
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-full px-4 h-7 text-[11px] font-medium bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-300 dark:hover:bg-emerald-500/20"
+                        onClick={() => handleOpenTaskCreate()}
+                      >
+                        <Plus className="mr-1 h-3 w-3" /> New task
+                      </Button>
+                    }
+                    accentColor="emerald"
                   />
-                </div>
-              </ActionPanelListArea>
+                  
+                  <ActionPanelListArea accentColor="emerald" className="overflow-y-auto max-h-[280px]">
+                    <TaskInput onAddTask={onAddTask} variant="glass" />
+                    <div className="mt-2">
+                      <TodayTasksSection
+                        tasks={tasks}
+                        onTaskComplete={onTaskComplete}
+                        onTaskDelete={onTaskDelete}
+                        onTaskClick={handleTaskClick}
+                        onUpdateTask={onUpdateTask}
+                        compact
+                      />
+                    </div>
+                  </ActionPanelListArea>
 
-              <ActionPanelFooter className="justify-end">
-                <button 
-                  onClick={() => onNavigate('/tasks')}
-                  className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-                >
-                  View all tasks
-                </button>
-              </ActionPanelFooter>
-            </ActionPanel>
-          </div>
+                  <ActionPanelFooter className="justify-end">
+                    <button 
+                      onClick={() => onNavigate('/tasks')}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      View all tasks
+                    </button>
+                  </ActionPanelFooter>
+                </ActionPanel>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* Row 2: Companies + Commitments + Reading List */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+        {/* Row 2: Companies + Commitments + Reading List - dynamic columns */}
+        <div className={cn(
+          "grid gap-6",
+          hasOpenCommitments 
+            ? "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3" 
+            : "grid-cols-1 lg:grid-cols-2"
+        )}>
           <div className="w-full min-w-[260px]">
             <CompaniesCommandPane
               onCompanyClick={openCommandPaneByEntityType}
@@ -217,14 +252,26 @@ export function DashboardMainContent({
             />
           </div>
 
-          <div className="w-full min-w-[260px]">
-            <CommitmentsPanel
-              maxItems={5}
-              showHeader
-              showStats
-              className="h-full min-h-[400px]"
-            />
-          </div>
+          {/* Commitments Panel - only show when open commitments exist */}
+          <AnimatePresence>
+            {hasOpenCommitments && (
+              <motion.div
+                variants={panelVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                transition={{ duration: 0.2 }}
+                className="w-full min-w-[260px]"
+              >
+                <CommitmentsPanel
+                  maxItems={5}
+                  showHeader
+                  showStats
+                  className="h-full min-h-[400px]"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div className="w-full min-w-[260px]">
             <ReadingListSection
