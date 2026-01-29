@@ -1,9 +1,15 @@
+import { useState } from 'react';
 import { PipelineCompanyDetail, PipelineInteraction } from '@/types/pipelineExtended';
 import { PipelineAttachment } from '@/hooks/usePipelineAttachments';
 import { LinkedCommunication } from '@/hooks/useCompanyLinkedCommunications';
 import { MomentumPanel } from '../overview/MomentumPanel';
 import { DealSignals } from '../overview/DealSignals';
+import { CompanyContextCard } from '../overview/CompanyContextCard';
+import { KeyPeopleCard } from '../overview/KeyPeopleCard';
+import { HarmonicMatchModal } from '../overview/HarmonicMatchModal';
 import { DealRoomTab } from '@/pages/PipelineCompanyDetail';
+import { usePipelineEnrichment } from '@/hooks/usePipelineEnrichment';
+import { HarmonicCandidate } from '@/types/enrichment';
 
 interface PipelineTask {
   id: string;
@@ -38,6 +44,17 @@ export function OverviewTab({
   onViewAllTasks,
   onNavigateTab,
 }: OverviewTabProps) {
+  const [matchModalOpen, setMatchModalOpen] = useState(false);
+
+  const {
+    enrichment,
+    loading: enrichmentLoading,
+    enriching,
+    enrichCompany,
+    searchCandidates,
+    refreshEnrichment,
+  } = usePipelineEnrichment(company.id);
+
   // Get most recent note (note, call, meeting, update types)
   const recentNote = interactions
     .filter(i => ['note', 'call', 'meeting', 'update'].includes(i.interaction_type))
@@ -60,6 +77,21 @@ export function OverviewTab({
       return bTime - aTime;
     })[0] || null;
 
+  const handleEnrich = () => {
+    const domain = company.primary_domain || (company.website ? new URL(company.website.startsWith('http') ? company.website : `https://${company.website}`).hostname.replace('www.', '') : null);
+    if (domain) {
+      enrichCompany('enrich_by_domain', { website_domain: domain });
+    } else {
+      setMatchModalOpen(true);
+    }
+  };
+
+  const handleSelectCandidate = async (candidate: HarmonicCandidate) => {
+    if (candidate.domain) {
+      await enrichCompany('enrich_by_domain', { website_domain: candidate.domain });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Primary focus: Momentum */}
@@ -70,6 +102,25 @@ export function OverviewTab({
         onViewAllTasks={onViewAllTasks}
       />
 
+      {/* Company context from Harmonic */}
+      <CompanyContextCard
+        company={company}
+        enrichment={enrichment}
+        loading={enrichmentLoading}
+        enriching={enriching}
+        onEnrich={handleEnrich}
+        onRefresh={refreshEnrichment}
+        onChangeMatch={() => setMatchModalOpen(true)}
+      />
+
+      {/* Key people (only if enriched and has entries) */}
+      {enrichment?.key_people && enrichment.key_people.length > 0 && (
+        <KeyPeopleCard
+          people={enrichment.key_people}
+          companyId={company.id}
+        />
+      )}
+
       {/* Compressed signals - only renders if data exists */}
       <DealSignals
         recentNote={recentNote}
@@ -77,6 +128,16 @@ export function OverviewTab({
         recentComm={recentComm}
         lastCompletedTask={lastCompletedTask}
         onNavigate={onNavigateTab}
+      />
+
+      {/* Harmonic match modal */}
+      <HarmonicMatchModal
+        open={matchModalOpen}
+        onOpenChange={setMatchModalOpen}
+        companyName={company.company_name}
+        onSearch={searchCandidates}
+        onSelectCandidate={handleSelectCandidate}
+        searching={enriching}
       />
     </div>
   );

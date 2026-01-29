@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.inbox-suggest-v2]
 verify_jwt = false
+
+[functions.harmonic-enrich-company]
+verify_jwt = false
