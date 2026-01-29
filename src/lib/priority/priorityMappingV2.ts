@@ -40,9 +40,13 @@ import {
   computeReadingImportanceScoreV2,
   computeNonnegotiableUrgencyScoreV2,
   computeNonnegotiableImportanceScoreV2,
+  computeCommitmentUrgencyScoreV2,
+  computeCommitmentImportanceScoreV2,
+  computeCommitmentCommitmentScoreV2,
   computeRecencyScoreV2,
   generateSignalsV2,
 } from "./priorityScoringV2";
+import type { Commitment } from "@/types/commitment";
 
 type Nonnegotiable = Database['public']['Tables']['nonnegotiables']['Row'];
 
@@ -458,6 +462,186 @@ export function mapNonnegotiableToPriorityItemV2(item: Nonnegotiable): PriorityI
     reasoning,
     signals,
   };
+}
+
+// ============================================================================
+// COMMITMENT MAPPING (new in Phase 2)
+// ============================================================================
+
+export function mapCommitmentToPriorityItemV2(
+  commitment: Commitment,
+  options?: { isVip?: boolean }
+): PriorityItem {
+  const hasPersonLink = !!commitment.personId;
+  const hasCompanyLink = !!commitment.companyId;
+  const isOverdue = commitment.dueAt
+    ? isPast(parseISO(commitment.dueAt)) && !isToday(parseISO(commitment.dueAt))
+    : false;
+  const isDueToday = commitment.dueAt
+    ? isToday(parseISO(commitment.dueAt))
+    : false;
+
+  const urgencyScore = computeCommitmentUrgencyScoreV2(
+    commitment.dueAt,
+    commitment.impliedUrgency,
+    commitment.snoozeCount
+  );
+  const importanceScore = computeCommitmentImportanceScoreV2(
+    commitment.personName,
+    commitment.companyType,
+    options?.isVip
+  );
+  const commitmentScore = computeCommitmentCommitmentScoreV2(
+    hasPersonLink,
+    commitment.companyType
+  );
+  const recencyScore = computeRecencyScoreV2(commitment.promisedAt);
+
+  const priorityScore = computePriorityScoreV2(
+    urgencyScore,
+    importanceScore,
+    commitmentScore,
+    recencyScore,
+    0.5 // Default effort
+  );
+
+  const subtitle = buildCommitmentSubtitle(commitment);
+  const iconType = isOverdue ? "commitment-broken" : "commitment";
+  const reasoning = generateCommitmentReasoning(commitment, isOverdue, isDueToday);
+
+  const signals = generateSignalsV2(
+    { urgency: urgencyScore, importance: importanceScore, commitment: commitmentScore, recency: recencyScore },
+    {
+      urgencyDescription: commitment.dueAt
+        ? getUrgencyDescription(commitment.dueAt)
+        : commitment.impliedUrgency || "No due date",
+      importanceDescription: commitment.personName
+        ? `Promise to ${commitment.personName}`
+        : "Open commitment",
+      commitmentDescription: hasPersonLink
+        ? `Commitment to ${commitment.personName}`
+        : "General commitment",
+      recencyDescription: `Promised ${formatRelative(commitment.promisedAt)}`,
+    }
+  );
+
+  return {
+    id: `commitment-${commitment.id}`,
+    sourceType: "commitment",
+    sourceId: commitment.id,
+    title: commitment.content,
+    subtitle,
+    description: commitment.context || undefined,
+    contextLabels: buildCommitmentContextLabels(commitment),
+    iconType,
+    urgencyScore,
+    importanceScore,
+    recencyScore,
+    commitmentScore,
+    priorityScore,
+    dueAt: commitment.dueAt,
+    snoozedUntil: commitment.snoozedUntil,
+    createdAt: commitment.createdAt,
+    lastTouchedAt: commitment.updatedAt,
+    isOverdue,
+    isDueToday,
+    isDueSoon: !isOverdue && !isDueToday && urgencyScore >= 0.5,
+    isSnoozed: !!commitment.snoozedUntil,
+    companyId: commitment.companyId,
+    companyName: commitment.companyName,
+    reasoning,
+    signals,
+  };
+}
+
+function buildCommitmentSubtitle(commitment: Commitment): string {
+  const parts: string[] = [];
+
+  if (commitment.personName) {
+    parts.push(`To: ${commitment.personName}`);
+  }
+
+  if (commitment.dueAt) {
+    const dueDate = parseISO(commitment.dueAt);
+    if (isPast(dueDate) && !isToday(dueDate)) {
+      const days = Math.abs(differenceInDays(new Date(), dueDate));
+      parts.push(`Overdue by ${days} day${days === 1 ? '' : 's'}`);
+    } else if (isToday(dueDate)) {
+      parts.push("Due today");
+    } else {
+      parts.push(`Due ${format(dueDate, 'MMM d')}`);
+    }
+  } else if (commitment.impliedUrgency) {
+    parts.push(formatImpliedUrgency(commitment.impliedUrgency));
+  }
+
+  return parts.join(' • ') || 'Open commitment';
+}
+
+function buildCommitmentContextLabels(commitment: Commitment): string[] {
+  const labels: string[] = ["Commitment"];
+
+  if (commitment.companyName) {
+    labels.push(commitment.companyName);
+  }
+
+  if (commitment.sourceType && commitment.sourceType !== 'manual') {
+    labels.push(`From ${commitment.sourceType}`);
+  }
+
+  if (commitment.snoozeCount > 0) {
+    labels.push(`Snoozed ${commitment.snoozeCount}x`);
+  }
+
+  return labels;
+}
+
+function formatImpliedUrgency(urgency: string): string {
+  switch (urgency) {
+    case 'asap': return 'ASAP';
+    case 'today': return 'Due today';
+    case 'this_week': return 'This week';
+    case 'next_week': return 'Next week';
+    case 'this_month': return 'This month';
+    case 'when_possible': return 'When possible';
+    default: return urgency;
+  }
+}
+
+function generateCommitmentReasoning(
+  commitment: Commitment,
+  isOverdue: boolean,
+  isDueToday: boolean
+): string {
+  const parts: string[] = [];
+
+  if (isOverdue) {
+    const days = Math.abs(differenceInDays(new Date(), parseISO(commitment.dueAt!)));
+    parts.push(`Overdue by ${days} days`);
+  } else if (isDueToday) {
+    parts.push("Due today");
+  } else if (commitment.dueAt) {
+    const days = differenceInDays(parseISO(commitment.dueAt), new Date());
+    if (days === 1) {
+      parts.push("Due tomorrow");
+    } else if (days <= 7) {
+      parts.push(`Due in ${days} days`);
+    }
+  }
+
+  if (commitment.personName) {
+    parts.push(`Promise to ${commitment.personName}`);
+  }
+
+  if (commitment.companyName) {
+    parts.push(`Related to ${commitment.companyName}`);
+  }
+
+  if (commitment.snoozeCount >= 3) {
+    parts.push(`Snoozed ${commitment.snoozeCount} times - escalating`);
+  }
+
+  return parts.length > 0 ? parts.join(". ") + "." : "Open commitment needs attention.";
 }
 
 // ============================================================================

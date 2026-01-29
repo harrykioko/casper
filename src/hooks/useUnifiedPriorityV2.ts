@@ -1,7 +1,7 @@
 /**
  * useUnifiedPriorityV2 Hook - Full Coverage Priority Engine
  *
- * Combines 8 data sources into a single prioritized list:
+ * Combines 9 data sources into a single prioritized list:
  * - Tasks (all incomplete tasks)
  * - Inbox items (unread/unresolved)
  * - Calendar events (next 48 hours)
@@ -9,6 +9,7 @@
  * - Pipeline companies (active deals, next_steps)
  * - Reading list (unread items)
  * - Nonnegotiables (active habits)
+ * - Commitments (promises made to others) [Phase 2]
  *
  * Features:
  * - 5-dimensional scoring (urgency, importance, commitment, recency, effort)
@@ -16,7 +17,7 @@
  * - Minimum score threshold (0.2)
  * - Effort-based filtering (quick wins mode)
  *
- * Status: Phase 1 - v2 Implementation
+ * Status: Phase 2 - Commitments Integration
  */
 
 import { useMemo } from 'react';
@@ -28,6 +29,7 @@ import { useDashboardPortfolioCompanies } from './useDashboardPortfolioCompanies
 import { useDashboardPipelineFocus } from './useDashboardPipelineFocus';
 import { useReadingItems } from './useReadingItems';
 import { useNonnegotiables } from './useNonnegotiables';
+import { useCommitments } from './useCommitments';
 import { useDismissedPriorityItems } from './useDismissedPriorityItems';
 import type { PriorityItem, PrioritySourceType } from '@/types/priority';
 import { V2_PRIORITY_CONFIG } from '@/types/priority';
@@ -39,6 +41,7 @@ import {
   mapPipelineCompanyToPriorityItemV2,
   mapReadingItemToPriorityItemV2,
   mapNonnegotiableToPriorityItemV2,
+  mapCommitmentToPriorityItemV2,
 } from '@/lib/priority/priorityMappingV2';
 
 export interface UnifiedPriorityV2Options {
@@ -98,6 +101,7 @@ export function useUnifiedPriorityV2(options?: UnifiedPriorityV2Options): Unifie
   const { companies: pipelineCompanies, loading: pipelineLoading } = useDashboardPipelineFocus();
   const { readingItems, loading: readingLoading } = useReadingItems();
   const { nonnegotiables, loading: nonnegotiablesLoading } = useNonnegotiables();
+  const { commitments, loading: commitmentsLoading } = useCommitments({ status: 'open' });
   const { dismissedSet, loading: dismissedLoading } = useDismissedPriorityItems();
 
   // =========================================================================
@@ -110,7 +114,7 @@ export function useUnifiedPriorityV2(options?: UnifiedPriorityV2Options): Unifie
 
     const includeSources = new Set(options?.includeSources || [
       'task', 'inbox', 'calendar_event', 'portfolio_company',
-      'pipeline_company', 'reading_item', 'nonnegotiable'
+      'pipeline_company', 'reading_item', 'nonnegotiable', 'commitment'
     ]);
     const excludeSources = new Set(options?.excludeSources || []);
 
@@ -310,7 +314,36 @@ export function useUnifiedPriorityV2(options?: UnifiedPriorityV2Options): Unifie
     }
 
     // -----------------------------------------------------------------------
-    // 8. APPLY MINIMUM SCORE THRESHOLD
+    // 8. MAP COMMITMENTS (open promises) [Phase 2]
+    // -----------------------------------------------------------------------
+    if (shouldInclude('commitment')) {
+      for (const commitment of commitments) {
+        // Skip snoozed
+        if (commitment.snoozedUntil) {
+          const snoozedUntil = parseISO(commitment.snoozedUntil);
+          if (snoozedUntil > now) {
+            filterStats.snoozed++;
+            continue;
+          }
+        }
+
+        // Skip dismissed
+        if (dismissedSet.has(`commitment-${commitment.id}`)) {
+          filterStats.dismissed++;
+          continue;
+        }
+
+        try {
+          const priorityItem = mapCommitmentToPriorityItemV2(commitment);
+          allItems.push(priorityItem);
+        } catch (error) {
+          console.error(`[Priority v2] Error mapping commitment ${commitment.id}:`, error);
+        }
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // 9. APPLY MINIMUM SCORE THRESHOLD
     // -----------------------------------------------------------------------
     const minScore = options?.minScore ?? V2_PRIORITY_CONFIG.minScore;
     const aboveThreshold = allItems.filter(item => {
@@ -322,7 +355,7 @@ export function useUnifiedPriorityV2(options?: UnifiedPriorityV2Options): Unifie
     });
 
     // -----------------------------------------------------------------------
-    // 9. APPLY DIVERSITY RULES
+    // 10. APPLY DIVERSITY RULES
     // -----------------------------------------------------------------------
     let selected: PriorityItem[];
 
@@ -340,7 +373,7 @@ export function useUnifiedPriorityV2(options?: UnifiedPriorityV2Options): Unifie
     }
 
     // -----------------------------------------------------------------------
-    // 10. COMPUTE DEBUG INFO
+    // 11. COMPUTE DEBUG INFO
     // -----------------------------------------------------------------------
     const distribution = new Map<PrioritySourceType, number>();
     const bySource: Record<string, PriorityItem[]> = {};
@@ -394,6 +427,7 @@ export function useUnifiedPriorityV2(options?: UnifiedPriorityV2Options): Unifie
     pipelineCompanies,
     readingItems,
     nonnegotiables,
+    commitments,
     dismissedSet,
     options?.availableMinutes,
     options?.maxItems,
@@ -408,7 +442,7 @@ export function useUnifiedPriorityV2(options?: UnifiedPriorityV2Options): Unifie
   // =========================================================================
   const isLoading = tasksLoading || inboxLoading || calendarLoading ||
                     portfolioLoading || pipelineLoading || readingLoading ||
-                    nonnegotiablesLoading || dismissedLoading;
+                    nonnegotiablesLoading || commitmentsLoading || dismissedLoading;
 
   if (isLoading) {
     return {

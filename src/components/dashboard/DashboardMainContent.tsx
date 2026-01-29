@@ -23,6 +23,7 @@ import {
   ActionPanelListArea,
   ActionPanelFooter,
 } from "@/components/ui/action-panel";
+import { CommitmentsPanel } from "@/components/commitments/CommitmentsPanel";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePriorityItems } from "@/hooks/usePriorityItems";
@@ -202,10 +203,10 @@ export function DashboardMainContent({
           </div>
         </div>
 
-        {/* Row 2: Companies + Reading List - responsive: stacked on lg, side-by-side on xl */}
-        <div className="grid grid-cols-1 xl:grid-cols-[2fr_1fr] gap-6">
+        {/* Row 2: Companies + Commitments + Reading List */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
           <div className="w-full min-w-[260px]">
-            <CompaniesCommandPane 
+            <CompaniesCommandPane
               onCompanyClick={openCommandPaneByEntityType}
               onCreateTask={(companyId, companyType) => {
                 handleOpenTaskCreate({
@@ -215,7 +216,16 @@ export function DashboardMainContent({
               }}
             />
           </div>
-          
+
+          <div className="w-full min-w-[260px]">
+            <CommitmentsPanel
+              maxItems={5}
+              showHeader
+              showStats
+              className="h-full min-h-[400px]"
+            />
+          </div>
+
           <div className="w-full min-w-[260px]">
             <ReadingListSection
               readingItems={readingItems}

@@ -17,6 +17,8 @@ import {
   MessageSquare,
   FileText,
   Building2,
+  Handshake,
+  HeartCrack,
 } from "lucide-react";
 import { format, formatDistanceToNow, addHours, addDays, setHours, setMinutes, nextMonday } from "date-fns";
 import type { PriorityItem, PriorityIconType, PrioritySourceType } from "@/types/priority";
@@ -119,6 +121,18 @@ const iconConfig: Record<
     bgColor: "bg-rose-100 dark:bg-rose-900/30",
     label: "High Priority",
   },
+  "commitment": {
+    icon: Handshake,
+    color: "text-teal-600 dark:text-teal-400",
+    bgColor: "bg-teal-100 dark:bg-teal-900/30",
+    label: "Commitment",
+  },
+  "commitment-broken": {
+    icon: HeartCrack,
+    color: "text-red-600 dark:text-red-400",
+    bgColor: "bg-red-100 dark:bg-red-900/30",
+    label: "Overdue Promise",
+  },
 };
 
 const defaultIconConfig = {
@@ -139,6 +153,12 @@ function getSourceIcon(sourceType: PrioritySourceType) {
     case "portfolio_company":
     case "pipeline_company":
       return AlertCircle;
+    case "commitment":
+      return Handshake;
+    case "reading_item":
+      return BookOpen;
+    case "nonnegotiable":
+      return Star;
     default:
       return CheckSquare;
   }
@@ -160,11 +180,12 @@ export function PriorityItemRow({
   const Icon = config?.icon || defaultIconConfig.icon;
   const SourceIcon = getSourceIcon(item.sourceType);
 
-  const canSnooze = item.sourceType === "task" || item.sourceType === "inbox";
+  const canSnooze = item.sourceType === "task" || item.sourceType === "inbox" || item.sourceType === "commitment";
   const canToggleTopPriority = item.sourceType === "task" || item.sourceType === "inbox";
   const isCompany = item.sourceType === "portfolio_company" || item.sourceType === "pipeline_company";
   const isCalendar = item.sourceType === "calendar_event";
   const isReading = item.sourceType === "reading_item";
+  const isCommitment = item.sourceType === "commitment";
 
   return (
     <div
@@ -406,6 +427,49 @@ export function PriorityItemRow({
               </Button>
             </TooltipTrigger>
             <TooltipContent side="top">Open article</TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Commitment actions: View person/company */}
+        {isCommitment && item.companyId && onViewCompany && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-teal-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewCompany(item.companyId!);
+                }}
+              >
+                <Building2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">View company</TooltipContent>
+          </Tooltip>
+        )}
+
+        {isCommitment && onCreateTask && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-emerald-600"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCreateTask({
+                    content: item.title,
+                    companyId: item.companyId || undefined,
+                  });
+                  toast.success("Creating task from commitment...");
+                }}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Create task</TooltipContent>
           </Tooltip>
         )}
 

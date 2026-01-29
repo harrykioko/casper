@@ -24,6 +24,7 @@ export type PrioritySourceType =
   | "calendar_event"
   | "reading_item"
   | "nonnegotiable"
+  | "commitment"
   | "project"; // Future: project milestones, deadlines
 
 /**
@@ -39,6 +40,8 @@ export type PriorityIconType =
   | "upcoming-event"    // Calendar - calendar event starting soon
   | "unread-reading"    // Book - unread reading item
   | "nonnegotiable"     // Star - daily habit/commitment
+  | "commitment"        // Handshake - promise made to someone
+  | "commitment-broken" // Broken handshake - overdue commitment
   | "high-importance";  // Red flag - high priority task
 
 /**

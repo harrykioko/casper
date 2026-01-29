@@ -355,6 +355,119 @@ export function computeNonnegotiableImportanceScoreV2(
 }
 
 // ============================================================================
+// COMMITMENT SCORING (new in Phase 2)
+// ============================================================================
+
+/**
+ * Compute urgency score for commitments based on due date and implied urgency
+ */
+export function computeCommitmentUrgencyScoreV2(
+  dueAt: string | null | undefined,
+  impliedUrgency: string | null | undefined,
+  snoozeCount: number = 0
+): number {
+  let urgency = 0.5; // Base urgency for commitments
+
+  // Due date takes priority
+  if (dueAt) {
+    const now = new Date();
+    const dueDate = parseISO(dueAt);
+    const daysUntilDue = differenceInDays(dueDate, now);
+
+    if (daysUntilDue < 0) {
+      // Overdue - escalate based on how overdue
+      urgency = Math.min(1.0, 0.95 + Math.abs(daysUntilDue) * 0.01);
+    } else if (daysUntilDue === 0 || isToday(dueDate)) {
+      urgency = 0.95;
+    } else if (daysUntilDue === 1) {
+      urgency = 0.85;
+    } else if (daysUntilDue <= 3) {
+      urgency = 0.7;
+    } else if (daysUntilDue <= 7) {
+      urgency = 0.5;
+    } else {
+      urgency = 0.3;
+    }
+  } else if (impliedUrgency) {
+    // Use implied urgency if no explicit due date
+    switch (impliedUrgency) {
+      case 'asap':
+        urgency = 0.95;
+        break;
+      case 'today':
+        urgency = 0.9;
+        break;
+      case 'this_week':
+        urgency = 0.7;
+        break;
+      case 'next_week':
+        urgency = 0.5;
+        break;
+      case 'this_month':
+        urgency = 0.3;
+        break;
+      case 'when_possible':
+        urgency = 0.2;
+        break;
+    }
+  }
+
+  // Snooze penalty - repeatedly snoozed commitments escalate
+  if (snoozeCount > 0) {
+    urgency = Math.min(1.0, urgency + snoozeCount * 0.05);
+  }
+
+  return urgency;
+}
+
+/**
+ * Compute importance score for commitments
+ * Based on who the commitment is to (VIP, company link)
+ */
+export function computeCommitmentImportanceScoreV2(
+  personName: string | null | undefined,
+  companyType: 'portfolio' | 'pipeline' | null | undefined,
+  isVip: boolean = false
+): number {
+  let baseScore = 0.7; // Commitments are inherently important
+
+  // VIP boost
+  if (isVip) {
+    baseScore = Math.min(1.0, baseScore + 0.2);
+  }
+
+  // Company type boost
+  if (companyType === 'portfolio') {
+    baseScore = Math.min(1.0, baseScore + 0.15);
+  } else if (companyType === 'pipeline') {
+    baseScore = Math.min(1.0, baseScore + 0.1);
+  }
+
+  return baseScore;
+}
+
+/**
+ * Compute commitment score for commitments (this IS the commitment itself)
+ */
+export function computeCommitmentCommitmentScoreV2(
+  hasPersonLink: boolean,
+  companyType: 'portfolio' | 'pipeline' | null | undefined
+): number {
+  // All commitments have high commitment score by definition
+  let score = 0.85;
+
+  if (hasPersonLink) {
+    score = 0.95; // Promise to a specific person is higher commitment
+  }
+
+  if (companyType === 'portfolio') {
+    score = Math.min(1.0, score + 0.05); // Portfolio company = highest stakes
+  }
+
+  return score;
+}
+
+// ============================================================================
 // CALENDAR SCORING (enhanced from v1)
 // ============================================================================
 
