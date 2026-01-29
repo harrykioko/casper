@@ -7,7 +7,8 @@ interface DashboardHeroBandProps {
   onCommandClick: () => void;
   priorityCount: number;
   inboxCount: number;
-  todoCount: number;
+  todoCount?: number;
+  commitmentCount?: number;
 }
 
 function StatBadge({ count, label }: { count: number; label: string }) {
@@ -24,7 +25,8 @@ export function DashboardHeroBand({
   onCommandClick,
   priorityCount,
   inboxCount,
-  todoCount 
+  todoCount,
+  commitmentCount
 }: DashboardHeroBandProps) {
   const firstName = userName?.split(' ')[0] || userName?.split('@')[0] || 'there';
   const today = new Date();
@@ -39,11 +41,16 @@ export function DashboardHeroBand({
       
       {/* Content - 3 column grid */}
       <div className="relative px-8 py-8 grid grid-cols-[auto_1fr_auto] items-center gap-8">
-        {/* LEFT: Vertically Stacked Stats */}
+        {/* LEFT: Vertically Stacked Stats - only show stats with content */}
         <div className="flex flex-col gap-1.5">
           <StatBadge count={priorityCount} label="Priority" />
           <StatBadge count={inboxCount} label="Inbox" />
-          <StatBadge count={todoCount} label="To-Dos" />
+          {todoCount !== undefined && todoCount > 0 && (
+            <StatBadge count={todoCount} label="To-Dos" />
+          )}
+          {commitmentCount !== undefined && commitmentCount > 0 && (
+            <StatBadge count={commitmentCount} label="Commitments" />
+          )}
         </div>
         
         {/* CENTER: Greeting (centered) */}
