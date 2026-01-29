@@ -3,6 +3,7 @@ import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { Inbox, Check, Archive, Mail, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   ActionPanel,
   ActionPanelHeader,
@@ -212,6 +213,11 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
           <ActionPanelListArea accentColor="sky" className="overflow-y-auto max-h-[280px]">
             {inboxItems.slice(0, 4).map((item, index) => {
               const isLast = index === Math.min(inboxItems.length, 4) - 1;
+              // Use display fields with fallbacks
+              const displayName = item.displayFromName || item.senderName;
+              const displaySubject = item.displaySubject || item.subject;
+              const displayPreview = item.summary || item.displaySnippet || item.preview;
+              const initial = displayName.charAt(0).toUpperCase();
 
               return (
                 <ActionPanelRow
@@ -224,7 +230,7 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
                     {/* Avatar - smaller */}
                     <div className="w-7 h-7 rounded-full bg-sky-50 dark:bg-sky-500/10 flex items-center justify-center flex-shrink-0">
                       <span className="text-xs font-medium text-sky-600 dark:text-sky-300">
-                        {item.senderName.charAt(0).toUpperCase()}
+                        {initial}
                       </span>
                     </div>
 
@@ -239,17 +245,22 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
                               : "font-medium text-slate-600 dark:text-slate-300"
                           )}
                         >
-                          {item.senderName}
+                          {displayName}
                         </span>
+                        {item.isForwarded && (
+                          <Badge variant="outline" className="text-[8px] h-3.5 px-1 font-medium text-muted-foreground border-muted-foreground/30">
+                            Fwd
+                          </Badge>
+                        )}
                         <span className="text-slate-300 dark:text-slate-600 flex-shrink-0">·</span>
                         <span className="text-sm text-slate-600 dark:text-slate-300 truncate">
-                          {item.subject}
+                          {displaySubject}
                         </span>
                         {!item.isRead && (
                           <div className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
                         )}
                       </div>
-                      <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{item.preview}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500 truncate">{displayPreview}</p>
                     </div>
                   </div>
 
