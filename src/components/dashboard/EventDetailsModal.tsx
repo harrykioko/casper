@@ -14,6 +14,7 @@ import { getDomainFromEmail } from '@/lib/domainMatching';
 import { useCalendarEventLinking } from '@/hooks/useCalendarEventLinking';
 import { useCalendarFollowups } from '@/hooks/useCalendarFollowups';
 import type { CompanySearchResult } from '@/types/calendarLinking';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CalendarEvent {
   id: string;
@@ -51,6 +52,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
   const [companyQuery, setCompanyQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CompanySearchResult[]>([]);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+  const [fallbackLogoUrl, setFallbackLogoUrl] = useState<string | null>(null);
 
   const {
     linkedCompany,
@@ -83,8 +85,34 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       setSearchResults([]);
       setSelectedItems(new Set());
       setFollowupData(null);
+      setFallbackLogoUrl(null);
     }
   }, [isOpen, setFollowupData]);
+
+  // Fetch fallback logo if linkedCompany has no logo stored
+  useEffect(() => {
+    if (linkedCompany && !linkedCompany.companyLogoUrl) {
+      const fetchFallbackLogo = async () => {
+        const table = linkedCompany.companyType === 'pipeline' 
+          ? 'pipeline_companies' 
+          : 'companies';
+        const { data } = await supabase
+          .from(table)
+          .select('logo_url')
+          .eq('id', linkedCompany.companyId)
+          .single();
+        if (data?.logo_url) {
+          setFallbackLogoUrl(data.logo_url);
+        }
+      };
+      fetchFallbackLogo();
+    } else {
+      setFallbackLogoUrl(null);
+    }
+  }, [linkedCompany]);
+
+  // Compute display logo URL
+  const displayLogoUrl = linkedCompany?.companyLogoUrl || fallbackLogoUrl;
 
   // Disable body scroll when modal is open
   useEffect(() => {
@@ -295,7 +323,7 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                       >
                         <Avatar className="h-5 w-5">
                           <AvatarImage 
-                            src={linkedCompany.companyLogoUrl || undefined} 
+                            src={displayLogoUrl || undefined} 
                             alt={linkedCompany.companyName} 
                           />
                           <AvatarFallback className="text-[9px] bg-background border border-border">
