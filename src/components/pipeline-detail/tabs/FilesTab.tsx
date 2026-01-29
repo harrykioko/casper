@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
-import { Upload, FileText, File, Image, FileSpreadsheet, Presentation, Download, Trash2, Loader2 } from 'lucide-react';
+import { Upload, FileText, File, Image, FileSpreadsheet, Presentation, Download, Trash2, Loader2, Eye, EyeOff, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { GlassPanel, GlassPanelHeader, GlassSubcard } from '@/components/ui/glass-panel';
-import { usePipelineAttachments, PipelineAttachment } from '@/hooks/usePipelineAttachments';
+import { usePipelineAttachments, PipelineAttachment, canPreviewInline } from '@/hooks/usePipelineAttachments';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -27,11 +27,56 @@ function formatFileSize(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// Inline preview component
+function AttachmentPreview({ 
+  attachment, 
+  signedUrl, 
+  onClose 
+}: { 
+  attachment: PipelineAttachment; 
+  signedUrl: string;
+  onClose: () => void;
+}) {
+  const isImage = attachment.file_type?.startsWith("image/");
+  const isPdf = attachment.file_type === "application/pdf";
+
+  return (
+    <div className="relative mt-2 rounded-lg border border-border overflow-hidden bg-muted/30">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-2 right-2 h-6 w-6 bg-background/80 hover:bg-background z-10"
+        onClick={onClose}
+      >
+        <X className="h-4 w-4" />
+      </Button>
+
+      {isImage && (
+        <img 
+          src={signedUrl} 
+          alt={attachment.file_name}
+          className="max-w-full max-h-[400px] object-contain mx-auto p-4"
+        />
+      )}
+
+      {isPdf && (
+        <iframe
+          src={signedUrl}
+          title={attachment.file_name}
+          className="w-full h-[500px] border-0"
+        />
+      )}
+    </div>
+  );
+}
+
 export function FilesTab({ companyId }: FilesTabProps) {
   const { attachments, loading, uploadAttachment, deleteAttachment, getSignedUrl } = usePipelineAttachments(companyId);
   const [uploading, setUploading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [previewAttachmentId, setPreviewAttachmentId] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,6 +117,21 @@ export function FilesTab({ companyId }: FilesTabProps) {
       await deleteAttachment(attachment);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handlePreview = async (attachment: PipelineAttachment) => {
+    if (previewAttachmentId === attachment.id) {
+      // Close preview
+      setPreviewAttachmentId(null);
+      setPreviewUrl(null);
+    } else {
+      // Open preview
+      const url = await getSignedUrl(attachment.storage_path);
+      if (url) {
+        setPreviewAttachmentId(attachment.id);
+        setPreviewUrl(url);
+      }
     }
   };
 
@@ -141,53 +201,83 @@ export function FilesTab({ companyId }: FilesTabProps) {
                 const FileIcon = getFileIcon(attachment.file_type);
                 const isDownloading = downloadingId === attachment.id;
                 const isDeleting = deletingId === attachment.id;
+                const isPreviewOpen = previewAttachmentId === attachment.id;
+                const canPreview = canPreviewInline(attachment.file_type);
 
                 return (
-                  <GlassSubcard key={attachment.id} className="p-3" hoverable={false}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
-                        <FileIcon className="w-5 h-5 text-muted-foreground" />
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {attachment.file_name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatFileSize(attachment.file_size)} • {format(new Date(attachment.created_at), 'MMM d, yyyy')}
-                        </p>
-                      </div>
+                  <div key={attachment.id}>
+                    <GlassSubcard className="p-3" hoverable={false}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
+                          <FileIcon className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">
+                            {attachment.file_name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(attachment.file_size)} • {format(new Date(attachment.created_at), 'MMM d, yyyy')}
+                          </p>
+                        </div>
 
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => handleDownload(attachment)}
-                          disabled={isDownloading}
-                        >
-                          {isDownloading ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Download className="w-4 h-4" />
+                        <div className="flex items-center gap-1">
+                          {canPreview && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => handlePreview(attachment)}
+                              title={isPreviewOpen ? "Hide preview" : "Preview"}
+                            >
+                              {isPreviewOpen ? (
+                                <EyeOff className="w-4 h-4" />
+                              ) : (
+                                <Eye className="w-4 h-4" />
+                              )}
+                            </Button>
                           )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => handleDelete(attachment)}
-                          disabled={isDeleting}
-                        >
-                          {isDeleting ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleDownload(attachment)}
+                            disabled={isDownloading}
+                          >
+                            {isDownloading ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDelete(attachment)}
+                            disabled={isDeleting}
+                          >
+                            {isDeleting ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </GlassSubcard>
+                    </GlassSubcard>
+                    
+                    {isPreviewOpen && previewUrl && (
+                      <AttachmentPreview
+                        attachment={attachment}
+                        signedUrl={previewUrl}
+                        onClose={() => {
+                          setPreviewAttachmentId(null);
+                          setPreviewUrl(null);
+                        }}
+                      />
+                    )}
+                  </div>
                 );
               })}
             </div>
