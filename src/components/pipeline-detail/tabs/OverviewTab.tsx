@@ -5,7 +5,6 @@ import { LinkedCommunication } from '@/hooks/useCompanyLinkedCommunications';
 import { MomentumPanel } from '../overview/MomentumPanel';
 import { DealSignals } from '../overview/DealSignals';
 import { CompanyContextCard } from '../overview/CompanyContextCard';
-import { KeyPeopleCard } from '../overview/KeyPeopleCard';
 import { HarmonicMatchModal } from '../overview/HarmonicMatchModal';
 import { DealRoomTab } from '@/pages/PipelineCompanyDetail';
 import { HarmonicEnrichment, HarmonicCandidate, EnrichmentMode } from '@/types/enrichment';
@@ -103,6 +102,8 @@ export function OverviewTab({
   const handleSelectCandidate = async (candidate: HarmonicCandidate) => {
     if (candidate.domain) {
       await onEnrich('enrich_by_domain', { website_domain: candidate.domain });
+    } else if (candidate.linkedin_url) {
+      await onEnrich('enrich_by_linkedin', { linkedin_url: candidate.linkedin_url });
     }
   };
 
@@ -126,14 +127,6 @@ export function OverviewTab({
         onRefresh={onRefreshEnrichment}
         onChangeMatch={() => setMatchModalOpen(true)}
       />
-
-      {/* Key people (only if enriched and has entries) */}
-      {enrichment?.key_people && enrichment.key_people.length > 0 && (
-        <KeyPeopleCard
-          people={enrichment.key_people}
-          companyId={company.id}
-        />
-      )}
 
       {/* Compressed signals - only renders if data exists */}
       <DealSignals
