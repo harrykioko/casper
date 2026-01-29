@@ -8,8 +8,13 @@ import { CompanyContextCard } from '../overview/CompanyContextCard';
 import { KeyPeopleCard } from '../overview/KeyPeopleCard';
 import { HarmonicMatchModal } from '../overview/HarmonicMatchModal';
 import { DealRoomTab } from '@/pages/PipelineCompanyDetail';
-import { usePipelineEnrichment } from '@/hooks/usePipelineEnrichment';
-import { HarmonicCandidate } from '@/types/enrichment';
+import { HarmonicEnrichment, HarmonicCandidate, EnrichmentMode } from '@/types/enrichment';
+
+interface EnrichOptions {
+  website_domain?: string;
+  linkedin_url?: string;
+  query_name?: string;
+}
 
 interface PipelineTask {
   id: string;
@@ -26,6 +31,12 @@ interface OverviewTabProps {
   interactions: PipelineInteraction[];
   attachments: PipelineAttachment[];
   linkedCommunications?: LinkedCommunication[];
+  enrichment: HarmonicEnrichment | null;
+  enrichmentLoading: boolean;
+  enriching: boolean;
+  onEnrich: (mode: EnrichmentMode, options?: EnrichOptions) => Promise<HarmonicEnrichment | null>;
+  onSearchCandidates: (queryName: string) => Promise<HarmonicCandidate[]>;
+  onRefreshEnrichment: () => Promise<HarmonicEnrichment | null>;
   onRefetch: () => void;
   onCreateTask: (content: string, options?: { scheduled_for?: string; priority?: string }) => Promise<any>;
   onViewAllTasks: () => void;
@@ -40,20 +51,17 @@ export function OverviewTab({
   interactions,
   attachments,
   linkedCommunications = [],
+  enrichment,
+  enrichmentLoading,
+  enriching,
+  onEnrich,
+  onSearchCandidates,
+  onRefreshEnrichment,
   onCreateTask,
   onViewAllTasks,
   onNavigateTab,
 }: OverviewTabProps) {
   const [matchModalOpen, setMatchModalOpen] = useState(false);
-
-  const {
-    enrichment,
-    loading: enrichmentLoading,
-    enriching,
-    enrichCompany,
-    searchCandidates,
-    refreshEnrichment,
-  } = usePipelineEnrichment(company.id);
 
   // Get most recent note (note, call, meeting, update types)
   const recentNote = interactions
@@ -80,7 +88,7 @@ export function OverviewTab({
   const handleEnrich = () => {
     const domain = company.primary_domain || (company.website ? new URL(company.website.startsWith('http') ? company.website : `https://${company.website}`).hostname.replace('www.', '') : null);
     if (domain) {
-      enrichCompany('enrich_by_domain', { website_domain: domain });
+      onEnrich('enrich_by_domain', { website_domain: domain });
     } else {
       setMatchModalOpen(true);
     }
@@ -88,7 +96,7 @@ export function OverviewTab({
 
   const handleSelectCandidate = async (candidate: HarmonicCandidate) => {
     if (candidate.domain) {
-      await enrichCompany('enrich_by_domain', { website_domain: candidate.domain });
+      await onEnrich('enrich_by_domain', { website_domain: candidate.domain });
     }
   };
 
@@ -109,7 +117,7 @@ export function OverviewTab({
         loading={enrichmentLoading}
         enriching={enriching}
         onEnrich={handleEnrich}
-        onRefresh={refreshEnrichment}
+        onRefresh={onRefreshEnrichment}
         onChangeMatch={() => setMatchModalOpen(true)}
       />
 
@@ -135,7 +143,7 @@ export function OverviewTab({
         open={matchModalOpen}
         onOpenChange={setMatchModalOpen}
         companyName={company.company_name}
-        onSearch={searchCandidates}
+        onSearch={onSearchCandidates}
         onSelectCandidate={handleSelectCandidate}
         searching={enriching}
       />
