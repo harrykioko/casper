@@ -139,7 +139,11 @@ export function SuggestionCard({
           className="h-6 text-[10px] flex-1"
           onClick={() => onApprove(suggestion)}
         >
-          {suggestion.type === "LINK_COMPANY" ? "Link" : "Create"}
+          {suggestion.type === "LINK_COMPANY" 
+            ? "Link" 
+            : suggestion.type === "CREATE_PIPELINE_COMPANY"
+            ? "Add to Pipeline"
+            : "Create"}
         </Button>
         <Button
           size="sm"

@@ -21,9 +21,10 @@ import { InboxSummaryPanel } from "@/components/inbox/InboxSummaryPanel";
 import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
 import { LinkCompanyModal } from "@/components/inbox/LinkCompanyModal";
 import { SaveAttachmentsModal } from "@/components/inbox/SaveAttachmentsModal";
+import { CreatePipelineFromInboxModal } from "@/components/inbox/CreatePipelineFromInboxModal";
 import { isActionRequired, isWaitingOn } from "@/components/inbox/inboxHelpers";
 import type { InboxItem, TaskPrefillOptions, InboxViewFilter } from "@/types/inbox";
-import type { StructuredSuggestion } from "@/types/inboxSuggestions";
+import type { StructuredSuggestion, CreatePipelineCompanyMetadata } from "@/types/inboxSuggestions";
 import type { InboxAttachment } from "@/hooks/useInboxAttachments";
 import { usePipeline } from "@/hooks/usePipeline";
 import { useAuth } from "@/contexts/AuthContext";
@@ -74,6 +75,12 @@ export default function Inbox() {
   
   // Save Attachments modal state
   const [saveAttachmentsItem, setSaveAttachmentsItem] = useState<InboxItem | null>(null);
+  
+  // Pipeline creation modal state
+  const [pipelineModalItem, setPipelineModalItem] = useState<{
+    item: InboxItem;
+    metadata: CreatePipelineCompanyMetadata;
+  } | null>(null);
 
   // Get the base items based on view filter
   const baseItems = useMemo(() => {
@@ -247,19 +254,40 @@ export default function Inbox() {
         break;
       }
       case "CREATE_PIPELINE_COMPANY": {
-        const companyName = suggestion.company_name || item.senderName;
-        try {
-          const newCompany = await createPipelineCompany({
-            company_name: companyName,
-            current_round: "unknown" as any,
-            website: item.senderEmail ? item.senderEmail.split("@")[1] : undefined,
+        // Extract metadata from suggestion or build fallback from email info
+        const rawMetadata = suggestion.metadata as Record<string, unknown> | undefined;
+        const hasValidMetadata = rawMetadata && 
+          typeof rawMetadata.extracted_company_name === 'string' && 
+          rawMetadata.extracted_company_name.length > 0;
+        
+        if (hasValidMetadata) {
+          // Use AI-extracted metadata
+          const metadata: CreatePipelineCompanyMetadata = {
+            extracted_company_name: rawMetadata.extracted_company_name as string,
+            extracted_domain: (rawMetadata.extracted_domain as string) || null,
+            primary_contact_name: (rawMetadata.primary_contact_name as string) || "",
+            primary_contact_email: (rawMetadata.primary_contact_email as string) || "",
+            description_oneliner: (rawMetadata.description_oneliner as string) || "",
+            notes_summary: (rawMetadata.notes_summary as string) || "",
+            suggested_tags: (rawMetadata.suggested_tags as string[]) || [],
+            intro_source: (rawMetadata.intro_source as string) || "Email",
+          };
+          setPipelineModalItem({ item, metadata });
+        } else {
+          // Fallback: Use basic extraction from email
+          setPipelineModalItem({
+            item,
+            metadata: {
+              extracted_company_name: suggestion.company_name || item.senderName || "",
+              extracted_domain: item.senderEmail?.split("@")[1] || null,
+              primary_contact_name: item.senderName || "",
+              primary_contact_email: item.senderEmail || "",
+              description_oneliner: "",
+              notes_summary: item.preview || "",
+              suggested_tags: [],
+              intro_source: "Email",
+            },
           });
-          if (newCompany?.id) {
-            linkCompany(item.id, newCompany.id, companyName);
-          }
-          toast.success(`${companyName} added to pipeline`);
-        } catch {
-          toast.error("Failed to create pipeline company");
         }
         break;
       }
@@ -320,6 +348,15 @@ export default function Inbox() {
       linkCompany(linkCompanyItem.id, companyId, companyName, companyType, companyLogoUrl);
       setLinkCompanyItem(null);
     }
+  };
+
+  // Handler for pipeline company created from modal
+  const handlePipelineCompanyCreated = (companyId: string, companyName: string) => {
+    if (pipelineModalItem) {
+      linkCompany(pipelineModalItem.item.id, companyId, companyName, 'pipeline');
+      toast.success(`${companyName} added to pipeline and linked to email`);
+    }
+    setPipelineModalItem(null);
   };
 
   const unreadCount = inboxItems.filter(item => !item.isRead).length;
@@ -511,6 +548,17 @@ export default function Inbox() {
           onLinkCompany={(companyId, companyName) => {
             linkCompany(saveAttachmentsItem.id, companyId, companyName);
           }}
+        />
+      )}
+
+      {/* Pipeline Company Creation Modal */}
+      {pipelineModalItem && (
+        <CreatePipelineFromInboxModal
+          open={!!pipelineModalItem}
+          onOpenChange={(open) => !open && setPipelineModalItem(null)}
+          inboxItem={pipelineModalItem.item}
+          prefillData={pipelineModalItem.metadata}
+          onCompanyCreated={handlePipelineCompanyCreated}
         />
       )}
     </div>
