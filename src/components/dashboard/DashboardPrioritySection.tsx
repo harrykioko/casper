@@ -49,10 +49,10 @@ interface DashboardPrioritySectionProps {
 }
 
 // Icon configuration mapped by PriorityIconType
-const iconConfig: Record<
+const iconConfig: Partial<Record<
   PriorityIconType,
   { icon: typeof AlertTriangle; color: string; bgColor: string; label: string }
-> = {
+>> = {
   "overdue": {
     icon: AlertTriangle,
     color: "text-red-600 dark:text-red-400",
@@ -100,6 +100,18 @@ const iconConfig: Record<
     color: "text-purple-600 dark:text-purple-400",
     bgColor: "bg-purple-100 dark:bg-purple-900/30",
     label: "Habit",
+  },
+  "commitment": {
+    icon: Flag,
+    color: "text-indigo-600 dark:text-indigo-400",
+    bgColor: "bg-indigo-100 dark:bg-indigo-900/30",
+    label: "Commitment",
+  },
+  "commitment-broken": {
+    icon: AlertTriangle,
+    color: "text-red-600 dark:text-red-400",
+    bgColor: "bg-red-100 dark:bg-red-900/30",
+    label: "Broken Commitment",
   },
   "high-importance": {
     icon: Flag,

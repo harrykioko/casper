@@ -1,6 +1,6 @@
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
-import { Inbox, ListTodo, Check, Archive, Mail, ExternalLink, Loader2 } from "lucide-react";
+import { Inbox, Check, Archive, Mail, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ActionPanel,
@@ -10,11 +10,10 @@ import {
   ActionPanelFooter,
   CountBadge,
 } from "@/components/ui/action-panel";
-import { InboxItem, TaskPrefillOptions } from "@/types/inbox";
-import { InboxDetailDrawer } from "./InboxDetailDrawer";
+import { TaskPrefillOptions } from "@/types/inbox";
 import { useInboxItems } from "@/hooks/useInboxItems";
+import { useGlobalInboxDrawer } from "@/contexts/GlobalInboxDrawerContext";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
 
 interface InboxPanelProps {
   onOpenTaskCreate: (options: TaskPrefillOptions) => void;
@@ -22,22 +21,20 @@ interface InboxPanelProps {
 
 export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
   const navigate = useNavigate();
-  const { inboxItems, isLoading, markAsRead, markComplete, archive } = useInboxItems();
-  const [selectedItem, setSelectedItem] = useState<InboxItem | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze } = useInboxItems();
+  const { openDrawer } = useGlobalInboxDrawer();
 
-  const openInboxDetail = (item: InboxItem) => {
-    setSelectedItem(item);
-    setIsDetailOpen(true);
-    // Mark as read when opening
+  const openInboxDetail = (item: typeof inboxItems[0]) => {
     if (!item.isRead) {
       markAsRead(item.id);
     }
-  };
-
-  const closeDetail = () => {
-    setIsDetailOpen(false);
-    setSelectedItem(null);
+    openDrawer(item, {
+      onCreateTask: handleCreateTaskFromEmail,
+      onMarkComplete: handleMarkComplete,
+      onArchive: handleArchive,
+      onSnooze: handleSnooze,
+      onAddNote: undefined,
+    });
   };
 
   const handleMarkComplete = (id: string) => {
@@ -48,27 +45,29 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
     archive(id);
   };
 
-  const handleCreateTaskFromEmail = (item: InboxItem) => {
+  const handleSnooze = (id: string, until: Date) => {
+    snooze(id, until);
+  };
+
+  const handleCreateTaskFromEmail = (item: typeof inboxItems[0], suggestionTitle?: string) => {
     onOpenTaskCreate({
-      content: item.subject,
+      content: suggestionTitle || item.subject,
       description: item.preview || undefined,
       companyName: item.relatedCompanyName,
     });
-    closeDetail();
   };
 
   const unreadCount = inboxItems.filter((item) => !item.isRead).length;
 
   return (
-    <>
-      <ActionPanel accentColor="sky" className="h-full">
-        <ActionPanelHeader
-          icon={<Inbox className="h-4 w-4" />}
-          title="Inbox"
-          subtitle={`${unreadCount} new messages`}
-          badge={unreadCount > 0 ? <CountBadge count={unreadCount} label="unread" accentColor="sky" /> : undefined}
-          accentColor="sky"
-        />
+    <ActionPanel accentColor="sky" className="h-full">
+      <ActionPanelHeader
+        icon={<Inbox className="h-4 w-4" />}
+        title="Inbox"
+        subtitle={`${unreadCount} new messages`}
+        badge={unreadCount > 0 ? <CountBadge count={unreadCount} label="unread" accentColor="sky" /> : undefined}
+        accentColor="sky"
+      />
 
         {isLoading ? (
           <ActionPanelListArea accentColor="sky" className="flex items-center justify-center">
@@ -191,16 +190,5 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
           </ActionPanelFooter>
         )}
       </ActionPanel>
-
-      {/* Detail Drawer */}
-      <InboxDetailDrawer
-        open={isDetailOpen}
-        onClose={closeDetail}
-        item={selectedItem}
-        onCreateTask={handleCreateTaskFromEmail}
-        onMarkComplete={handleMarkComplete}
-        onArchive={handleArchive}
-      />
-    </>
   );
 }
