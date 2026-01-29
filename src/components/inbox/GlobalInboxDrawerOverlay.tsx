@@ -132,6 +132,7 @@ export function GlobalInboxDrawerOverlay() {
                 onAddNote={handlers.onAddNote}
                 onLinkCompany={handlers.onLinkCompany}
                 onSaveAttachments={handlers.onSaveAttachments}
+                onApproveSuggestion={handlers.onApproveSuggestion}
                 hideCloseButton={true}
               />
             </div>

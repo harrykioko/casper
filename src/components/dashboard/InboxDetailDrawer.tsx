@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { InboxDetailWorkspace } from "@/components/inbox/InboxDetailWorkspace";
 import { InboxItem } from "@/types/inbox";
+import type { StructuredSuggestion } from "@/types/inboxSuggestions";
 
 interface InboxDetailContentProps {
   item: InboxItem;
@@ -212,6 +213,7 @@ interface InboxDetailDrawerProps {
   onAddNote?: (item: InboxItem) => void;
   onLinkCompany?: (item: InboxItem) => void;
   onSaveAttachments?: (item: InboxItem) => void;
+  onApproveSuggestion?: (item: InboxItem, suggestion: StructuredSuggestion) => void;
   attachmentCount?: number;
 }
 
@@ -227,6 +229,7 @@ export function InboxDetailDrawer({
   onAddNote,
   onLinkCompany,
   onSaveAttachments,
+  onApproveSuggestion,
   attachmentCount = 0,
 }: InboxDetailDrawerProps) {
   if (!item) return null;
@@ -244,6 +247,7 @@ export function InboxDetailDrawer({
         onAddNote={onAddNote}
         onLinkCompany={onLinkCompany}
         onSaveAttachments={onSaveAttachments}
+        onApproveSuggestion={onApproveSuggestion}
         attachmentCount={attachmentCount}
       />
     );

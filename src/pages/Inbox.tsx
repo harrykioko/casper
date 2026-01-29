@@ -25,6 +25,8 @@ import { LinkCompanyModal } from "@/components/inbox/LinkCompanyModal";
 import { SaveAttachmentsModal } from "@/components/inbox/SaveAttachmentsModal";
 import { isActionRequired, isWaitingOn } from "@/components/inbox/inboxHelpers";
 import type { InboxItem, TaskPrefillOptions, InboxViewFilter } from "@/types/inbox";
+import type { StructuredSuggestion } from "@/types/inboxSuggestions";
+import { usePipeline } from "@/hooks/usePipeline";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +41,7 @@ export default function Inbox() {
   const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze, linkCompany } = useInboxItems();
   const { inboxItems: archivedItems, isLoading: isLoadingArchived } = useInboxItems({ onlyArchived: true });
   const { createTask } = useTasks();
+  const { createCompany: createPipelineCompany } = usePipeline();
 
   // Snooze handler
   const handleSnooze = (id: string, until: Date) => {
@@ -178,6 +181,7 @@ export default function Inbox() {
         onAddNote: handleAddNote,
         onLinkCompany: handleLinkCompany,
         onSaveAttachments: handleSaveAttachments,
+        onApproveSuggestion: handleApproveSuggestion,
       });
     }
   };
@@ -216,6 +220,87 @@ export default function Inbox() {
 
   const handleSaveAttachments = (item: InboxItem) => {
     setSaveAttachmentsItem(item);
+  };
+
+  const handleApproveSuggestion = async (item: InboxItem, suggestion: StructuredSuggestion) => {
+    switch (suggestion.type) {
+      case "LINK_COMPANY": {
+        if (suggestion.company_id) {
+          linkCompany(item.id, suggestion.company_id, suggestion.company_name || null);
+          toast.success(`Linked to ${suggestion.company_name || "company"}`);
+        } else {
+          // No company_id in suggestion — open the link company modal for manual selection
+          setLinkCompanyItem(item);
+        }
+        break;
+      }
+      case "CREATE_PIPELINE_COMPANY": {
+        const companyName = suggestion.company_name || item.senderName;
+        try {
+          const newCompany = await createPipelineCompany({
+            company_name: companyName,
+            current_round: "unknown" as any,
+            website: item.senderEmail ? item.senderEmail.split("@")[1] : undefined,
+          });
+          if (newCompany?.id) {
+            linkCompany(item.id, newCompany.id, companyName);
+          }
+          toast.success(`${companyName} added to pipeline`);
+        } catch {
+          toast.error("Failed to create pipeline company");
+        }
+        break;
+      }
+      case "CREATE_FOLLOW_UP_TASK": {
+        setTaskPrefill({
+          content: suggestion.title,
+          description: item.preview || undefined,
+          companyId: suggestion.company_id || item.relatedCompanyId || undefined,
+          companyType: suggestion.company_type || undefined,
+          companyName: suggestion.company_name || item.relatedCompanyName || undefined,
+          sourceInboxItemId: item.id,
+          category: "follow_up",
+        });
+        setIsTaskDialogOpen(true);
+        break;
+      }
+      case "CREATE_PERSONAL_TASK": {
+        setTaskPrefill({
+          content: suggestion.title,
+          description: item.preview || undefined,
+          sourceInboxItemId: item.id,
+          category: "personal",
+        });
+        setIsTaskDialogOpen(true);
+        break;
+      }
+      case "CREATE_INTRO_TASK": {
+        setTaskPrefill({
+          content: suggestion.title,
+          description: item.preview || undefined,
+          companyId: suggestion.company_id || item.relatedCompanyId || undefined,
+          companyType: suggestion.company_type || undefined,
+          companyName: suggestion.company_name || item.relatedCompanyName || undefined,
+          sourceInboxItemId: item.id,
+          category: "intro",
+        });
+        setIsTaskDialogOpen(true);
+        break;
+      }
+      case "SET_STATUS": {
+        toast.info("Status update coming soon");
+        break;
+      }
+      case "EXTRACT_UPDATE_HIGHLIGHTS": {
+        toast.info("Highlights extraction coming soon");
+        break;
+      }
+      default: {
+        // Fallback: create a task
+        handleCreateTask(item, suggestion.title);
+        break;
+      }
+    }
   };
 
   const handleCompanyLinked = (companyId: string, companyName: string, companyType: 'pipeline' | 'portfolio') => {
@@ -399,6 +484,7 @@ export default function Inbox() {
                 onAddNote={handleAddNote}
                 onLinkCompany={handleLinkCompany}
                 onSaveAttachments={handleSaveAttachments}
+                onApproveSuggestion={handleApproveSuggestion}
                 attachmentCount={selectedItemAttachments.length}
               />
             </div>

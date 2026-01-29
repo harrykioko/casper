@@ -40,6 +40,7 @@ interface InboxActionRailProps {
   onAddNote?: (item: InboxItem) => void;
   onLinkCompany?: (item: InboxItem) => void;
   onSaveAttachments?: (item: InboxItem) => void;
+  onApproveSuggestion?: (item: InboxItem, suggestion: StructuredSuggestion) => void;
   attachmentCount?: number;
 }
 
@@ -96,6 +97,7 @@ export function InboxActionRail({
   onSnooze,
   onAddNote,
   onLinkCompany,
+  onApproveSuggestion,
   onSaveAttachments,
   attachmentCount = 0,
 }: InboxActionRailProps) {
@@ -128,8 +130,14 @@ export function InboxActionRail({
   };
 
   const handleApproveSuggestion = (suggestion: StructuredSuggestion) => {
-    // For now, just create a task with the suggestion title
-    onCreateTask(item, suggestion.title);
+    if (onApproveSuggestion) {
+      onApproveSuggestion(item, suggestion);
+    } else {
+      // Fallback: create a task with the suggestion title
+      onCreateTask(item, suggestion.title);
+    }
+    // Auto-dismiss the suggestion after acting on it
+    dismissSuggestion(suggestion.id);
   };
 
   const handleEditSuggestion = (suggestion: StructuredSuggestion) => {

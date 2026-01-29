@@ -60,6 +60,7 @@ export interface TaskPrefillOptions {
   companyName?: string;
   dueDate?: Date;
   sourceInboxItemId?: string;
+  category?: string;
 }
 
 export type InboxViewFilter = 'all' | 'action' | 'waiting' | 'archived';

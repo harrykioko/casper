@@ -1,6 +1,7 @@
 import { InboxContentPane } from "./InboxContentPane";
 import { InboxActionRail } from "./InboxActionRail";
 import type { InboxItem } from "@/types/inbox";
+import type { StructuredSuggestion } from "@/types/inboxSuggestions";
 
 interface InboxDetailWorkspaceProps {
   item: InboxItem;
@@ -12,6 +13,7 @@ interface InboxDetailWorkspaceProps {
   onAddNote?: (item: InboxItem) => void;
   onLinkCompany?: (item: InboxItem) => void;
   onSaveAttachments?: (item: InboxItem) => void;
+  onApproveSuggestion?: (item: InboxItem, suggestion: StructuredSuggestion) => void;
   attachmentCount?: number;
   hideCloseButton?: boolean;
 }
@@ -26,6 +28,7 @@ export function InboxDetailWorkspace({
   onAddNote,
   onLinkCompany,
   onSaveAttachments,
+  onApproveSuggestion,
   attachmentCount = 0,
   hideCloseButton = false,
 }: InboxDetailWorkspaceProps) {
@@ -51,6 +54,7 @@ export function InboxDetailWorkspace({
           onAddNote={onAddNote}
           onLinkCompany={onLinkCompany}
           onSaveAttachments={onSaveAttachments}
+          onApproveSuggestion={onApproveSuggestion}
           attachmentCount={attachmentCount}
         />
       </div>

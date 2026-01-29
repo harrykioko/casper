@@ -1709,16 +1709,38 @@ function useWaitingFor() {
 - Created `useSnooze` hook with escalation tracking
 - Enhanced `PriorityItemRow` with source-specific inline actions
 
-#### Phase 2: Commitments & People (Weeks 4-6)
+#### Phase 2: Commitments & People (Weeks 4-6) — PARTIAL ✅
 
-| Priority | Solution | Effort | Impact |
-|----------|----------|--------|--------|
-| P0 | 1.1 Commitments table | High | Critical |
-| P0 | 1.2 Unified people table | High | High |
-| P1 | 4.3 Email → Task conversion | Medium | High |
-| P1 | 2.2 Meeting prep intelligence | Medium | Medium |
+| Priority | Solution | Effort | Impact | Status |
+|----------|----------|--------|--------|--------|
+| P0 | 1.1 Commitments table | High | Critical | ✅ Done |
+| P0 | 1.2 Unified people table | High | High | ✅ Done |
+| P1 | 4.3 Email → Task conversion | Medium | High | ⏳ Deferred |
+| P1 | 2.2 Meeting prep intelligence | Medium | Medium | ⏳ Deferred |
 
-**Milestone:** Commitments tracked explicitly; people unified; emails convert to tasks with context.
+**Milestone:** Commitments tracked explicitly; people unified. Email→task and meeting prep deferred to Phase 2b.
+
+**Implementation Notes (January 2026):**
+- Created migration `20260128000002_phase2_commitments_and_people.sql`
+- **Commitments system:**
+  - `commitments` table with snooze, delegation, completion tracking, implied urgency
+  - `useCommitments` hook with full CRUD, snooze/delegate/complete/cancel operations
+  - `useCommitmentFromInteraction()` for creating commitments from company interactions
+  - `usePersonCommitmentStats()` for per-person commitment analytics
+  - Full UI: `CommitmentCard`, `CommitmentList` (with filtering/grouping), `CommitmentForm`, `CommitmentModal` (multi-mode: create/complete/snooze/delegate), `CommitmentsPanel`, `CommitmentWidget`
+  - Integrated into dashboard Row 2 (3-column grid: Companies / Commitments / Reading List)
+- **Unified people directory:**
+  - `people` table + `person_company_roles` junction table + `people_with_roles` view
+  - `usePeople` hook with CRUD, company role management, VIP filtering, search
+  - `usePerson`, `usePersonProfile`, `useFindOrCreatePerson` hooks
+  - Person profile aggregates commitments, interactions, meetings, emails, and company associations
+- **Priority system v2 expanded to 9 sources:**
+  - Added commitment scoring functions (urgency, importance, commitment dimensions)
+  - Added `mapCommitmentToPriorityItemV2()` adapter with snooze/dismissed filtering
+  - Added `Handshake` (teal) and `HeartCrack` (red/overdue) icons to PriorityItemRow
+  - Commitment-specific inline actions (view company, create task)
+- **Files created:** 10 new files (hooks, types, components, priority adapters)
+- **Files modified:** 5 existing files (priority system, dashboard, PriorityItemRow)
 
 #### Phase 3: Workflow & Rituals (Weeks 7-9)
 
@@ -1750,7 +1772,7 @@ function useWaitingFor() {
 
 | Metric | Current | Target | How to Measure |
 |--------|---------|--------|----------------|
-| Priority sources coverage | 3/8 | 8/8 | Count adapters in priority system |
+| Priority sources coverage | 9/9 ✅ | 8/8 | Count adapters in priority system |
 | Snooze reliability | ~60% | 99% | Items that resurface vs. snoozed |
 | Items with effort estimate | 0% | 80% | Tasks with effort_minutes set |
 | Commitments captured | 0 | 5+/week | New commitments logged |
@@ -1780,17 +1802,82 @@ function useWaitingFor() {
 
 ### Revised Readiness Projection
 
-| Dimension | Current | After Phase 1 | After Phase 4 |
-|-----------|---------|---------------|---------------|
-| Data Capture | 6/10 | 7/10 | 9/10 |
-| Data Linking | 4/10 | 5/10 | 8/10 |
-| Prioritization | 5/10 | 8/10 | 9/10 |
-| Actionability | 5/10 | 7/10 | 9/10 |
-| Orchestration | 3/10 | 5/10 | 8/10 |
-| Peace of Mind | 3/10 | 6/10 | 9/10 |
-| Learning | 1/10 | 2/10 | 5/10 |
-| **Overall** | **4/10** | **6/10** | **8/10** |
+| Dimension | Current | After Phase 1 | After Phase 2 | After Phase 4 |
+|-----------|---------|---------------|---------------|---------------|
+| Data Capture | 6/10 | 7/10 | 8/10 | 9/10 |
+| Data Linking | 4/10 | 5/10 | 7/10 | 8/10 |
+| Prioritization | 5/10 | 8/10 | 9/10 | 9/10 |
+| Actionability | 5/10 | 7/10 | 7/10 | 9/10 |
+| Orchestration | 3/10 | 5/10 | 6/10 | 8/10 |
+| Peace of Mind | 3/10 | 6/10 | 7/10 | 9/10 |
+| Learning | 1/10 | 2/10 | 2/10 | 5/10 |
+| **Overall** | **4/10** | **6/10** | **7/10** | **8/10** |
 
 ---
 
 *End of Solutions Section*
+
+---
+
+## Proposed Next Steps
+
+### Status Summary
+
+| Phase | Status | Key Deliverables |
+|-------|--------|-----------------|
+| Phase 1 | ✅ Complete | Priority v2 (8→9 sources), snooze infrastructure, effort estimates, inline actions |
+| Phase 2 (core) | ✅ Complete | Commitments system, unified people directory, priority integration |
+| Phase 2 (deferred) | ⏳ Pending | Email→task conversion, meeting prep intelligence |
+
+### Recommended Next: Phase 2b — Deferred Items
+
+Before moving to Phase 3, complete the two deferred Phase 2 items that directly improve data capture and actionability:
+
+#### 2b.1 Email → Task Conversion (P1)
+Convert inbox items into actionable tasks with context preserved.
+
+**What it involves:**
+- Add "Convert to task" action on inbox items (InboxPanel, InboxItemRow)
+- Auto-populate task content from email subject/body
+- Link task back to source email for reference
+- Optionally extract commitment if email contains a promise
+- Add `source_type` and `source_id` fields to tasks table
+
+**Impact:** Closes the gap between email triage and task execution. Currently inbox items sit in a separate silo.
+
+#### 2b.2 Meeting Prep Intelligence (P1)
+Auto-generate briefing cards before calendar meetings.
+
+**What it involves:**
+- Before a meeting with a known person, surface: open commitments, recent interactions, company status, pending tasks
+- Leverage `usePersonProfile` hook (already built) as data source
+- Create a `MeetingPrepCard` component shown in priority panel ~1hr before meetings
+- Add meeting prep as a new priority source type in the scoring system
+
+**Impact:** Ensures you never walk into a meeting unprepared. Uses the people + commitments infrastructure already in place.
+
+### Alternative: Skip to Phase 3
+
+If email→task and meeting prep aren't urgent, Phase 3 focuses on workflow orchestration:
+
+#### 3.1 Command Loop / Focus Mode (P0)
+A guided workflow that walks through priority items one at a time: act, snooze, delegate, or dismiss. Prevents the "stare at the list" problem.
+
+#### 3.2 Review Rituals (P1)
+Daily morning review (what's on today) and weekly review (what slipped, what's stale, what to plan). Structured checklists that surface the right data.
+
+#### 3.3 Coverage Dashboard (P1)
+Visual health check: which companies haven't been contacted recently, which commitments are aging, which tasks are stale. Turns invisible problems visible.
+
+#### 3.4 Quick Wins Mode (P2)
+Filter priority list to items under 15 minutes. Uses the effort estimates from Phase 1 to surface fast wins when energy is low.
+
+### Decision Point
+
+The recommended path is **Phase 2b first** because:
+1. The infrastructure for both features already exists (people hooks, inbox system, calendar events)
+2. Email→task is a high-frequency action that compounds daily
+3. Meeting prep leverages the commitments + people work just completed
+4. Phase 3 (focus mode, rituals) benefits from having all data sources wired up first
+
+However, if the current data capture feels sufficient, Phase 3's command loop would deliver the biggest UX improvement.
