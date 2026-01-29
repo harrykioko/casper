@@ -42,6 +42,9 @@ const DISCLAIMER_PATTERNS = [
   "DISCLAIMER:",
   "DISCLAIMER",
   "CONFIDENTIALITY NOTICE",
+  "CONFIDENTIALITY NOTICE:",
+  "CONFIDENTIALITY NOTE",
+  "CONFIDENTIALITY NOTE:",
   "CONFIDENTIALITY:",
   "This email and any attachments",
   "This email and any files transmitted",
@@ -52,6 +55,10 @@ const DISCLAIMER_PATTERNS = [
   "The information contained in this email",
   "NOTICE: This email is intended for",
   "________________________________",
+  "This message contains confidential",
+  "The contents of this email",
+  "IMPORTANT NOTICE:",
+  "LEGAL NOTICE:",
 ];
 
 // Signature markers
@@ -62,17 +69,34 @@ const SIGNATURE_MARKERS = [
   "\nSent from my iPad",
   "\nSent from Outlook",
   "\nGet Outlook for",
+  "\nSent from Mail for",
 ];
 
 // Phone patterns that often appear in signatures
-const PHONE_PATTERN = /(?:Tel|Phone|Mobile|Cell|Fax):\s*[\d\s\-\+\(\)\.]+/i;
+const PHONE_PATTERN = /(?:Tel|Phone|Mobile|Cell|Fax|Direct Line|Direct|Office|Work|Main):\s*[\d\s\-\+\(\)\.]+/i;
+
+// Inline quote patterns (Gmail-style replies)
+const INLINE_QUOTE_PATTERNS = [
+  /On .{10,80} wrote:\s*$/im,
+  /On .{10,60}, .{3,40} <.+@.+> wrote:/im,
+  /On .{10,60} at .{5,20}, .+? wrote:/im,
+  /\d{1,2}\/\d{1,2}\/\d{2,4}.{1,40}<.+@.+>.{0,10}wrote:/im,
+];
+
+/**
+ * Escape special regex characters in a string
+ */
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 /**
  * Main function to clean email content
  */
 export function cleanEmailContent(
   textBody: string | null,
-  htmlBody: string | null
+  htmlBody: string | null,
+  senderName?: string
 ): CleanedEmail {
   const cleaningApplied: string[] = [];
   let cleanedText = textBody || "";
@@ -98,24 +122,41 @@ export function cleanEmailContent(
     cleaningApplied.push("forwarded_wrapper");
   }
 
-  // Step 2: Strip disclaimers
+  // Step 2: Strip inline quoted replies
+  const quoteResult = stripInlineQuotes(cleanedText);
+  if (quoteResult !== cleanedText) {
+    cleanedText = quoteResult;
+    cleaningApplied.push("inline_quotes");
+  }
+
+  // Step 3: Strip disclaimers
   const disclaimerResult = stripDisclaimers(cleanedText);
   if (disclaimerResult !== cleanedText) {
     cleanedText = disclaimerResult;
     cleaningApplied.push("disclaimers");
   }
 
-  // Step 3: Strip signatures (only if they don't remove too much)
-  const signatureResult = stripSignatures(cleanedText);
-  if (signatureResult !== cleanedText && signatureResult.length > cleanedText.length * 0.3) {
+  // Step 4: Strip signatures (pass sender name for better detection)
+  const signatureResult = stripSignatures(cleanedText, senderName);
+  if (signatureResult !== cleanedText && signatureResult.length > cleanedText.length * 0.2) {
     cleanedText = signatureResult;
     cleaningApplied.push("signatures");
   }
 
-  // Step 4: Sanitize HTML if present
+  // Step 5: Clean HTML if present
   if (cleanedHtml) {
+    // First sanitize HTML
     cleanedHtml = sanitizeHtml(cleanedHtml);
     cleaningApplied.push("html_sanitized");
+    
+    // Then try to clean disclaimers from HTML
+    const htmlCleanResult = cleanHtmlContent(cleanedHtml, cleanedText);
+    if (htmlCleanResult.wasModified) {
+      cleanedHtml = htmlCleanResult.html;
+      if (!cleaningApplied.includes("disclaimers")) {
+        cleaningApplied.push("html_disclaimers");
+      }
+    }
   }
 
   // Safety check: if we removed more than 80% of content, fall back to original
@@ -140,6 +181,7 @@ export function cleanEmailContent(
 
 /**
  * Strip forwarded message wrapper and extract metadata
+ * Now also strips content BEFORE the forwarded marker (forwarder's signature)
  */
 export function stripForwardedWrapper(text: string): {
   body: string;
@@ -190,6 +232,9 @@ export function stripForwardedWrapper(text: string): {
 
     return { body, meta };
   }
+
+  // IMPORTANT: Strip content BEFORE the marker (forwarder's signature)
+  // Only keep content AFTER the forwarded marker
 
   // Extract lines after the marker
   const afterMarker = text.substring(markerIndex + markerLength);
@@ -278,6 +323,27 @@ function parseHeaderLines(
 }
 
 /**
+ * Strip inline quoted replies (Gmail-style "On X wrote:")
+ */
+export function stripInlineQuotes(text: string): string {
+  let result = text;
+  
+  for (const pattern of INLINE_QUOTE_PATTERNS) {
+    const match = result.match(pattern);
+    if (match && match.index !== undefined) {
+      // Only strip if we're not removing too much content (at least 20% should remain)
+      const beforeQuote = result.substring(0, match.index);
+      if (beforeQuote.length > result.length * 0.2) {
+        result = beforeQuote.trim();
+        break;
+      }
+    }
+  }
+  
+  return result;
+}
+
+/**
  * Strip legal disclaimers from content
  */
 export function stripDisclaimers(text: string): string {
@@ -286,6 +352,7 @@ export function stripDisclaimers(text: string): string {
 
   for (const pattern of DISCLAIMER_PATTERNS) {
     const index = result.toLowerCase().indexOf(pattern.toLowerCase());
+    // Only strip if pattern appears after some reasonable content (at least 50 chars)
     if (index !== -1 && index > 50 && index < earliestIndex) {
       earliestIndex = index;
     }
@@ -299,26 +366,132 @@ export function stripDisclaimers(text: string): string {
 }
 
 /**
- * Strip email signatures
+ * Strip email signatures with enhanced Outlook detection
  */
-export function stripSignatures(text: string): string {
+export function stripSignatures(text: string, senderName?: string): string {
   let result = text;
+  const isShortEmail = result.length < 500;
 
-  // Check for common signature markers
+  // 1. Check for common signature markers first
   for (const marker of SIGNATURE_MARKERS) {
     const index = result.indexOf(marker);
-    if (index !== -1 && index > result.length * 0.3) {
-      // Only strip if marker is in latter portion of email
+    // For short emails, be more aggressive (don't require marker to be past 30%)
+    const threshold = isShortEmail ? 0.15 : 0.3;
+    if (index !== -1 && index > result.length * threshold) {
       result = result.substring(0, index).trim();
       break;
     }
   }
 
-  // Check for phone patterns at end (common in signatures)
+  // 2. NEW: Check for sender's name followed by pipe (Outlook "Name | Title" format)
+  if (senderName && senderName.length > 3) {
+    const namePattern = new RegExp(
+      `^${escapeRegex(senderName)}\\s*[|]`,
+      "im"
+    );
+    const nameMatch = result.match(namePattern);
+    if (nameMatch && nameMatch.index !== undefined) {
+      // Found sender's name with pipe - this is signature start
+      // Only strip if we have some content before it (at least 20 chars)
+      if (nameMatch.index > 20) {
+        result = result.substring(0, nameMatch.index).trim();
+        return result;
+      }
+    }
+  }
+
+  // 3. NEW: Check for C:/M: phone pattern (common Outlook cell format)
+  const cellPattern = /^[CM][:.]\s*\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}/m;
+  const cellMatch = result.match(cellPattern);
+  if (cellMatch && cellMatch.index !== undefined) {
+    // Look back for the signature start (name line)
+    const beforeCell = result.substring(0, cellMatch.index);
+    const lines = beforeCell.split(/\r?\n/);
+    
+    // Check last 3 lines for name-like pattern
+    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 3); i--) {
+      const line = lines[i].trim();
+      // Name | Title pattern
+      if (/^[A-Z][a-z]+\s+[A-Z][a-z]+\s*[|]/.test(line)) {
+        const cutIndex = result.indexOf(line);
+        if (cutIndex > 20) {
+          result = result.substring(0, cutIndex).trim();
+          return result;
+        }
+      }
+    }
+    
+    // If no name found, cut at cell line if we have enough content
+    if (cellMatch.index > 30) {
+      result = result.substring(0, cellMatch.index).trim();
+      return result;
+    }
+  }
+
+  // 4. NEW: Check for "Name | Title" pattern anywhere (even without sender name)
+  const nameTitlePattern = /^[A-Z][a-z]+\s+[A-Z][a-z]+\s*\|\s*[A-Z]/m;
+  const nameTitleMatch = result.match(nameTitlePattern);
+  if (nameTitleMatch && nameTitleMatch.index !== undefined) {
+    // Found a "Name | Title" line
+    const threshold = isShortEmail ? 20 : 50;
+    if (nameTitleMatch.index > threshold) {
+      result = result.substring(0, nameTitleMatch.index).trim();
+      return result;
+    }
+  }
+
+  // 5. Check for mailto: links (common in Outlook signatures)
+  const mailtoPattern = /<mailto:[^>]+>/;
+  const mailtoMatch = result.match(mailtoPattern);
+  if (mailtoMatch && mailtoMatch.index !== undefined) {
+    // Look back for signature start
+    const beforeMailto = result.substring(0, mailtoMatch.index);
+    const lines = beforeMailto.split(/\r?\n/);
+    
+    // Find where signature likely starts (look for name patterns)
+    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 5); i--) {
+      const line = lines[i].trim();
+      if (/^[A-Z][a-z]+\s+[A-Z][a-z]+/.test(line) && line.length < 60) {
+        const cutIndex = result.indexOf(line);
+        if (cutIndex > 20) {
+          result = result.substring(0, cutIndex).trim();
+          return result;
+        }
+      }
+    }
+  }
+
+  // 6. Check for bracketed company taglines [Company Name...]
+  const taglinePattern = /\[[A-Z][^\]]{10,}\]/;
+  const taglineMatch = result.match(taglinePattern);
+  if (taglineMatch && taglineMatch.index !== undefined) {
+    // This is often at the end of a signature, look back for start
+    const beforeTagline = result.substring(0, taglineMatch.index);
+    const lines = beforeTagline.split(/\r?\n/);
+    
+    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 6); i--) {
+      const line = lines[i].trim();
+      // Look for name or phone patterns
+      if (/^[A-Z][a-z]+\s+[A-Z][a-z]+/.test(line) || 
+          /^[CM][:.]\s*\(?\d{3}/.test(line) ||
+          /^[A-Z][a-z]+\s*\|/.test(line)) {
+        const cutIndex = result.indexOf(line);
+        if (cutIndex > 20) {
+          result = result.substring(0, cutIndex).trim();
+          return result;
+        }
+      }
+    }
+  }
+
+  // 7. Original phone pattern check with lowered thresholds for short emails
   const lines = result.split(/\r?\n/);
   let signatureStartLine = -1;
   
-  for (let i = lines.length - 1; i >= Math.max(0, lines.length - 10); i--) {
+  // For short emails, look through more lines
+  const linesToCheck = isShortEmail ? Math.min(15, lines.length) : 10;
+  
+  for (let i = lines.length - 1; i >= Math.max(0, lines.length - linesToCheck); i--) {
     const line = lines[i].trim();
     if (PHONE_PATTERN.test(line)) {
       signatureStartLine = i;
@@ -326,8 +499,10 @@ export function stripSignatures(text: string): string {
     }
   }
 
-  // If we found a phone line near the end, check if preceding lines look like a signature
-  if (signatureStartLine !== -1 && signatureStartLine > lines.length * 0.5) {
+  // If we found a phone line, check if preceding lines look like a signature
+  // Lower threshold for short emails
+  const lineThreshold = isShortEmail ? 0.2 : 0.5;
+  if (signatureStartLine !== -1 && signatureStartLine > lines.length * lineThreshold) {
     // Look back for short lines that might be name/title
     let cutLine = signatureStartLine;
     for (let i = signatureStartLine - 1; i >= Math.max(0, signatureStartLine - 5); i--) {
@@ -342,6 +517,57 @@ export function stripSignatures(text: string): string {
   }
 
   return result;
+}
+
+/**
+ * Clean HTML content by trying to remove disclaimers and signatures
+ */
+export function cleanHtmlContent(html: string, cleanedText: string): {
+  html: string;
+  wasModified: boolean;
+} {
+  let result = html;
+  let wasModified = false;
+
+  // Try to find and remove disclaimer blocks in HTML
+  // Common patterns: divs/tables at the end with disclaimer keywords
+  
+  // Look for disclaimer text in HTML and try to truncate
+  for (const pattern of DISCLAIMER_PATTERNS) {
+    const patternLower = pattern.toLowerCase();
+    const htmlLower = result.toLowerCase();
+    const index = htmlLower.indexOf(patternLower);
+    
+    if (index !== -1 && index > result.length * 0.3) {
+      // Find the nearest opening tag before the disclaimer
+      const beforeDisclaimer = result.substring(0, index);
+      
+      // Look for common wrapper patterns
+      const divMatch = beforeDisclaimer.lastIndexOf("<div");
+      const pMatch = beforeDisclaimer.lastIndexOf("<p");
+      const tableMatch = beforeDisclaimer.lastIndexOf("<table");
+      const tdMatch = beforeDisclaimer.lastIndexOf("<td");
+      
+      // Use the closest opening tag
+      const cutPoints = [divMatch, pMatch, tableMatch, tdMatch].filter(x => x > 0);
+      if (cutPoints.length > 0) {
+        const cutPoint = Math.max(...cutPoints);
+        // Only cut if we're keeping at least 30% of content
+        if (cutPoint > result.length * 0.3) {
+          result = result.substring(0, cutPoint).trim();
+          wasModified = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // Remove trailing empty divs/paragraphs
+  result = result.replace(/(<div[^>]*>\s*<\/div>\s*)+$/gi, "");
+  result = result.replace(/(<p[^>]*>\s*<\/p>\s*)+$/gi, "");
+  result = result.replace(/(<br\s*\/?\s*>\s*)+$/gi, "");
+
+  return { html: result, wasModified };
 }
 
 /**

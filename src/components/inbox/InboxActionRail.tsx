@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { 
   ListTodo, 
   StickyNote, 
@@ -12,7 +12,6 @@ import {
   ChevronDown,
   Loader2,
   Wand2,
-  Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +22,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { useInboxSuggestions } from "@/hooks/useInboxSuggestions";
+import { useInboxSuggestionsV2 } from "@/hooks/useInboxSuggestionsV2";
+import { SuggestionCard } from "@/components/inbox/SuggestionCard";
+import { EMAIL_INTENT_LABELS } from "@/types/inboxSuggestions";
+import type { StructuredSuggestion } from "@/types/inboxSuggestions";
 import { cn } from "@/lib/utils";
 import type { InboxItem } from "@/types/inbox";
 
@@ -71,16 +73,14 @@ function ActionButton({
   );
 }
 
-const effortLabels: Record<string, string> = {
-  quick: "~5 min",
-  medium: "~15 min",
-  long: "30+ min",
-};
-
-const confidenceColors: Record<string, string> = {
-  high: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400",
-  medium: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400",
-  low: "bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400",
+const INTENT_STYLES: Record<string, string> = {
+  intro_first_touch: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
+  pipeline_follow_up: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  portfolio_update: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  intro_request: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  scheduling: "bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-400",
+  personal_todo: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
+  fyi_informational: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/50 dark:text-zinc-400",
 };
 
 export function InboxActionRail({
@@ -93,19 +93,16 @@ export function InboxActionRail({
 }: InboxActionRailProps) {
   const [isActivityOpen, setIsActivityOpen] = useState(false);
 
-  // Use the suggestions hook
+  // Use the V2 suggestions hook
   const { 
     suggestions, 
+    intent,
     isLoading: isSuggestionsLoading, 
     isAI, 
     isGenerating,
-    generateAISuggestions 
-  } = useInboxSuggestions(
-    item.id,
-    item.subject,
-    item.body,
-    item.htmlBody
-  );
+    generateSuggestions,
+    dismissSuggestion,
+  } = useInboxSuggestionsV2(item.id);
 
   const handleSnooze = (hours: number) => {
     if (!onSnooze) return;
@@ -122,13 +119,14 @@ export function InboxActionRail({
     onSnooze(item.id, until);
   };
 
-  const handleApprove = (title: string) => {
-    onCreateTask(item, title);
+  const handleApproveSuggestion = (suggestion: StructuredSuggestion) => {
+    // For now, just create a task with the suggestion title
+    onCreateTask(item, suggestion.title);
   };
 
-  const handleEdit = (title: string) => {
+  const handleEditSuggestion = (suggestion: StructuredSuggestion) => {
     // Open task dialog with prefilled title for editing
-    onCreateTask(item, title);
+    onCreateTask(item, suggestion.title);
   };
 
   // Placeholder activity - will be replaced with actual activity log from tasks
@@ -225,12 +223,26 @@ export function InboxActionRail({
               </span>
             )}
             {isAI && (
-              <Badge variant="outline" className="text-[8px] h-4 px-1 ml-1 border-violet-300 text-violet-600 dark:border-violet-700 dark:text-violet-400">
+              <Badge variant="outline" className="text-[8px] h-4 px-1 ml-1 border-primary/30 text-primary">
                 AI
               </Badge>
             )}
           </span>
         </SectionHeader>
+
+        {/* Intent badge */}
+        {intent && (
+          <div className="mb-2">
+            <span
+              className={cn(
+                "inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium",
+                INTENT_STYLES[intent] || INTENT_STYLES.fyi_informational
+              )}
+            >
+              {EMAIL_INTENT_LABELS[intent] || intent}
+            </span>
+          </div>
+        )}
 
         {isSuggestionsLoading ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
@@ -244,67 +256,32 @@ export function InboxActionRail({
         ) : (
           <div className="space-y-2">
             {suggestions.map((suggestion) => (
-              <div 
+              <SuggestionCard
                 key={suggestion.id}
-                className="p-2 rounded-lg border border-border bg-background/50"
-              >
-                <p className="text-xs font-medium mb-1.5 leading-snug">
-                  {suggestion.title}
-                </p>
-                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-2">
-                  <span className={cn(
-                    "px-1.5 py-0.5 rounded",
-                    confidenceColors[suggestion.confidence]
-                  )}>
-                    {suggestion.confidence}
-                  </span>
-                  <span>{effortLabels[suggestion.effortBucket]}</span>
-                  {suggestion.dueHint && (
-                    <span className="text-amber-600 dark:text-amber-400">
-                      {suggestion.dueHint}
-                    </span>
-                  )}
-                </div>
-                <div className="flex gap-1">
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="h-6 text-[10px] flex-1"
-                    onClick={() => handleApprove(suggestion.title)}
-                  >
-                    Create Task
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="h-6 text-[10px] px-2"
-                    onClick={() => handleEdit(suggestion.title)}
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
+                suggestion={suggestion}
+                onApprove={handleApproveSuggestion}
+                onEdit={handleEditSuggestion}
+                onDismiss={dismissSuggestion}
+              />
             ))}
           </div>
         )}
 
         {/* Generate with AI button */}
-        {!isAI && suggestions.length > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full mt-2 h-7 text-[10px] text-muted-foreground hover:text-foreground"
-            onClick={generateAISuggestions}
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
-            ) : (
-              <Wand2 className="h-3 w-3 mr-1.5" />
-            )}
-            {isGenerating ? "Generating..." : "Generate with AI"}
-          </Button>
-        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full mt-2 h-7 text-[10px] text-muted-foreground hover:text-foreground"
+          onClick={() => generateSuggestions(isAI)}
+          disabled={isGenerating}
+        >
+          {isGenerating ? (
+            <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+          ) : (
+            <Wand2 className="h-3 w-3 mr-1.5" />
+          )}
+          {isGenerating ? "Generating..." : isAI ? "Regenerate" : "Generate with AI"}
+        </Button>
       </div>
 
       {/* Divider */}

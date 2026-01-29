@@ -124,6 +124,125 @@ export type Database = {
         }
         Relationships: []
       }
+      commitments: {
+        Row: {
+          company_id: string | null
+          company_name: string | null
+          company_type: string | null
+          completed_at: string | null
+          completed_via: string | null
+          completion_notes: string | null
+          content: string
+          context: string | null
+          created_at: string
+          created_by: string
+          delegated_at: string | null
+          delegated_to_name: string | null
+          delegated_to_person_id: string | null
+          due_at: string | null
+          id: string
+          implied_urgency: string | null
+          last_snoozed_at: string | null
+          person_id: string | null
+          person_name: string | null
+          promised_at: string
+          snooze_count: number | null
+          snoozed_until: string | null
+          source_id: string | null
+          source_reference: string | null
+          source_type: Database["public"]["Enums"]["commitment_source"]
+          status: Database["public"]["Enums"]["commitment_status"]
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          company_name?: string | null
+          company_type?: string | null
+          completed_at?: string | null
+          completed_via?: string | null
+          completion_notes?: string | null
+          content: string
+          context?: string | null
+          created_at?: string
+          created_by: string
+          delegated_at?: string | null
+          delegated_to_name?: string | null
+          delegated_to_person_id?: string | null
+          due_at?: string | null
+          id?: string
+          implied_urgency?: string | null
+          last_snoozed_at?: string | null
+          person_id?: string | null
+          person_name?: string | null
+          promised_at?: string
+          snooze_count?: number | null
+          snoozed_until?: string | null
+          source_id?: string | null
+          source_reference?: string | null
+          source_type?: Database["public"]["Enums"]["commitment_source"]
+          status?: Database["public"]["Enums"]["commitment_status"]
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          company_name?: string | null
+          company_type?: string | null
+          completed_at?: string | null
+          completed_via?: string | null
+          completion_notes?: string | null
+          content?: string
+          context?: string | null
+          created_at?: string
+          created_by?: string
+          delegated_at?: string | null
+          delegated_to_name?: string | null
+          delegated_to_person_id?: string | null
+          due_at?: string | null
+          id?: string
+          implied_urgency?: string | null
+          last_snoozed_at?: string | null
+          person_id?: string | null
+          person_name?: string | null
+          promised_at?: string
+          snooze_count?: number | null
+          snoozed_until?: string | null
+          source_id?: string | null
+          source_reference?: string | null
+          source_type?: Database["public"]["Enums"]["commitment_source"]
+          status?: Database["public"]["Enums"]["commitment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commitments_delegated_to_person_id_fkey"
+            columns: ["delegated_to_person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commitments_delegated_to_person_id_fkey"
+            columns: ["delegated_to_person_id"]
+            isOneToOne: false
+            referencedRelation: "people_with_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commitments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commitments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people_with_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           created_at: string | null
@@ -220,6 +339,7 @@ export type Database = {
           id: string
           interaction_type: Database["public"]["Enums"]["interaction_type"]
           occurred_at: string
+          person_id: string | null
         }
         Insert: {
           company_id: string
@@ -230,6 +350,7 @@ export type Database = {
           id?: string
           interaction_type: Database["public"]["Enums"]["interaction_type"]
           occurred_at?: string
+          person_id?: string | null
         }
         Update: {
           company_id?: string
@@ -240,6 +361,7 @@ export type Database = {
           id?: string
           interaction_type?: Database["public"]["Enums"]["interaction_type"]
           occurred_at?: string
+          person_id?: string | null
         }
         Relationships: [
           {
@@ -254,6 +376,20 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "company_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_interactions_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_interactions_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people_with_roles"
             referencedColumns: ["id"]
           },
         ]
@@ -394,25 +530,40 @@ export type Database = {
       }
       inbox_suggestions: {
         Row: {
+          candidate_companies: Json | null
+          dismissed_ids: Json | null
           generated_at: string
           id: string
           inbox_item_id: string
+          intent: string | null
           source: string
           suggestions: Json
+          updated_at: string | null
+          version: number | null
         }
         Insert: {
+          candidate_companies?: Json | null
+          dismissed_ids?: Json | null
           generated_at?: string
           id?: string
           inbox_item_id: string
+          intent?: string | null
           source?: string
           suggestions: Json
+          updated_at?: string | null
+          version?: number | null
         }
         Update: {
+          candidate_companies?: Json | null
+          dismissed_ids?: Json | null
           generated_at?: string
           id?: string
           inbox_item_id?: string
+          intent?: string | null
           source?: string
           suggestions?: Json
+          updated_at?: string | null
+          version?: number | null
         }
         Relationships: [
           {
@@ -558,6 +709,114 @@ export type Database = {
         }
         Relationships: []
       }
+      people: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          created_by: string
+          email: string | null
+          id: string
+          is_vip: boolean | null
+          linkedin_url: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          relationship_tier: string | null
+          tags: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by: string
+          email?: string | null
+          id?: string
+          is_vip?: boolean | null
+          linkedin_url?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          relationship_tier?: string | null
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string
+          email?: string | null
+          id?: string
+          is_vip?: boolean | null
+          linkedin_url?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          relationship_tier?: string | null
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      person_company_roles: {
+        Row: {
+          company_id: string
+          company_type: string
+          created_at: string
+          created_by: string
+          ended_at: string | null
+          id: string
+          is_current: boolean | null
+          is_founder: boolean | null
+          is_primary_contact: boolean | null
+          person_id: string
+          role: string | null
+          started_at: string | null
+        }
+        Insert: {
+          company_id: string
+          company_type: string
+          created_at?: string
+          created_by: string
+          ended_at?: string | null
+          id?: string
+          is_current?: boolean | null
+          is_founder?: boolean | null
+          is_primary_contact?: boolean | null
+          person_id: string
+          role?: string | null
+          started_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          company_type?: string
+          created_at?: string
+          created_by?: string
+          ended_at?: string | null
+          id?: string
+          is_current?: boolean | null
+          is_founder?: boolean | null
+          is_primary_contact?: boolean | null
+          person_id?: string
+          role?: string | null
+          started_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "person_company_roles_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "person_company_roles_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people_with_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_companies: {
         Row: {
           close_date: string | null
@@ -668,6 +927,7 @@ export type Database = {
           id: string
           interaction_type: Database["public"]["Enums"]["interaction_type"]
           occurred_at: string
+          person_id: string | null
           pipeline_company_id: string
         }
         Insert: {
@@ -678,6 +938,7 @@ export type Database = {
           id?: string
           interaction_type?: Database["public"]["Enums"]["interaction_type"]
           occurred_at?: string
+          person_id?: string | null
           pipeline_company_id: string
         }
         Update: {
@@ -688,6 +949,7 @@ export type Database = {
           id?: string
           interaction_type?: Database["public"]["Enums"]["interaction_type"]
           occurred_at?: string
+          person_id?: string | null
           pipeline_company_id?: string
         }
         Relationships: [
@@ -696,6 +958,20 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "pipeline_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_interactions_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pipeline_interactions_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people_with_roles"
             referencedColumns: ["id"]
           },
           {
@@ -1088,12 +1364,219 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      open_commitments_detailed: {
+        Row: {
+          company_id: string | null
+          company_name: string | null
+          company_type: string | null
+          completed_at: string | null
+          completed_via: string | null
+          completion_notes: string | null
+          content: string | null
+          context: string | null
+          created_at: string | null
+          created_by: string | null
+          delegated_at: string | null
+          delegated_to_name: string | null
+          delegated_to_person_id: string | null
+          due_at: string | null
+          id: string | null
+          implied_urgency: string | null
+          last_snoozed_at: string | null
+          person_avatar: string | null
+          person_email: string | null
+          person_id: string | null
+          person_name: string | null
+          promised_at: string | null
+          snooze_count: number | null
+          snoozed_until: string | null
+          source_id: string | null
+          source_reference: string | null
+          source_type: Database["public"]["Enums"]["commitment_source"] | null
+          status: Database["public"]["Enums"]["commitment_status"] | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commitments_delegated_to_person_id_fkey"
+            columns: ["delegated_to_person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commitments_delegated_to_person_id_fkey"
+            columns: ["delegated_to_person_id"]
+            isOneToOne: false
+            referencedRelation: "people_with_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commitments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commitments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people_with_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      overdue_commitments: {
+        Row: {
+          company_id: string | null
+          company_name: string | null
+          company_type: string | null
+          completed_at: string | null
+          completed_via: string | null
+          completion_notes: string | null
+          content: string | null
+          context: string | null
+          created_at: string | null
+          created_by: string | null
+          delegated_at: string | null
+          delegated_to_name: string | null
+          delegated_to_person_id: string | null
+          due_at: string | null
+          id: string | null
+          implied_urgency: string | null
+          last_snoozed_at: string | null
+          person_id: string | null
+          person_name: string | null
+          promised_at: string | null
+          snooze_count: number | null
+          snoozed_until: string | null
+          source_id: string | null
+          source_reference: string | null
+          source_type: Database["public"]["Enums"]["commitment_source"] | null
+          status: Database["public"]["Enums"]["commitment_status"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          company_name?: string | null
+          company_type?: string | null
+          completed_at?: string | null
+          completed_via?: string | null
+          completion_notes?: string | null
+          content?: string | null
+          context?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          delegated_at?: string | null
+          delegated_to_name?: string | null
+          delegated_to_person_id?: string | null
+          due_at?: string | null
+          id?: string | null
+          implied_urgency?: string | null
+          last_snoozed_at?: string | null
+          person_id?: string | null
+          person_name?: string | null
+          promised_at?: string | null
+          snooze_count?: number | null
+          snoozed_until?: string | null
+          source_id?: string | null
+          source_reference?: string | null
+          source_type?: Database["public"]["Enums"]["commitment_source"] | null
+          status?: Database["public"]["Enums"]["commitment_status"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          company_name?: string | null
+          company_type?: string | null
+          completed_at?: string | null
+          completed_via?: string | null
+          completion_notes?: string | null
+          content?: string | null
+          context?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          delegated_at?: string | null
+          delegated_to_name?: string | null
+          delegated_to_person_id?: string | null
+          due_at?: string | null
+          id?: string | null
+          implied_urgency?: string | null
+          last_snoozed_at?: string | null
+          person_id?: string | null
+          person_name?: string | null
+          promised_at?: string | null
+          snooze_count?: number | null
+          snoozed_until?: string | null
+          source_id?: string | null
+          source_reference?: string | null
+          source_type?: Database["public"]["Enums"]["commitment_source"] | null
+          status?: Database["public"]["Enums"]["commitment_status"] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commitments_delegated_to_person_id_fkey"
+            columns: ["delegated_to_person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commitments_delegated_to_person_id_fkey"
+            columns: ["delegated_to_person_id"]
+            isOneToOne: false
+            referencedRelation: "people_with_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commitments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commitments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "people_with_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      people_with_roles: {
+        Row: {
+          avatar_url: string | null
+          company_roles: Json | null
+          created_at: string | null
+          created_by: string | null
+          email: string | null
+          id: string | null
+          is_vip: boolean | null
+          linkedin_url: string | null
+          name: string | null
+          notes: string | null
+          phone: string | null
+          relationship_tier: string | null
+          tags: string[] | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
     }
     Enums: {
+      commitment_source: "call" | "email" | "meeting" | "message" | "manual"
+      commitment_status:
+        | "open"
+        | "completed"
+        | "broken"
+        | "delegated"
+        | "cancelled"
       company_kind: "portfolio" | "pipeline" | "other"
       company_status: "active" | "watching" | "exited" | "archived"
       interaction_type: "note" | "call" | "meeting" | "email" | "update"
@@ -1243,6 +1726,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      commitment_source: ["call", "email", "meeting", "message", "manual"],
+      commitment_status: [
+        "open",
+        "completed",
+        "broken",
+        "delegated",
+        "cancelled",
+      ],
       company_kind: ["portfolio", "pipeline", "other"],
       company_status: ["active", "watching", "exited", "archived"],
       interaction_type: ["note", "call", "meeting", "email", "update"],

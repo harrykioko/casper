@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.inbox-suggest]
 verify_jwt = false
+
+[functions.inbox-suggest-v2]
+verify_jwt = false

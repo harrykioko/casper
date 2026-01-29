@@ -1,410 +1,377 @@
+# Upgrade Inbox Suggestions to VC-Intent Aware Engine
 
+## Status: IMPLEMENTED
 
-# Inbox Enhancement Plan: Clean Rendering, Attachments, and Suggested Actions
+**Completed:**
+- Type definitions (`src/types/inboxSuggestions.ts`)
+- Candidate company retrieval library (`src/lib/candidateCompanyRetrieval.ts`)
+- Database migration (added intent, version, dismissed_ids, candidate_companies, updated_at)
+- Edge function `inbox-suggest-v2` with OpenAI tool calling
+- Frontend hook `useInboxSuggestionsV2`
+- SuggestionCard component
+- Updated InboxActionRail with V2 suggestions
+- Documentation (`docs/inbox_suggestions_types.md`)
 
 ## Overview
 
-This plan implements three major upgrades to the Inbox detail workspace:
-1. **Clean email rendering** with deterministic stripping of forwarded wrappers, disclaimers, and signatures
-2. **Attachment storage and UI** with Supabase Storage bucket and inline previews
-3. **Suggested actions** with Phase A (heuristics) and Phase B (AI via Edge Function)
+Transform the current bullet-based task extractor into a structured, VC-domain-aware suggestion engine that:
+- Classifies email intent (intro, follow-up, portfolio update, etc.)
+- Produces typed suggestions with entity references
+- Uses candidate retrieval to ensure LINK_COMPANY suggestions only reference real company IDs
 
----
+## Architecture
 
-## Current State Summary
+```text
++------------------+     +----------------------+     +------------------+
+| InboxActionRail  | --> | useInboxSuggestionsV2| --> | inbox-suggest-v2 |
+| (UI Rendering)   |     | (Frontend Hook)      |     | (Edge Function)  |
++------------------+     +----------------------+     +------------------+
+                                  |
+                                  v
+                         +------------------+
+                         | Candidate        |
+                         | Retrieval Lib    |
+                         +------------------+
+                                  |
+                                  v
+                    +---------------------------+
+                    | companies + pipeline_co.  |
+                    +---------------------------+
+```
 
-**Inbox Item Schema** (`inbox_items` table):
-- `text_body`, `html_body` - raw email content
-- `snippet` - 280 char preview
-- `from_email`, `from_name`, `subject` - already parsed for forwarded emails in ingestion
-- No attachment columns or related table
+## Data Models
 
-**Existing Patterns**:
-- `readingHelpers.ts` provides a good model for heuristic suggestion logic
-- OPENAI_API_KEY secret is already configured for AI features
-- Storage bucket `company-logos` exists with public access pattern
+### Suggestion Types
 
-**Current Content Pane** (`InboxContentPane.tsx`):
-- Has basic disclaimer splitting (`splitContentAtDisclaimer`)
-- "View original email" collapsible exists but needs improvement
-- Placeholder for attachments section exists
+| Type | Description | When to suggest |
+|------|-------------|-----------------|
+| `LINK_COMPANY` | Link this email to an existing company | Domain match or name mention found |
+| `CREATE_PIPELINE_COMPANY` | Create new pipeline company | Intro/first touch with no strong match |
+| `CREATE_FOLLOW_UP_TASK` | Follow-up task linked to company | Pipeline or portfolio follow-up email |
+| `CREATE_PERSONAL_TASK` | Personal/one-off task (no company) | Self-sent reminders, scheduling |
+| `CREATE_INTRO_TASK` | Task to make an intro | Request for intro emails |
+| `SET_STATUS` | Update pipeline stage | Status change implied in email |
+| `EXTRACT_UPDATE_HIGHLIGHTS` | Extract key metrics/updates | Portfolio update emails |
 
----
+### Email Intent Categories
 
-## Implementation Plan
+| Intent | Description |
+|--------|-------------|
+| `intro_first_touch` | First contact from a new company or intro request |
+| `pipeline_follow_up` | Ongoing deal discussion |
+| `portfolio_update` | Company update from portfolio co |
+| `intro_request` | Someone asking for an intro |
+| `scheduling` | Meeting scheduling |
+| `personal_todo` | Self-sent or personal reminder |
+| `fyi_informational` | No action needed |
 
-### Phase 1: Enhanced Email Cleaning (Client-Side First)
-
-**Create: `src/lib/emailCleaners.ts`**
-
-A utility module with pure functions for deterministic email cleaning:
+### Candidate Company Structure
 
 ```typescript
-interface CleanedEmail {
-  cleanedText: string;
-  cleanedHtml: string | null;
-  originalSender: { name: string | null; email: string | null } | null;
-  originalSubject: string | null;
-  originalDate: string | null;
-  wasForwarded: boolean;
-  cleaningApplied: string[];
-}
-
-// Main cleaning functions:
-- cleanEmailContent(text, html): CleanedEmail
-- stripForwardedWrapper(text): { body: string; meta: ForwardedMeta | null }
-- stripDisclaimers(text): string
-- stripSignatures(text): string  
-- sanitizeHtml(html): string
-```
-
-**Cleaning Rules**:
-
-| Pattern Type | Detection | Action |
-|-------------|-----------|--------|
-| Forwarded wrapper | `---------- Forwarded message ---------`, `--- Original Message ---` | Extract original sender/subject, strip header block |
-| Header blocks | Lines starting with `From:`, `Sent:`, `To:`, `Subject:`, `Date:` at start of content | Strip entire block, preserve extracted metadata |
-| Legal disclaimers | `DISCLAIMER:`, `CONFIDENTIALITY NOTICE`, `This email and any files transmitted`, `If you are not the intended recipient`, `This message is intended only` | Strip from first match onwards |
-| Signatures | `-- ` on own line, phone patterns, multi-line blocks at end with name/title | Strip cautiously (only if after main content) |
-| HTML cleaning | `<style>`, `<script>`, tracking pixels | Use regex removal, preserve semantic structure |
-
-**Safety Rule**: If cleaning removes more than 80% of content, fall back to raw.
-
-**Update: `src/components/inbox/InboxContentPane.tsx`**
-
-- Replace inline `splitContentAtDisclaimer` with `cleanEmailContent()`
-- Display cleaned content by default
-- Update "View original email" to show full raw text/html
-- Show original sender info in header if different from stored sender
-
----
-
-### Phase 2: Attachment Storage and UI
-
-**Database Migration: Create `inbox_attachments` table**
-
-```sql
-CREATE TABLE public.inbox_attachments (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  inbox_item_id uuid NOT NULL REFERENCES public.inbox_items(id) ON DELETE CASCADE,
-  filename text NOT NULL,
-  mime_type text NOT NULL,
-  size_bytes integer NOT NULL,
-  storage_path text NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  created_by uuid NOT NULL
-);
-
-ALTER TABLE public.inbox_attachments ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view their own attachments"
-  ON public.inbox_attachments FOR SELECT
-  USING (auth.uid() = created_by);
-
-CREATE POLICY "Service role can insert attachments"
-  ON public.inbox_attachments FOR INSERT
-  WITH CHECK (true);
-```
-
-**Database Migration: Create `inbox-attachments` storage bucket**
-
-```sql
-INSERT INTO storage.buckets (id, name, public) VALUES ('inbox-attachments', 'inbox-attachments', false);
-
-CREATE POLICY "Users can read their own attachments"
-  ON storage.objects FOR SELECT
-  USING (bucket_id = 'inbox-attachments' AND auth.uid()::text = (storage.foldername(name))[1]);
-```
-
-**Update: `supabase/functions/email-inbox-ingest/index.ts`**
-
-Modify to handle attachments from the webhook payload:
-
-```typescript
-// After inbox_item insert, process attachments
-if (payload.attachments && Array.isArray(payload.attachments)) {
-  for (const attachment of payload.attachments) {
-    const storagePath = `${user.id}/${inboxItemId}/${attachment.filename}`;
-    
-    // Upload binary content to storage
-    const { error: uploadError } = await supabaseClient.storage
-      .from('inbox-attachments')
-      .upload(storagePath, decode(attachment.content), {
-        contentType: attachment.contentType,
-      });
-    
-    // Insert metadata record
-    if (!uploadError) {
-      await supabaseClient.from('inbox_attachments').insert({
-        inbox_item_id: inboxItemId,
-        filename: attachment.filename,
-        mime_type: attachment.contentType,
-        size_bytes: attachment.size,
-        storage_path: storagePath,
-        created_by: user.id,
-      });
-    }
-  }
-}
-```
-
-**Create: `src/hooks/useInboxAttachments.ts`**
-
-```typescript
-interface InboxAttachment {
+interface CandidateCompany {
   id: string;
-  filename: string;
-  mimeType: string;
-  sizeBytes: number;
-  storagePath: string;
-}
-
-function useInboxAttachments(inboxItemId: string) {
-  // Fetch attachments for item
-  // Generate signed URLs for download/preview
-  return { attachments, isLoading, getSignedUrl };
+  name: string;
+  type: "portfolio" | "pipeline";
+  primary_domain: string | null;
+  match_score: number;
+  match_reason: "domain" | "name_mention" | "prior_link" | "sender_history";
 }
 ```
 
-**Create: `src/components/inbox/InboxAttachmentsSection.tsx`**
-
-UI component for the content pane:
-- List attachment cards (icon by mime type, filename, formatted size)
-- Download button using signed URL
-- Inline preview toggle for images (png, jpg, gif, webp) and PDFs
-- Use `<img>` for images, `<iframe>` for PDFs (with fallback)
-
-**Update: `src/components/inbox/InboxContentPane.tsx`**
-
-- Add `<InboxAttachmentsSection>` between body and "View original email"
-- Pass `inboxItemId` to fetch attachments
-
----
-
-### Phase 3A: Suggested Actions (Heuristic)
-
-**Create: `src/lib/inboxSuggestions.ts`**
+### Structured Suggestion
 
 ```typescript
-interface SuggestedAction {
+interface StructuredSuggestion {
   id: string;
+  type: SuggestionType;
   title: string;
-  effortMinutes: number | null;
-  effortBucket: 'quick' | 'medium' | 'long';
-  confidence: 'low' | 'medium' | 'high';
-  source: 'heuristic' | 'ai';
+  confidence: "low" | "medium" | "high";
+  effort_bucket: "quick" | "medium" | "long";
+  effort_minutes: number;
   rationale: string;
-  dueHint?: string;
-  category?: string;
-}
-
-function extractHeuristicSuggestions(
-  subject: string, 
-  cleanedText: string
-): SuggestedAction[]
-```
-
-**Heuristic Rules**:
-
-| Pattern | Detection | Suggested Title | Confidence |
-|---------|-----------|-----------------|------------|
-| Action verbs | Lines with "send", "share", "schedule", "follow up", "intro", "review", "update", "draft", "attach", "confirm", "call", "meet" | Extract line as task | medium |
-| Numbered lists | `1.`, `2.`, etc. at line start | Each item as separate task | high |
-| Bullet points | `- `, `* `, `• ` at line start | Each item as separate task | medium |
-| Questions | Lines ending with `?` requiring action | "Respond to: [question]" | medium |
-| Deadlines | "by [date]", "before [date]", "deadline" | Extract with due hint | high |
-| Default | No matches found | "Follow up on: [subject]" | low |
-
-**Effort Estimation**:
-- Quick (5 min): Single-line items, confirmations
-- Medium (15 min): Multi-step items, reviews
-- Long (30+ min): Calls, meetings, document creation
-
-**Update: `src/components/inbox/InboxActionRail.tsx`**
-
-- Replace placeholder `suggestions` array with `useMemo` calling `extractHeuristicSuggestions`
-- Wire "Approve" button to `onCreateTask` with prefilled content
-- Wire "Edit" button to open task dialog with editable prefill
-- Add "Generate with AI" button (disabled until Phase B)
-
----
-
-### Phase 3B: Suggested Actions (AI via Edge Function)
-
-**Create: `supabase/functions/inbox-suggest/index.ts`**
-
-Edge function using OpenAI with structured JSON output:
-
-```typescript
-// Input: { inbox_item_id } or { subject, cleanedText, sender }
-// Output: { suggested_tasks: SuggestedAction[] }
-
-const systemPrompt = `You are analyzing an email to extract actionable tasks.
-Return a JSON object with suggested_tasks array. Each task has:
-- title: clear, actionable task title (imperative verb)
-- effort_minutes: estimated time (5, 15, 30, 60)
-- due_hint: relative date hint if deadline mentioned ("tomorrow", "this week", "by Friday")
-- category: optional category ("follow-up", "meeting", "review", "send", "call")
-- confidence: "low" | "medium" | "high"
-- rationale: brief explanation of why this is a task
-
-Be conservative - only suggest genuine actionable items, not FYIs.
-Return maximum 5 suggestions. If no tasks needed, return empty array.`;
-
-// Use OpenAI with OPENAI_API_KEY (already configured)
-// Response format enforcement with JSON mode
-```
-
-**Database Migration: Optional caching table**
-
-```sql
-CREATE TABLE public.inbox_suggestions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  inbox_item_id uuid NOT NULL REFERENCES public.inbox_items(id) ON DELETE CASCADE,
-  suggestions jsonb NOT NULL,
-  generated_at timestamptz NOT NULL DEFAULT now(),
-  source text NOT NULL DEFAULT 'ai',
-  UNIQUE(inbox_item_id)
-);
-
-ALTER TABLE public.inbox_suggestions ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users can view suggestions for their items"
-  ON public.inbox_suggestions FOR SELECT
-  USING (EXISTS (
-    SELECT 1 FROM public.inbox_items 
-    WHERE id = inbox_suggestions.inbox_item_id AND created_by = auth.uid()
-  ));
-```
-
-**Create: `src/hooks/useInboxSuggestions.ts`**
-
-```typescript
-function useInboxSuggestions(inboxItemId: string) {
-  // 1. Check cache in inbox_suggestions table
-  // 2. If no cache or stale, return heuristic suggestions
-  // 3. Provide generateAISuggestions() mutation
-  return { 
-    suggestions, 
-    isLoading, 
-    isAI, 
-    generateAISuggestions,
-    refreshSuggestions 
-  };
+  company_id?: string | null;      // Only from candidate_companies
+  company_name?: string | null;
+  company_type?: "portfolio" | "pipeline";
+  due_hint?: string | null;
+  metadata?: Record<string, unknown>;  // For EXTRACT_UPDATE_HIGHLIGHTS etc.
 }
 ```
 
-**Update: `src/components/inbox/InboxActionRail.tsx`**
+## Implementation Steps
 
-- Replace local heuristic call with `useInboxSuggestions` hook
-- Show AI badge on suggestions from AI source
-- "Generate with AI" button calls `generateAISuggestions()`
-- Loading state while generating
-- Show "Powered by AI" indicator when applicable
+### Step 1: Candidate Retrieval Library
 
----
+Create `src/lib/candidateCompanyRetrieval.ts`:
 
-### Phase 4: Task Linking and Activity Feedback
+**Matching Strategies (in order of score):**
 
-**Database Migration: Add `source_inbox_item_id` to tasks**
+1. **Domain Match (score: 100)** - Extract domain from sender email, match against `primary_domain` in both `companies` and `pipeline_companies`
 
-```sql
-ALTER TABLE public.tasks 
-ADD COLUMN source_inbox_item_id uuid REFERENCES public.inbox_items(id) ON DELETE SET NULL;
+2. **Name Mention (score: 75)** - Search for company names from both tables appearing in subject or first 500 chars of body. Use Fuse.js for fuzzy matching.
+
+3. **Prior Link (score: 90)** - Check if this sender email has been previously linked to a company via `related_company_id` on past inbox items
+
+4. **Sender History (score: 50)** - Check if any email from this sender domain has been linked to a company before
+
+**Output:** Top 8 candidates with score and match reason
+
+### Step 2: Database Schema Updates
+
+**Modify `inbox_suggestions` table:**
+
+Add columns via migration:
+- `intent` (text, nullable) - Classified email intent
+- `version` (integer, default 1) - Schema version for future migrations
+- `dismissed_ids` (jsonb, default []) - IDs of dismissed suggestions
+- `candidate_companies` (jsonb, nullable) - Cached candidates used for generation
+- `updated_at` (timestamptz, default now()) - For cache validation
+
+Add index on `(inbox_item_id, updated_at)` for cache lookups.
+
+### Step 3: Edge Function inbox-suggest-v2
+
+**File:** `supabase/functions/inbox-suggest-v2/index.ts`
+
+**Flow:**
+
+1. Validate auth, get user ID
+2. Check cache: if `inbox_suggestions` row exists with `updated_at` within 1 hour and `force !== true`, return cached
+3. Fetch inbox item (subject, text_body, from_email, from_name)
+4. Fetch candidate companies from both tables (portfolio + pipeline)
+5. Run domain/name matching on candidates
+6. Build OpenAI prompt with:
+   - System prompt defining intents and suggestion types
+   - User message with email content + candidate company list (IDs + names only)
+7. Parse response using tool calling for strict schema
+8. Validate all `company_id` references exist in candidates
+9. Upsert to `inbox_suggestions` with full structured data
+10. Return suggestions
+
+**OpenAI Prompt Structure:**
+
+System prompt defines:
+- VC context (investor managing deal flow)
+- Intent classification rules
+- Suggestion type rules
+- Quality rules (e.g., portfolio updates get EXTRACT_UPDATE_HIGHLIGHTS, not task lists)
+
+Tool schema enforces:
+- `intent` must be one of defined enum values
+- `suggestions[].type` must be one of defined enum values
+- `suggestions[].company_id` must be string or null (validated post-hoc against candidates)
+
+### Step 4: Frontend Hook Update
+
+**File:** `src/hooks/useInboxSuggestionsV2.ts`
+
+Changes from current hook:
+- Call `inbox-suggest-v2` instead of `inbox-suggest`
+- Parse structured suggestions with new type
+- Provide `generateSuggestions(force?: boolean)` for regeneration
+- Expose `dismissSuggestion(id)` - updates local state and persists to `dismissed_ids`
+- Expose `intent` classification for UI display
+- Handle candidate companies for display
+
+### Step 5: UI Updates
+
+**File:** `src/components/inbox/InboxActionRail.tsx`
+
+**Suggestion Card Redesign:**
+
+```text
++--------------------------------------------------+
+| [Type Badge]  [Confidence: high]                 |
+| Title of the suggestion goes here                |
+| Effort: ~15 min  |  Due: tomorrow                |
+| ------------------------------------------------ |
+| "Rationale text in muted color"                  |
+| ------------------------------------------------ |
+| [  Approve  ]  [Edit]  [Dismiss]                 |
++--------------------------------------------------+
 ```
 
-**Update: `src/pages/Inbox.tsx`**
+**Type-specific styling:**
+- `LINK_COMPANY`: Building2 icon, blue accent
+- `CREATE_PIPELINE_COMPANY`: PlusCircle icon, violet accent
+- `CREATE_FOLLOW_UP_TASK`: ArrowRight icon, amber accent
+- `CREATE_PERSONAL_TASK`: ListTodo icon, slate accent
+- `CREATE_INTRO_TASK`: Users icon, emerald accent
+- `SET_STATUS`: Flag icon, orange accent
+- `EXTRACT_UPDATE_HIGHLIGHTS`: Sparkles icon, sky accent
 
-Modify `handleCreateTask` to include inbox item link:
+**Generate Button:**
+- Always visible at bottom of suggestions section
+- Shows "Generate with AI" or "Regenerate" based on state
+- Loading state with spinner
+
+**Intent Badge:**
+- Small badge above suggestions showing classified intent
+- Helps user understand context
+
+### Step 6: Type Definitions
+
+**File:** `src/types/inboxSuggestions.ts`
 
 ```typescript
-const handleCreateTask = async (item: InboxItem, suggestionTitle?: string) => {
-  setTaskPrefill({
-    content: suggestionTitle || item.subject,
-    description: item.preview || undefined,
-    companyName: item.relatedCompanyName,
-    sourceInboxItemId: item.id, // New field
-  });
-  setIsTaskDialogOpen(true);
-};
+export type EmailIntent = 
+  | "intro_first_touch"
+  | "pipeline_follow_up"
+  | "portfolio_update"
+  | "intro_request"
+  | "scheduling"
+  | "personal_todo"
+  | "fyi_informational";
+
+export type SuggestionType =
+  | "LINK_COMPANY"
+  | "CREATE_PIPELINE_COMPANY"
+  | "CREATE_FOLLOW_UP_TASK"
+  | "CREATE_PERSONAL_TASK"
+  | "CREATE_INTRO_TASK"
+  | "SET_STATUS"
+  | "EXTRACT_UPDATE_HIGHLIGHTS";
+
+export interface StructuredSuggestion {
+  id: string;
+  type: SuggestionType;
+  title: string;
+  confidence: "low" | "medium" | "high";
+  effort_bucket: "quick" | "medium" | "long";
+  effort_minutes: number;
+  rationale: string;
+  company_id?: string | null;
+  company_name?: string | null;
+  company_type?: "portfolio" | "pipeline";
+  due_hint?: string | null;
+  metadata?: Record<string, unknown>;
+  is_dismissed?: boolean;
+}
+
+export interface CandidateCompany {
+  id: string;
+  name: string;
+  type: "portfolio" | "pipeline";
+  primary_domain: string | null;
+  match_score: number;
+  match_reason: "domain" | "name_mention" | "prior_link" | "sender_history";
+}
+
+export interface InboxSuggestionsResponse {
+  intent: EmailIntent;
+  intent_confidence: "low" | "medium" | "high";
+  asks: string[];       // Extracted asks from email
+  entities: string[];   // Mentioned entities (people, companies)
+  suggestions: StructuredSuggestion[];
+  candidate_companies: CandidateCompany[];
+  generated_at: string;
+}
 ```
 
-**Update: `src/hooks/useTasks.ts`**
+## Quality Rules (in Edge Function prompt)
 
-- Add `source_inbox_item_id` to transform and create functions
-- Track in Task interface
+1. **Portfolio Updates:**
+   - Suggest `LINK_COMPANY` if not already linked
+   - Suggest `EXTRACT_UPDATE_HIGHLIGHTS` to capture metrics
+   - Do NOT create tasks for each metric mentioned
 
-**Activity Trail** (Lightweight for MVP):
+2. **Intro/First Touch:**
+   - If strong company match exists: suggest `LINK_COMPANY`
+   - If no match: suggest `CREATE_PIPELINE_COMPANY`
+   - One follow-up task at most
 
-For now, derive activity from related data rather than a separate audit log:
-- When rendering activity section, query tasks where `source_inbox_item_id = item.id`
-- Show "Created task: [title]" entries with timestamps
-- Future: full audit table for all actions
+3. **Pipeline Follow-ups:**
+   - Suggest single `CREATE_FOLLOW_UP_TASK` with context in notes
+   - Optionally suggest `SET_STATUS` if status change implied
 
----
+4. **Intro Requests:**
+   - Suggest `CREATE_INTRO_TASK`
+   - Link to relevant company if mentioned
 
-## File Changes Summary
+5. **Personal/Self-sent:**
+   - Suggest `CREATE_PERSONAL_TASK` with cleaned title
+   - No company linking
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/lib/emailCleaners.ts` | CREATE | Email cleaning utilities |
-| `src/lib/inboxSuggestions.ts` | CREATE | Heuristic suggestion extraction |
-| `src/hooks/useInboxAttachments.ts` | CREATE | Attachment fetching hook |
-| `src/hooks/useInboxSuggestions.ts` | CREATE | Suggestion hook (heuristic + AI) |
-| `src/components/inbox/InboxAttachmentsSection.tsx` | CREATE | Attachment list/preview UI |
-| `src/components/inbox/InboxContentPane.tsx` | MODIFY | Use cleaners, add attachments section |
-| `src/components/inbox/InboxActionRail.tsx` | MODIFY | Wire real suggestions, approve flow |
-| `src/pages/Inbox.tsx` | MODIFY | Pass suggestion handlers, task linking |
-| `src/types/inbox.ts` | MODIFY | Add attachment types, suggestion types |
-| `supabase/functions/email-inbox-ingest/index.ts` | MODIFY | Handle attachment uploads |
-| `supabase/functions/inbox-suggest/index.ts` | CREATE | AI suggestion edge function |
-| `supabase/config.toml` | MODIFY | Add inbox-suggest function config |
+6. **FYI/Informational:**
+   - Return empty suggestions or just `LINK_COMPANY` if relevant
 
-**Migrations Required**:
-1. `inbox_attachments` table + RLS
-2. `inbox-attachments` storage bucket + RLS
-3. `inbox_suggestions` table (optional cache)
-4. `tasks.source_inbox_item_id` column
+## Files to Create/Modify
 
----
+| File | Action |
+|------|--------|
+| `src/types/inboxSuggestions.ts` | Create - New type definitions |
+| `src/lib/candidateCompanyRetrieval.ts` | Create - Client-side candidate retrieval |
+| `supabase/functions/inbox-suggest-v2/index.ts` | Create - New edge function |
+| `supabase/config.toml` | Modify - Add inbox-suggest-v2 function |
+| `src/hooks/useInboxSuggestionsV2.ts` | Create - New hook with structured suggestions |
+| `src/components/inbox/InboxActionRail.tsx` | Modify - New suggestion card UI |
+| `src/components/inbox/SuggestionCard.tsx` | Create - Reusable suggestion card component |
+| Migration for inbox_suggestions schema | Create - Add new columns |
+| `docs/inbox_suggestions_types.md` | Create - README snippet |
 
-## Verification Scenarios
+## Migration SQL
 
-After implementation, these scenarios should work:
+```sql
+-- Add new columns to inbox_suggestions
+ALTER TABLE inbox_suggestions
+ADD COLUMN IF NOT EXISTS intent text,
+ADD COLUMN IF NOT EXISTS version integer DEFAULT 1,
+ADD COLUMN IF NOT EXISTS dismissed_ids jsonb DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS candidate_companies jsonb,
+ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
-| # | Scenario | Expected Result |
-|---|----------|-----------------|
-| 1 | Email with legal disclaimer | Disclaimer hidden, clean body shown, "View original" shows full |
-| 2 | Forwarded email | Original sender displayed, wrapper stripped |
-| 3 | Email with PDF attachment | Attachment card shown, download works, PDF preview opens |
-| 4 | Email with action items | Heuristic suggestions appear in rail |
-| 5 | Click "Approve" on suggestion | Task created, linked to email, appears in Activity |
-| 6 | Click "Generate with AI" | AI suggestions load, replace heuristics |
-| 7 | Create task from email | Task has `source_inbox_item_id`, shows in Activity section |
+-- Add index for cache validation
+CREATE INDEX IF NOT EXISTS idx_inbox_suggestions_cache 
+ON inbox_suggestions (inbox_item_id, updated_at DESC);
 
----
+-- Update RLS to allow update for dismissed_ids
+-- (Already has update policy, no change needed)
+```
 
-## Deferred Items
+## Edge Function Pseudocode
 
-- **Server-side cleaning**: Initially client-side for iteration speed; migrate to Edge Function for consistency if needed
-- **Full audit log**: Activity section uses derived data; full audit table is future work
-- **Link Company flow**: Placeholder remains; requires company search modal
-- **Set Category flow**: Placeholder remains; requires inbox category system
+```typescript
+// inbox-suggest-v2/index.ts
 
----
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-## Technical Notes
+serve(async (req) => {
+  // 1. Auth validation
+  // 2. Parse request body { inbox_item_id, force?: boolean }
+  
+  // 3. Check cache
+  const cached = await getCachedSuggestions(inbox_item_id);
+  if (cached && !force && Date.now() - cached.updated_at < CACHE_TTL_MS) {
+    return Response.json(cached);
+  }
+  
+  // 4. Fetch inbox item
+  const item = await fetchInboxItem(inbox_item_id);
+  
+  // 5. Fetch candidate companies (both portfolio + pipeline)
+  const candidates = await fetchCandidateCompanies(userId, item);
+  
+  // 6. Build and call OpenAI with tool calling
+  const response = await callOpenAI(item, candidates);
+  
+  // 7. Validate company_id references
+  const validated = validateCompanyReferences(response, candidates);
+  
+  // 8. Persist to database
+  await upsertSuggestions(inbox_item_id, validated, candidates);
+  
+  // 9. Return response
+  return Response.json(validated);
+});
+```
 
-**Attachment Size Limits** (from existing memory):
-- Individual email bodies: 60KB text, 120KB HTML
-- Recommended attachment limit: 10MB each (tune based on usage)
+## Testing Scenarios
 
-**AI Rate Limiting**:
-- Cache AI suggestions in `inbox_suggestions` table
-- Only re-generate if user explicitly requests
-- Consider debounce on rapid inbox item selection
-
-**HTML Sanitization**:
-- Continue using `dangerouslySetInnerHTML` with pre-sanitized content
-- `sanitizeHtml()` removes scripts, styles, event handlers, data URIs
+| Email Type | Expected Intent | Expected Suggestions |
+|------------|-----------------|---------------------|
+| Cold intro from new startup | `intro_first_touch` | CREATE_PIPELINE_COMPANY, CREATE_FOLLOW_UP_TASK |
+| Reply from pipeline company | `pipeline_follow_up` | LINK_COMPANY (if not linked), CREATE_FOLLOW_UP_TASK |
+| Quarterly update from portfolio | `portfolio_update` | LINK_COMPANY, EXTRACT_UPDATE_HIGHLIGHTS |
+| "Can you intro me to X?" | `intro_request` | CREATE_INTRO_TASK, possibly LINK_COMPANY |
+| Self-sent "call dentist" | `personal_todo` | CREATE_PERSONAL_TASK |
+| Newsletter / FYI email | `fyi_informational` | Empty or LINK_COMPANY only |
 
