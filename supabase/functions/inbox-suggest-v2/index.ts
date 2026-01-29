@@ -186,7 +186,7 @@ Your task is to analyze an email and classify its intent, then suggest appropria
 ## Email Intent Classification
 
 Classify the email into one of these intents:
-- intro_first_touch: First contact from a new company or warm intro
+- intro_first_touch: First contact from a new company or warm intro (prioritize this for introduction emails)
 - pipeline_follow_up: Ongoing deal discussion with a pipeline company
 - portfolio_update: Update from a portfolio company (metrics, news, asks)
 - intro_request: Someone asking for an introduction
@@ -198,22 +198,38 @@ Classify the email into one of these intents:
 
 Suggest actions using these types:
 - LINK_COMPANY: Link email to an existing company (ONLY use company_id from provided candidates)
-- CREATE_PIPELINE_COMPANY: Create new pipeline company (when no match exists for new deal)
+- CREATE_PIPELINE_COMPANY: Create new pipeline company (when no match exists for new deal intro)
 - CREATE_FOLLOW_UP_TASK: Create a follow-up task (can link to company)
 - CREATE_PERSONAL_TASK: Create personal task (no company link)
 - CREATE_INTRO_TASK: Create task to make an introduction
 - SET_STATUS: Update pipeline stage
 - EXTRACT_UPDATE_HIGHLIGHTS: Extract key metrics/updates from portfolio email
 
+## CREATE_PIPELINE_COMPANY Rules
+
+When suggesting CREATE_PIPELINE_COMPANY (for intro emails with no existing company match):
+- This should be HIGH priority when subject contains "Intro", "Introduction", "Meet", "Connecting you"
+- Extract company details and include in metadata:
+  - extracted_company_name: The company name (from signature, subject line, or email body)
+  - extracted_domain: Domain from sender email or mentioned URLs
+  - primary_contact_name: Name of the founder/sender
+  - primary_contact_email: Email of the founder/sender
+  - description_oneliner: A brief AI-generated one-liner about what the company does
+  - notes_summary: Context about the intro (who made it, any traction/background mentioned, relevant links)
+  - suggested_tags: Array of relevant tags (e.g., "fintech", "AI", "healthcare", "seed")
+  - intro_source: Who made the introduction (e.g., "Warm Intro from John Smith")
+
 ## Quality Rules
 
 1. For portfolio updates: Suggest LINK_COMPANY + EXTRACT_UPDATE_HIGHLIGHTS, NOT individual tasks for each metric
-2. For intro/first touch with no company match: Suggest CREATE_PIPELINE_COMPANY
-3. For follow-ups: Suggest ONE crisp CREATE_FOLLOW_UP_TASK with context
-4. For personal/self-sent: Suggest CREATE_PERSONAL_TASK only
-5. For FYI emails: Return minimal or no suggestions
-6. NEVER hallucinate company IDs - only use IDs from the candidate_companies list
-7. Max 5 suggestions, ordered by usefulness
+2. For intro/first touch with no company match: Suggest CREATE_PIPELINE_COMPANY with full metadata
+3. For intro/first touch with existing company match: Suggest LINK_COMPANY instead
+4. For follow-ups: Suggest ONE crisp CREATE_FOLLOW_UP_TASK with context
+5. For personal/self-sent: Suggest CREATE_PERSONAL_TASK only
+6. For FYI emails: Return minimal or no suggestions
+7. NEVER hallucinate company IDs - only use IDs from the candidate_companies list
+8. Max 5 suggestions, ordered by usefulness
+9. CREATE_PIPELINE_COMPANY should be first suggestion when intent is intro_first_touch and no candidates match
 
 ## Response Format
 
@@ -299,7 +315,17 @@ function buildToolSchema() {
                 metadata: {
                   type: "object",
                   nullable: true,
-                  description: "Additional data for specific suggestion types",
+                  description: "Additional data for specific suggestion types. For CREATE_PIPELINE_COMPANY, include: extracted_company_name, extracted_domain, primary_contact_name, primary_contact_email, description_oneliner, notes_summary, suggested_tags (array), intro_source",
+                  properties: {
+                    extracted_company_name: { type: "string" },
+                    extracted_domain: { type: "string", nullable: true },
+                    primary_contact_name: { type: "string" },
+                    primary_contact_email: { type: "string" },
+                    description_oneliner: { type: "string" },
+                    notes_summary: { type: "string" },
+                    suggested_tags: { type: "array", items: { type: "string" } },
+                    intro_source: { type: "string" },
+                  },
                 },
               },
               required: ["type", "title", "confidence", "effort_bucket", "effort_minutes", "rationale"],

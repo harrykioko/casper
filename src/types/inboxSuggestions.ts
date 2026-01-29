@@ -80,3 +80,15 @@ export const EFFORT_LABELS: Record<string, string> = {
   medium: "~15 min",
   long: "30+ min",
 };
+
+// Metadata for CREATE_PIPELINE_COMPANY suggestions
+export interface CreatePipelineCompanyMetadata {
+  extracted_company_name: string;
+  extracted_domain: string | null;
+  primary_contact_name: string;
+  primary_contact_email: string;
+  description_oneliner: string;
+  notes_summary: string;
+  suggested_tags: string[];
+  intro_source: string;
+}
