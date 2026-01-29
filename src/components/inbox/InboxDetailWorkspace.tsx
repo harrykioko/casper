@@ -10,6 +10,9 @@ interface InboxDetailWorkspaceProps {
   onArchive: (id: string) => void;
   onSnooze?: (id: string, until: Date) => void;
   onAddNote?: (item: InboxItem) => void;
+  onLinkCompany?: (item: InboxItem) => void;
+  onSaveAttachments?: (item: InboxItem) => void;
+  attachmentCount?: number;
   hideCloseButton?: boolean;
 }
 
@@ -21,6 +24,9 @@ export function InboxDetailWorkspace({
   onArchive,
   onSnooze,
   onAddNote,
+  onLinkCompany,
+  onSaveAttachments,
+  attachmentCount = 0,
   hideCloseButton = false,
 }: InboxDetailWorkspaceProps) {
   return (
@@ -43,6 +49,9 @@ export function InboxDetailWorkspace({
           onArchive={onArchive}
           onSnooze={onSnooze}
           onAddNote={onAddNote}
+          onLinkCompany={onLinkCompany}
+          onSaveAttachments={onSaveAttachments}
+          attachmentCount={attachmentCount}
         />
       </div>
     </div>

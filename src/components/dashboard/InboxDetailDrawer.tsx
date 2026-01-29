@@ -205,11 +205,14 @@ interface InboxDetailDrawerProps {
   open: boolean;
   onClose: () => void;
   item: InboxItem | null;
-  onCreateTask: (item: InboxItem) => void;
+  onCreateTask: (item: InboxItem, suggestionTitle?: string) => void;
   onMarkComplete: (id: string) => void;
   onArchive: (id: string) => void;
   onSnooze?: (id: string, until: Date) => void;
   onAddNote?: (item: InboxItem) => void;
+  onLinkCompany?: (item: InboxItem) => void;
+  onSaveAttachments?: (item: InboxItem) => void;
+  attachmentCount?: number;
 }
 
 export function InboxDetailDrawer({
@@ -222,6 +225,9 @@ export function InboxDetailDrawer({
   onArchive,
   onSnooze,
   onAddNote,
+  onLinkCompany,
+  onSaveAttachments,
+  attachmentCount = 0,
 }: InboxDetailDrawerProps) {
   if (!item) return null;
 
@@ -236,6 +242,9 @@ export function InboxDetailDrawer({
         onArchive={onArchive}
         onSnooze={onSnooze}
         onAddNote={onAddNote}
+        onLinkCompany={onLinkCompany}
+        onSaveAttachments={onSaveAttachments}
+        attachmentCount={attachmentCount}
       />
     );
   }

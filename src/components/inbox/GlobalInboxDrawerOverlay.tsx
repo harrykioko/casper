@@ -130,6 +130,8 @@ export function GlobalInboxDrawerOverlay() {
                 onArchive={handlers.onArchive}
                 onSnooze={handlers.onSnooze}
                 onAddNote={handlers.onAddNote}
+                onLinkCompany={handlers.onLinkCompany}
+                onSaveAttachments={handlers.onSaveAttachments}
                 hideCloseButton={true}
               />
             </div>

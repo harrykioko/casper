@@ -8,6 +8,7 @@ import {
   SlidersHorizontal
 } from "lucide-react";
 import { useInboxItems } from "@/hooks/useInboxItems";
+import { useInboxAttachments } from "@/hooks/useInboxAttachments";
 import { useTasks } from "@/hooks/useTasks";
 import { useIsDesktop } from "@/hooks/use-mobile";
 import { useGlobalInboxDrawer } from "@/contexts/GlobalInboxDrawerContext";
@@ -20,6 +21,8 @@ import { InboxEmptyState } from "@/components/inbox/InboxEmptyState";
 import { InboxDetailDrawer } from "@/components/dashboard/InboxDetailDrawer";
 import { InboxSummaryPanel } from "@/components/inbox/InboxSummaryPanel";
 import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
+import { LinkCompanyModal } from "@/components/inbox/LinkCompanyModal";
+import { SaveAttachmentsModal } from "@/components/inbox/SaveAttachmentsModal";
 import { isActionRequired, isWaitingOn } from "@/components/inbox/inboxHelpers";
 import type { InboxItem, TaskPrefillOptions, InboxViewFilter } from "@/types/inbox";
 import { toast } from "sonner";
@@ -33,7 +36,7 @@ export default function Inbox() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const { openDrawer: openGlobalDrawer, closeDrawer: closeGlobalDrawer } = useGlobalInboxDrawer();
-  const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze } = useInboxItems();
+  const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze, linkCompany } = useInboxItems();
   const { inboxItems: archivedItems, isLoading: isLoadingArchived } = useInboxItems({ onlyArchived: true });
   const { createTask } = useTasks();
 
@@ -64,6 +67,15 @@ export default function Inbox() {
   // Task creation state
   const [taskPrefill, setTaskPrefill] = useState<TaskPrefillOptions | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  
+  // Link Company modal state
+  const [linkCompanyItem, setLinkCompanyItem] = useState<InboxItem | null>(null);
+  
+  // Save Attachments modal state
+  const [saveAttachmentsItem, setSaveAttachmentsItem] = useState<InboxItem | null>(null);
+  
+  // Attachment count for selected item
+  const { attachments: selectedItemAttachments } = useInboxAttachments(selectedItem?.id);
 
   // Get the base items based on view filter
   const baseItems = useMemo(() => {
@@ -164,6 +176,8 @@ export default function Inbox() {
         onArchive: handleArchive,
         onSnooze: handleSnooze,
         onAddNote: handleAddNote,
+        onLinkCompany: handleLinkCompany,
+        onSaveAttachments: handleSaveAttachments,
       });
     }
   };
@@ -194,6 +208,21 @@ export default function Inbox() {
   const handleBulkArchive = (ids: string[]) => {
     ids.forEach(id => archive(id));
     toast.success(`Archived ${ids.length} messages`);
+  };
+
+  const handleLinkCompany = (item: InboxItem) => {
+    setLinkCompanyItem(item);
+  };
+
+  const handleSaveAttachments = (item: InboxItem) => {
+    setSaveAttachmentsItem(item);
+  };
+
+  const handleCompanyLinked = (companyId: string, companyName: string, companyType: 'pipeline' | 'portfolio') => {
+    if (linkCompanyItem) {
+      linkCompany(linkCompanyItem.id, companyId, companyName);
+      setLinkCompanyItem(null);
+    }
   };
 
   const unreadCount = inboxItems.filter(item => !item.isRead).length;
@@ -368,6 +397,9 @@ export default function Inbox() {
                 onArchive={handleArchive}
                 onSnooze={handleSnooze}
                 onAddNote={handleAddNote}
+                onLinkCompany={handleLinkCompany}
+                onSaveAttachments={handleSaveAttachments}
+                attachmentCount={selectedItemAttachments.length}
               />
             </div>
           )}
@@ -381,6 +413,31 @@ export default function Inbox() {
         onAddTask={(taskData) => createTask(taskData)}
         prefill={taskPrefill || undefined}
       />
+
+      {/* Link Company Modal */}
+      {linkCompanyItem && (
+        <LinkCompanyModal
+          open={!!linkCompanyItem}
+          onOpenChange={(open) => !open && setLinkCompanyItem(null)}
+          inboxItem={linkCompanyItem}
+          onLinked={handleCompanyLinked}
+        />
+      )}
+
+      {/* Save Attachments Modal */}
+      {saveAttachmentsItem && (
+        <SaveAttachmentsModal
+          open={!!saveAttachmentsItem}
+          onOpenChange={(open) => !open && setSaveAttachmentsItem(null)}
+          inboxItemId={saveAttachmentsItem.id}
+          linkedCompanyId={saveAttachmentsItem.relatedCompanyId}
+          linkedCompanyName={saveAttachmentsItem.relatedCompanyName}
+          linkedCompanyType={saveAttachmentsItem.relatedCompanyId ? 'pipeline' : undefined}
+          onLinkCompany={(companyId, companyName) => {
+            linkCompany(saveAttachmentsItem.id, companyId, companyName);
+          }}
+        />
+      )}
     </div>
   );
 }
