@@ -1,6 +1,5 @@
-
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Clock, MapPin, Video, Users, Calendar, ExternalLink, Building2, Link2, Unlink, Search, MessageSquare, Loader2, Check, Sparkles, ChevronDown, ChevronUp, Mail, Globe } from "lucide-react";
+import { X, Clock, MapPin, Video, Users, Calendar, ExternalLink, Link2, Unlink, Search, MessageSquare, Loader2, Check, Sparkles, ChevronDown, ChevronUp, Mail, Globe } from "lucide-react";
 import { Dialog, DialogContent, DialogOverlay, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import DOMPurify from 'dompurify';
 import { extractJoinLink, stripBoilerplate } from '@/lib/calendarParsing';
 import { getDomainFromEmail } from '@/lib/domainMatching';
@@ -44,6 +44,7 @@ const QUICK_CHIPS = [
 ];
 
 export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalProps) {
+  const navigate = useNavigate();
   const [showFollowups, setShowFollowups] = useState(false);
   const [followupText, setFollowupText] = useState('');
   const [showCompanySearch, setShowCompanySearch] = useState(false);
@@ -150,6 +151,16 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
       return next;
     });
   }, []);
+
+  const handleCompanyClick = useCallback(() => {
+    if (linkedCompany) {
+      const path = linkedCompany.companyType === 'pipeline' 
+        ? `/pipeline/${linkedCompany.companyId}`
+        : `/portfolio/${linkedCompany.companyId}`;
+      navigate(path);
+      onClose();
+    }
+  }, [linkedCompany, navigate, onClose]);
 
   if (!event) return null;
 
@@ -278,11 +289,24 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                   <div className="space-y-2">
                     <p className="text-xs uppercase tracking-wide font-medium text-muted-foreground">Linked Company</p>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full">
-                        <Building2 className="h-3 w-3" />
-                        {linkedCompany.companyName}
+                      <div 
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 cursor-pointer hover:bg-muted/70 transition-colors"
+                        onClick={handleCompanyClick}
+                      >
+                        <Avatar className="h-5 w-5">
+                          <AvatarImage 
+                            src={linkedCompany.companyLogoUrl || undefined} 
+                            alt={linkedCompany.companyName} 
+                          />
+                          <AvatarFallback className="text-[9px] bg-background border border-border">
+                            {linkedCompany.companyName.slice(0, 2).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm font-medium text-foreground">
+                          {linkedCompany.companyName}
+                        </span>
                         <span className="text-xs text-muted-foreground">({linkedCompany.companyType})</span>
-                      </Badge>
+                      </div>
                       <Button variant="ghost" size="icon" className="h-6 w-6" onClick={unlinkCompany}>
                         <Unlink className="h-3 w-3 text-muted-foreground" />
                       </Button>
@@ -298,7 +322,11 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                       {suggestions.map(s => (
                         <div key={s.id} className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-background/50 border border-muted/30">
                           <div className="flex items-center gap-2 min-w-0">
-                            <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <Avatar className="h-6 w-6 flex-shrink-0">
+                              <AvatarFallback className="text-[9px] bg-muted">
+                                {s.companyName.slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
                             <div className="min-w-0">
                               <p className="text-sm font-medium truncate">{s.companyName}</p>
                               <p className="text-xs text-muted-foreground">
@@ -347,7 +375,12 @@ export function EventDetailsModal({ event, isOpen, onClose }: EventDetailsModalP
                               setCompanyQuery('');
                             }}
                           >
-                            <Building2 className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            <Avatar className="h-5 w-5 flex-shrink-0">
+                              <AvatarImage src={r.logoUrl || undefined} alt={r.name} />
+                              <AvatarFallback className="text-[8px] bg-muted">
+                                {r.name.slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
                             <span className="text-sm truncate">{r.name}</span>
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0 ml-auto">{r.type}</Badge>
                           </button>
