@@ -97,7 +97,7 @@ const CALENDAR_RSVP_PATTERNS = [
   /^Going\?\s*Yes\s*-?\s*No\s*-?\s*Maybe/im,
 ];
 
-// Calendar metadata patterns (When:/Where:/Guests:)
+// Calendar metadata patterns (When:/Where:/Guests:) - with standalone labels
 const CALENDAR_METADATA_PATTERNS = [
   /^When:\s*.+$/im,
   /^Where:\s*.+$/im,
@@ -105,6 +105,32 @@ const CALENDAR_METADATA_PATTERNS = [
   /^Calendar:\s*.+$/im,
   /^Who:\s*.+$/im,
   /^Video call:\s*.+$/im,
+  // Standalone labels (no colon) - Google Calendar format
+  /^When$/im,
+  /^Where$/im,
+  /^Location$/im,
+  /^Guests$/im,
+  /^Description$/im,
+];
+
+// AGGRESSIVE: Calendar block indicators that trigger early cut
+const CALENDAR_BLOCK_INDICATORS = [
+  "This event has been updated",
+  "This event has been changed",
+  "Join with Google Meet<",
+  "Join with Google Meet",
+  "View all guest info<https://calendar",
+  "Invitation from Google Calendar",
+  "Reply for ",
+  "Yes<https://calendar.google.com",
+  "No<https://calendar.google.com", 
+  "Maybe<https://calendar.google.com",
+  "More options<https://calendar.google.com",
+  "action=RESPOND&eid=",
+  "action=VIEW&eid=",
+  "\nWhen\n",
+  "\nLocation\n",
+  "\nGuests\n",
 ];
 
 // Phone patterns that often appear in signatures
@@ -134,6 +160,27 @@ const SIGNOFF_PATTERNS = [
  */
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * AGGRESSIVE: Cut at the earliest calendar block indicator
+ * This catches forwarded calendar invites and cuts ALL content from that point
+ */
+function cutAtCalendarBlock(text: string): { result: string; wasCut: boolean } {
+  let earliestIndex = text.length;
+  
+  for (const indicator of CALENDAR_BLOCK_INDICATORS) {
+    const idx = text.toLowerCase().indexOf(indicator.toLowerCase());
+    // Only cut if there's meaningful content before (at least 50 chars)
+    if (idx !== -1 && idx > 50 && idx < earliestIndex) {
+      earliestIndex = idx;
+    }
+  }
+  
+  if (earliestIndex < text.length) {
+    return { result: text.substring(0, earliestIndex).trim(), wasCut: true };
+  }
+  return { result: text, wasCut: false };
 }
 
 /**
@@ -200,36 +247,44 @@ export function cleanEmailContent(
     cleaningApplied.push("forwarded_wrapper");
   }
 
-  // Step 2: Strip calendar event content
-  const calendarResult = stripCalendarContent(cleanedText);
-  if (calendarResult !== cleanedText) {
-    cleanedText = calendarResult;
-    cleaningApplied.push("calendar_content");
+  // Step 2: AGGRESSIVE - Cut at earliest calendar block indicator
+  // This MUST happen early to cut all calendar junk before other processing
+  const calendarBlockResult = cutAtCalendarBlock(cleanedText);
+  if (calendarBlockResult.wasCut) {
+    cleanedText = calendarBlockResult.result;
+    cleaningApplied.push("calendar_block_cut");
   }
 
-  // Step 3: Strip inline quoted replies
-  const quoteResult = stripInlineQuotes(cleanedText);
-  if (quoteResult !== cleanedText) {
-    cleanedText = quoteResult;
-    cleaningApplied.push("inline_quotes");
-  }
-
-  // Step 4: Strip disclaimers (more aggressively)
-  const disclaimerResult = stripDisclaimers(cleanedText);
-  if (disclaimerResult !== cleanedText) {
-    cleanedText = disclaimerResult;
-    cleaningApplied.push("disclaimers");
-  }
-
-  // Step 5: Strip signatures (pass sender name for better detection)
+  // Step 3: Strip signatures EARLY (the -- marker is a hard boundary)
   const signatureResult = stripSignatures(cleanedText, senderName);
   if (signatureResult !== cleanedText && signatureResult.length > cleanedText.length * 0.15) {
     cleanedText = signatureResult;
     cleaningApplied.push("signatures");
   }
 
-  // Step 6: Strip after common sign-offs if signature junk follows
+  // Step 4: Strip after common sign-offs if signature junk follows
   cleanedText = stripAfterSignOff(cleanedText);
+
+  // Step 5: Strip inline quoted replies
+  const quoteResult = stripInlineQuotes(cleanedText);
+  if (quoteResult !== cleanedText) {
+    cleanedText = quoteResult;
+    cleaningApplied.push("inline_quotes");
+  }
+
+  // Step 6: Strip disclaimers (more aggressively)
+  const disclaimerResult = stripDisclaimers(cleanedText);
+  if (disclaimerResult !== cleanedText) {
+    cleanedText = disclaimerResult;
+    cleaningApplied.push("disclaimers");
+  }
+
+  // Step 7: Additional calendar content cleaning (line-by-line)
+  const calendarResult = stripCalendarContent(cleanedText);
+  if (calendarResult !== cleanedText) {
+    cleanedText = calendarResult;
+    cleaningApplied.push("calendar_content");
+  }
 
   // Step 6: Clean HTML if present
   if (cleanedHtml) {
@@ -309,7 +364,7 @@ export function stripCalendarContent(text: string): string {
     const lineLower = line.toLowerCase();
     const lineTrimmed = line.trim();
     
-    // Check for calendar block start
+    // Check for calendar block start - expanded patterns
     const isCalendarLine = CALENDAR_PATTERNS.some(p => lineLower.includes(p.toLowerCase())) ||
       CALENDAR_RSVP_PATTERNS.some(p => p.test(lineTrimmed)) ||
       CALENDAR_METADATA_PATTERNS.some(p => p.test(lineTrimmed)) ||
@@ -319,7 +374,18 @@ export function stripCalendarContent(text: string): string {
       /^more details\s*[»›>]/i.test(lineTrimmed) ||
       /^\s*Yes\s*<\s*https:/i.test(lineTrimmed) ||
       /^\s*No\s*<\s*https:/i.test(lineTrimmed) ||
-      /^\s*Maybe\s*<\s*https:/i.test(lineTrimmed);
+      /^\s*Maybe\s*<\s*https:/i.test(lineTrimmed) ||
+      // Additional calendar link patterns
+      /action=RESPOND&eid=/i.test(lineTrimmed) ||
+      /action=VIEW&eid=/i.test(lineTrimmed) ||
+      /^Reply for /i.test(lineTrimmed) ||
+      /^View map</i.test(lineTrimmed) ||
+      /^View all guest info</i.test(lineTrimmed) ||
+      /^More phone numbers</i.test(lineTrimmed) ||
+      /^Join by phone/i.test(lineTrimmed) ||
+      /^Meeting link/i.test(lineTrimmed) ||
+      /^PIN:/i.test(lineTrimmed) ||
+      /^Google$/i.test(lineTrimmed);
     
     if (isCalendarLine) {
       inCalendarBlock = true;
