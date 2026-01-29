@@ -292,13 +292,31 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
         .update({ status: 'accepted' })
         .eq('id', suggestion.id);
 
-      // Create the actual link
+      // Fetch the company's logo before linking
+      let logoUrl: string | null = null;
+      if (suggestion.companyType === 'pipeline') {
+        const { data } = await supabase
+          .from('pipeline_companies')
+          .select('logo_url')
+          .eq('id', suggestion.companyId)
+          .single();
+        logoUrl = data?.logo_url || null;
+      } else {
+        const { data } = await supabase
+          .from('companies')
+          .select('logo_url')
+          .eq('id', suggestion.companyId)
+          .single();
+        logoUrl = data?.logo_url || null;
+      }
+
+      // Create the actual link with the logo
       await linkCompany({
         id: suggestion.companyId,
         name: suggestion.companyName,
         type: suggestion.companyType,
         primaryDomain: suggestion.matchedDomain,
-        logoUrl: null,
+        logoUrl: logoUrl,
       });
     } catch (err) {
       console.error('Error accepting suggestion:', err);
