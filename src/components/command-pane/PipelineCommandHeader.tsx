@@ -72,7 +72,7 @@ export function PipelineCommandHeader({ company, onClose, onToggleTopOfMind }: P
             </>
           )}
           <Link
-            to="/pipeline"
+            to={`/pipeline/${company.id}`}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
           >
             <ArrowUpRight className="w-3 h-3" />

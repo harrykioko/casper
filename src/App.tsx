@@ -23,6 +23,7 @@ import ProjectDetail from "./pages/ProjectDetail";
 import Prompts from "./pages/Prompts";
 import ReadingList from "./pages/ReadingList";
 import Pipeline from "./pages/Pipeline";
+import PipelineCompanyDetail from "./pages/PipelineCompanyDetail";
 import Portfolio from "./pages/Portfolio";
 import PortfolioCompanyDetail from "./pages/PortfolioCompanyDetail";
 import PromptBuilder from "./pages/PromptBuilder";
@@ -115,6 +116,7 @@ const MainContent = () => {
           <Route path="/prompt-builder" element={<PromptBuilder />} />
           <Route path="/reading-list" element={<ReadingList />} />
           <Route path="/pipeline" element={<Pipeline />} />
+          <Route path="/pipeline/:companyId" element={<PipelineCompanyDetail />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/portfolio/:companyId" element={<PortfolioCompanyDetail />} />
           <Route path="/priority" element={<Priority />} />
