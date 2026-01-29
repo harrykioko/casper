@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { PipelineViewMode, PipelineFilters, PipelineCompany, PipelineStatus } from '@/types/pipeline';
+import { PipelineViewMode, PipelineFilters, PipelineCompany, PipelineStatus, PipelineCardAttention } from '@/types/pipeline';
 import { usePipeline } from '@/hooks/usePipeline';
+import { usePipelineTasksAggregate } from '@/hooks/usePipelineTasksAggregate';
+import { useTasks } from '@/hooks/useTasks';
+import { computeCardAttention } from '@/lib/pipeline/pipelineAttentionHelpers';
 import { NewPipelineInput } from '@/components/pipeline/NewPipelineInput';
 import { PipelineToolbar } from '@/components/pipeline/PipelineToolbar';
 import { SummaryBox } from '@/components/pipeline/SummaryBox';
@@ -10,9 +13,12 @@ import { PipelineBoard } from '@/components/pipeline/PipelineBoard';
 import { PipelineDetailModal } from '@/components/pipeline/PipelineDetailModal';
 import { PipelineLayout } from '@/components/pipeline/PipelineLayout';
 import { DashboardLoading } from '@/components/dashboard/DashboardLoading';
+import { AddTaskDialog } from '@/components/modals/AddTaskDialog';
+import { toast } from 'sonner';
 
 export default function Pipeline() {
   const { companies, loading, getStats, updateCompany } = usePipeline();
+  const { createTask } = useTasks();
   const [viewMode, setViewMode] = useState<PipelineViewMode>(() => {
     const saved = localStorage.getItem('casper.pipeline.view');
     return (saved as PipelineViewMode) || 'kanban';
@@ -21,9 +27,41 @@ export default function Pipeline() {
     search: '',
     rounds: [],
     sectors: [],
+    needsAttention: false,
+    topOfMindOnly: false,
+    staleOnly: false,
   });
   const [selectedCompany, setSelectedCompany] = useState<PipelineCompany | null>(null);
   const [filterStatus, setFilterStatus] = useState<PipelineStatus | null>(null);
+  
+  // Task dialog state
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [taskDialogCompany, setTaskDialogCompany] = useState<PipelineCompany | null>(null);
+
+  // Aggregate tasks for all pipeline companies
+  const companyIds = useMemo(() => companies.map(c => c.id), [companies]);
+  const { tasks: allTasks, tasksByCompany } = usePipelineTasksAggregate(companyIds);
+
+  // Compute attention map for all companies
+  const attentionMap = useMemo(() => {
+    const map = new Map<string, PipelineCardAttention>();
+    for (const company of companies) {
+      const attention = computeCardAttention(company, allTasks);
+      map.set(company.id, attention);
+    }
+    return map;
+  }, [companies, allTasks]);
+
+  // Group companies by status for SummaryBox sublabels
+  const companiesByStatus = useMemo(() => {
+    const map = new Map<PipelineStatus, string[]>();
+    for (const company of companies) {
+      const existing = map.get(company.status) || [];
+      existing.push(company.id);
+      map.set(company.status, existing);
+    }
+    return map;
+  }, [companies]);
 
   // Persist view mode to localStorage
   useEffect(() => {
@@ -44,6 +82,18 @@ export default function Pipeline() {
       console.error('Failed to update company status:', error);
     }
   };
+
+  const handleAddTask = useCallback((company: PipelineCompany) => {
+    setTaskDialogCompany(company);
+    setTaskDialogOpen(true);
+  }, []);
+
+  const handleLogNote = useCallback((company: PipelineCompany) => {
+    // For now, navigate to the deal room's notes tab
+    // In a future iteration, this could open a quick note modal
+    setSelectedCompany(company);
+    toast.info('Open the deal room to log notes');
+  }, []);
 
   if (loading) {
     return <DashboardLoading />;
@@ -73,6 +123,9 @@ export default function Pipeline() {
           filters={filters}
           onCardClick={setSelectedCompany}
           onStatusChange={handleStatusChange}
+          allTasks={allTasks}
+          onAddTask={handleAddTask}
+          onLogNote={handleLogNote}
         />
       </div>
     </>
@@ -86,6 +139,8 @@ export default function Pipeline() {
         setFilterStatus={setFilterStatus}
         lastUpdated={lastUpdated}
         totalActiveRaise={totalActiveRaise}
+        attentionMap={attentionMap}
+        companiesByStatus={companiesByStatus}
       />
       <ActiveDealsSidebar
         activeDeals={activeDeals}
@@ -135,6 +190,25 @@ export default function Pipeline() {
         company={selectedCompany}
         isOpen={!!selectedCompany}
         onClose={() => setSelectedCompany(null)}
+      />
+
+      {/* Add Task Dialog */}
+      <AddTaskDialog
+        open={taskDialogOpen}
+        onOpenChange={setTaskDialogOpen}
+        onAddTask={async (content: string) => {
+          if (taskDialogCompany) {
+            await createTask({
+              content,
+              pipeline_company_id: taskDialogCompany.id,
+            });
+          }
+        }}
+        prefill={taskDialogCompany ? {
+          content: '',
+          companyId: taskDialogCompany.id,
+          companyType: 'pipeline' as const,
+        } : undefined}
       />
     </motion.div>
   );

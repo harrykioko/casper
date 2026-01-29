@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent } from '@dnd-kit/core';
-import { PipelineCompany, PipelineViewMode, PipelineFilters } from '@/types/pipeline';
+import { PipelineCompany, PipelineViewMode, PipelineFilters, PipelineCardAttention } from '@/types/pipeline';
 import { PipelineKanbanView } from './PipelineKanbanView';
 import { PipelineListView } from './PipelineListView';
 import { PipelineGridView } from './PipelineGridView';
 import { PipelineCard } from './PipelineCard';
 import { usePipeline } from '@/hooks/usePipeline';
 import { useToast } from '@/hooks/use-toast';
+import { PipelineTask, computeCardAttention } from '@/lib/pipeline/pipelineAttentionHelpers';
 
 interface PipelineBoardProps {
   companies: PipelineCompany[];
@@ -14,6 +15,9 @@ interface PipelineBoardProps {
   filters: PipelineFilters;
   onCardClick: (company: PipelineCompany) => void;
   onStatusChange: (companyId: string, newStatus: string) => void;
+  allTasks?: PipelineTask[];
+  onAddTask?: (company: PipelineCompany) => void;
+  onLogNote?: (company: PipelineCompany) => void;
 }
 
 export function PipelineBoard({ 
@@ -21,25 +25,53 @@ export function PipelineBoard({
   viewMode, 
   filters, 
   onCardClick, 
-  onStatusChange 
+  onStatusChange,
+  allTasks = [],
+  onAddTask,
+  onLogNote,
 }: PipelineBoardProps) {
   const [activeCard, setActiveCard] = useState<PipelineCompany | null>(null);
   const { updateCompany } = usePipeline();
   const { toast } = useToast();
 
-  // Filter companies based on filters
-  const filteredCompanies = companies.filter(company => {
-    const matchesSearch = !filters.search || 
-      company.company_name.toLowerCase().includes(filters.search.toLowerCase());
-    
-    const matchesRound = filters.rounds.length === 0 || 
-      filters.rounds.includes(company.current_round);
-    
-    const matchesSector = filters.sectors.length === 0 || 
-      (company.sector && filters.sectors.includes(company.sector));
+  // Compute attention map for all companies
+  const attentionMap = useMemo(() => {
+    const map = new Map<string, PipelineCardAttention>();
+    for (const company of companies) {
+      const attention = computeCardAttention(company, allTasks);
+      map.set(company.id, attention);
+    }
+    return map;
+  }, [companies, allTasks]);
 
-    return matchesSearch && matchesRound && matchesSector;
-  });
+  // Filter companies based on filters
+  const filteredCompanies = useMemo(() => {
+    return companies.filter(company => {
+      const matchesSearch = !filters.search || 
+        company.company_name.toLowerCase().includes(filters.search.toLowerCase());
+      
+      const matchesRound = filters.rounds.length === 0 || 
+        filters.rounds.includes(company.current_round);
+      
+      const matchesSector = filters.sectors.length === 0 || 
+        (company.sector && filters.sectors.includes(company.sector));
+
+      // New attention-based filters
+      const attention = attentionMap.get(company.id);
+      
+      const matchesNeedsAttention = !filters.needsAttention || 
+        (attention?.needsAttention ?? false);
+      
+      const matchesTopOfMind = !filters.topOfMindOnly || 
+        company.is_top_of_mind;
+      
+      const matchesStale = !filters.staleOnly || 
+        (attention?.isStale ?? false);
+
+      return matchesSearch && matchesRound && matchesSector && 
+             matchesNeedsAttention && matchesTopOfMind && matchesStale;
+    });
+  }, [companies, filters, attentionMap]);
 
   // Exclude active deals from board view
   const boardCompanies = filteredCompanies.filter(c => c.status !== 'active');
@@ -132,13 +164,32 @@ export function PipelineBoard({
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex-1">
         {viewMode === 'kanban' && (
-          <PipelineKanbanView companies={boardCompanies} onCardClick={onCardClick} />
+          <PipelineKanbanView 
+            companies={boardCompanies} 
+            onCardClick={onCardClick}
+            attentionMap={attentionMap}
+            allTasks={allTasks}
+            onAddTask={onAddTask}
+            onLogNote={onLogNote}
+          />
         )}
         {viewMode === 'list' && (
-          <PipelineListView companies={boardCompanies} onCardClick={onCardClick} />
+          <PipelineListView 
+            companies={boardCompanies} 
+            onCardClick={onCardClick}
+            attentionMap={attentionMap}
+            onAddTask={onAddTask}
+            onLogNote={onLogNote}
+          />
         )}
         {viewMode === 'grid' && (
-          <PipelineGridView companies={boardCompanies} onCardClick={onCardClick} />
+          <PipelineGridView 
+            companies={boardCompanies} 
+            onCardClick={onCardClick}
+            attentionMap={attentionMap}
+            onAddTask={onAddTask}
+            onLogNote={onLogNote}
+          />
         )}
       </div>
 
@@ -148,6 +199,7 @@ export function PipelineBoard({
             company={activeCard}
             onClick={() => {}}
             isDragging
+            attention={attentionMap.get(activeCard.id)}
           />
         ) : null}
       </DragOverlay>

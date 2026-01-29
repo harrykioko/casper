@@ -2,7 +2,7 @@ import { FC, SVGProps } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
-interface MetricTileProps {
+export interface MetricTileProps {
   label: string;
   value: number;
   color: string;
@@ -10,6 +10,7 @@ interface MetricTileProps {
   size?: 'sm' | 'lg';
   selected?: boolean;
   onClick?: () => void;
+  sublabel?: string;
 }
 
 export const MetricTile: FC<MetricTileProps> = ({
@@ -20,13 +21,14 @@ export const MetricTile: FC<MetricTileProps> = ({
   size = 'sm', 
   selected, 
   onClick,
+  sublabel,
 }) => {
   return (
     <motion.button
       onClick={onClick}
       className={cn(
         'flex flex-col justify-center items-center glass-card transition-all duration-200 hover:scale-[1.02] cursor-pointer',
-        size === 'lg' ? 'p-6 h-20 w-full' : 'p-3 h-16 w-full aspect-square',
+        size === 'lg' ? 'p-6 h-20 w-full' : 'p-3 h-auto min-h-16 w-full',
         selected && 'ring-2 ring-primary/70',
         'group'
       )}
@@ -68,6 +70,12 @@ export const MetricTile: FC<MetricTileProps> = ({
       )}>
         {label}
       </span>
+
+      {sublabel && (
+        <span className="text-[10px] text-muted-foreground/70 mt-0.5 text-center">
+          {sublabel}
+        </span>
+      )}
     </motion.button>
   );
 };
