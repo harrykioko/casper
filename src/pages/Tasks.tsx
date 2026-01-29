@@ -30,6 +30,7 @@ export default function Tasks() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
   const [showInbox, setShowInbox] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   const isDesktop = useIsDesktop();
@@ -38,6 +39,7 @@ export default function Tasks() {
     tasks,
     inboxTasks,
     nonInboxTasks,
+    archivedTasks,
     handleAddTask,
     handleCompleteTask,
     handleDeleteTask,
@@ -45,18 +47,26 @@ export default function Tasks() {
     handleUpdateTaskStatus,
     handleUpdateTask,
     quickInlineUpdate,
-    bulkUpdate
+    bulkUpdate,
+    handleArchiveTask,
+    handleUnarchiveTask,
   } = useTasksManager();
 
   const { categories } = useCategories();
   const { projects } = useProjects();
 
+  // Combine non-inbox + archived when showArchived is toggled
+  const visibleTasks = useMemo(() => {
+    if (showArchived) return [...nonInboxTasks, ...archivedTasks];
+    return nonInboxTasks;
+  }, [nonInboxTasks, archivedTasks, showArchived]);
+
   // Filter by search query first
   const searchedTasks = useMemo(() => {
-    if (!searchQuery.trim()) return nonInboxTasks;
+    if (!searchQuery.trim()) return visibleTasks;
     const q = searchQuery.toLowerCase();
-    return nonInboxTasks.filter(t => t.content.toLowerCase().includes(q));
-  }, [nonInboxTasks, searchQuery]);
+    return visibleTasks.filter(t => t.content.toLowerCase().includes(q));
+  }, [visibleTasks, searchQuery]);
 
   // Apply filtering to searched tasks
   const filteredTasks = useTaskFiltering(searchedTasks, {
@@ -161,6 +171,7 @@ export default function Tasks() {
                 <TasksSummaryPanel
                   tasks={nonInboxTasks}
                   triageCount={inboxTasks.length}
+                  archivedCount={archivedTasks.length}
                   statusFilter={statusFilter}
                   onStatusFilterChange={setStatusFilter}
                   priorityFilter={priorityFilter}
@@ -177,6 +188,8 @@ export default function Tasks() {
                   onViewModeChange={setViewMode}
                   showTriage={showInbox}
                   onShowTriageChange={setShowInbox}
+                  showArchived={showArchived}
+                  onShowArchivedChange={setShowArchived}
                 />
               </div>
             )}
@@ -231,6 +244,8 @@ export default function Tasks() {
             task={selectedTask}
             onUpdateTask={handleUpdateTask}
             onDeleteTask={handleDeleteTask}
+            onArchiveTask={handleArchiveTask}
+            onUnarchiveTask={handleUnarchiveTask}
           />
         </div>
       </div>

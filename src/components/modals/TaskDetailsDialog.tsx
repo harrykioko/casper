@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Edit, Trash, StickyNote } from "lucide-react";
+import { Edit, Trash, StickyNote, Archive, ArchiveRestore } from "lucide-react";
 import { GlassModal, GlassModalContent, GlassModalHeader, GlassModalTitle } from "@/components/ui/GlassModal";
 import { Button } from "@/components/ui/button";
 import { Task } from "@/hooks/useTasks";
@@ -15,14 +15,18 @@ interface TaskDetailsDialogProps {
   task: Task | null;
   onUpdateTask: (task: Task) => void;
   onDeleteTask: (id: string) => void;
+  onArchiveTask?: (id: string) => void;
+  onUnarchiveTask?: (id: string) => void;
 }
 
 export function TaskDetailsDialog({ 
-  open, 
-  onOpenChange, 
-  task, 
-  onUpdateTask, 
-  onDeleteTask 
+  open,
+  onOpenChange,
+  task,
+  onUpdateTask,
+  onDeleteTask,
+  onArchiveTask,
+  onUnarchiveTask,
 }: TaskDetailsDialogProps) {
   const { openFloatingNote } = useFloatingNote();
   const {
@@ -66,6 +70,19 @@ export function TaskDetailsDialog({
       description: "Your task has been successfully deleted.",
       variant: "destructive"
     });
+  };
+
+  const handleArchive = () => {
+    if (!task) return;
+    if (task.archived_at && onUnarchiveTask) {
+      onUnarchiveTask(task.id);
+      onOpenChange(false);
+      toast({ title: "Task unarchived", description: "Task restored to active list." });
+    } else if (onArchiveTask) {
+      onArchiveTask(task.id);
+      onOpenChange(false);
+      toast({ title: "Task archived", description: "Task moved to archive." });
+    }
   };
 
   useEffect(() => {
@@ -145,14 +162,35 @@ export function TaskDetailsDialog({
         )}
 
         <div className="flex justify-between pt-6 border-t border-muted mt-4">
-          <Button
-            variant="ghost"
-            onClick={handleDelete}
-            className="flex items-center gap-2 text-muted-foreground hover:text-destructive"
-          >
-            <Trash className="h-4 w-4" />
-            Delete Task
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="ghost"
+              onClick={handleDelete}
+              className="flex items-center gap-2 text-muted-foreground hover:text-destructive"
+            >
+              <Trash className="h-4 w-4" />
+              Delete
+            </Button>
+            {(onArchiveTask || onUnarchiveTask) && (
+              <Button
+                variant="ghost"
+                onClick={handleArchive}
+                className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+              >
+                {task?.archived_at ? (
+                  <>
+                    <ArchiveRestore className="h-4 w-4" />
+                    Unarchive
+                  </>
+                ) : (
+                  <>
+                    <Archive className="h-4 w-4" />
+                    Archive
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
           <div className="flex gap-2">
             <Button
               type="button"
@@ -161,7 +199,7 @@ export function TaskDetailsDialog({
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               onClick={handleSave}
               className="bg-gradient-to-r from-[#FF6A79] to-[#415AFF] text-white hover:opacity-90"
             >

@@ -3,7 +3,7 @@ import { useTasks, transformTaskForDatabase } from './useTasks';
 import { useCategories } from './useCategories';
 
 export function useTasksManager() {
-  const { tasks, createTask, updateTask, deleteTask, getInboxTasks, getNonInboxTasks } = useTasks();
+  const { tasks, createTask, updateTask, deleteTask, getInboxTasks, getNonInboxTasks, getArchivedTasks, archiveTask, unarchiveTask } = useTasks();
   const { getCategoryIdByName } = useCategories();
   
   const handleAddTask = (content: string) => {
@@ -74,10 +74,19 @@ export function useTasksManager() {
     ids.forEach(id => updateTask(id, dbPatch));
   };
 
+  const handleArchiveTask = (id: string) => {
+    archiveTask(id);
+  };
+
+  const handleUnarchiveTask = (id: string) => {
+    unarchiveTask(id);
+  };
+
   return {
     tasks,
     inboxTasks: getInboxTasks(),
     nonInboxTasks: getNonInboxTasks(),
+    archivedTasks: getArchivedTasks(),
     handleAddTask,
     handleCompleteTask,
     handleDeleteTask,
@@ -85,6 +94,8 @@ export function useTasksManager() {
     handleUpdateTaskStatus,
     handleUpdateTask,
     quickInlineUpdate,
-    bulkUpdate
+    bulkUpdate,
+    handleArchiveTask,
+    handleUnarchiveTask,
   };
 }

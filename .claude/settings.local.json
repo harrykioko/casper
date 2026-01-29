@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npm run lint)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(cd:*)",
+      "Bash(npx vite build)"
     ],
     "deny": []
   }

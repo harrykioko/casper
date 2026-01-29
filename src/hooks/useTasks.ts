@@ -31,6 +31,8 @@ export interface Task {
   snoozed_until?: string | null;
   is_top_priority?: boolean;
   source_inbox_item_id?: string | null;
+  archived_at?: string | null;
+  completed_at?: string | null;
 }
 
 // Transform database row to frontend Task type
@@ -55,6 +57,8 @@ const transformTask = (row: TaskRow & { project?: any; category?: any }): Task =
     snoozed_until: row.snoozed_until || null,
     is_top_priority: row.is_top_priority || false,
     source_inbox_item_id: row.source_inbox_item_id || null,
+    archived_at: (row as any).archived_at || null,
+    completed_at: row.completed_at || null,
   };
 };
 
@@ -125,8 +129,61 @@ export function useTasks() {
       .sort((a, b) => new Date(b.created_at || '').getTime() - new Date(a.created_at || '').getTime());
   };
 
+  const isTaskArchived = (task: Task): boolean => {
+    if (task.archived_at) return true;
+    if (task.completed && task.completed_at) {
+      const completedDate = new Date(task.completed_at);
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+      return completedDate < fourteenDaysAgo;
+    }
+    return false;
+  };
+
   const getNonInboxTasks = () => {
-    return tasks.filter(task => !task.inbox);
+    return tasks.filter(task => !task.inbox && !isTaskArchived(task));
+  };
+
+  const getArchivedTasks = () => {
+    return tasks.filter(task => !task.inbox && isTaskArchived(task));
+  };
+
+  const archiveTask = async (id: string) => {
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ archived_at: new Date().toISOString() } as any)
+      .eq('id', id)
+      .select(`
+        *,
+        project:projects(id, name, color),
+        category:categories(id, name)
+      `)
+      .single();
+
+    if (error) throw error;
+
+    const transformedTask = transformTask(data);
+    setTasks(prev => prev.map(t => t.id === id ? transformedTask : t));
+    return transformedTask;
+  };
+
+  const unarchiveTask = async (id: string) => {
+    const { data, error } = await supabase
+      .from('tasks')
+      .update({ archived_at: null } as any)
+      .eq('id', id)
+      .select(`
+        *,
+        project:projects(id, name, color),
+        category:categories(id, name)
+      `)
+      .single();
+
+    if (error) throw error;
+
+    const transformedTask = transformTask(data);
+    setTasks(prev => prev.map(t => t.id === id ? transformedTask : t));
+    return transformedTask;
   };
 
   const createTask = async (taskData: Omit<TaskInsert, 'id' | 'created_at' | 'updated_at' | 'created_by'>) => {
@@ -227,16 +284,19 @@ export function useTasks() {
     return transformedTask;
   };
 
-  return { 
-    tasks, 
-    loading, 
-    error, 
-    createTask, 
-    updateTask, 
+  return {
+    tasks,
+    loading,
+    error,
+    createTask,
+    updateTask,
     deleteTask,
     snoozeTask,
     markTaskTopPriority,
     getInboxTasks,
-    getNonInboxTasks 
+    getNonInboxTasks,
+    getArchivedTasks,
+    archiveTask,
+    unarchiveTask,
   };
 }

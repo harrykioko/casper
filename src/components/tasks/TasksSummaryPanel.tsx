@@ -12,6 +12,7 @@ import {
   LayoutGrid,
   Filter,
   Sparkles,
+  Archive,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -24,6 +25,7 @@ import type { Task } from "@/hooks/useTasks";
 interface TasksSummaryPanelProps {
   tasks: Task[];
   triageCount: number;
+  archivedCount: number;
   statusFilter: string;
   onStatusFilterChange: (filter: string) => void;
   priorityFilter: string;
@@ -40,6 +42,8 @@ interface TasksSummaryPanelProps {
   onViewModeChange: (mode: "list" | "kanban") => void;
   showTriage: boolean;
   onShowTriageChange: (show: boolean) => void;
+  showArchived: boolean;
+  onShowArchivedChange: (show: boolean) => void;
 }
 
 interface StatChipProps {
@@ -78,6 +82,7 @@ function StatChip({ label, count, icon, isActive, onClick, colorClass }: StatChi
 export function TasksSummaryPanel({
   tasks,
   triageCount,
+  archivedCount,
   statusFilter,
   onStatusFilterChange,
   priorityFilter,
@@ -94,6 +99,8 @@ export function TasksSummaryPanel({
   onViewModeChange,
   showTriage,
   onShowTriageChange,
+  showArchived,
+  onShowArchivedChange,
 }: TasksSummaryPanelProps) {
   const { categories, loading: categoriesLoading } = useCategories();
   const { projects, loading: projectsLoading } = useProjects();
@@ -170,6 +177,14 @@ export function TasksSummaryPanel({
             isActive={statusFilter === "done"}
             onClick={() => onStatusFilterChange("done")}
             colorClass="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+          />
+          <StatChip
+            label="Archived"
+            count={archivedCount}
+            icon={<Archive className="h-4 w-4" />}
+            isActive={showArchived}
+            onClick={() => onShowArchivedChange(!showArchived)}
+            colorClass="bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
           />
         </div>
 
@@ -308,6 +323,22 @@ export function TasksSummaryPanel({
             <Switch
               checked={showTriage}
               onCheckedChange={onShowTriageChange}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Archive className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Show Archived</span>
+              {archivedCount > 0 && (
+                <span className="min-w-[20px] h-5 px-1.5 rounded-full text-xs flex items-center justify-center bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+                  {archivedCount}
+                </span>
+              )}
+            </div>
+            <Switch
+              checked={showArchived}
+              onCheckedChange={onShowArchivedChange}
             />
           </div>
         </div>

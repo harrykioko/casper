@@ -15,6 +15,7 @@ interface FilterOptions {
   categories: Category[];
   projects: Project[];
   excludeInbox?: boolean;
+  showArchived?: boolean;
 }
 
 export function useTaskFiltering(tasks: Task[], filters: FilterOptions) {
