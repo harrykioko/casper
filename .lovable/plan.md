@@ -1,341 +1,291 @@
 
-# Fix Inbox Email Cleaning and Add Attachment Ingestion
+
+# Fix Inbox Email Cleaning and Attachment Processing
 
 ## Problem Summary
 
-Two issues have been identified in the inbox system based on the Myles Patel email:
+Based on the screenshots and investigation, there are two distinct issues:
 
-### Issue 1: Email Content Not Being Cleaned Properly
-The displayed email shows:
-- Harrison Kioko's signature (the forwarder) at the TOP instead of being stripped
-- Google Calendar event metadata, RSVP buttons, and invite details
-- Duplicate DISCLAIMER blocks at the bottom
-- Quoted reply threads ("On Tue, Jan 13, 2026...wrote:")
+### Issue 1: Attachment Processing Fails
+The edge function logs show:
+```
+TypeError: base64.includes is not a function
+  at base64ToUint8Array
+```
 
-**Root Cause**: The email cleaning logic in `src/lib/emailCleaners.ts`:
-1. Strips content AFTER the forwarded marker but doesn't fully remove content BEFORE it (the forwarder's signature)
-2. Lacks patterns for Google Calendar content blocks
-3. Doesn't detect and strip quoted reply threads early enough
-4. Isn't aggressive enough with disclaimer removal for duplicated blocks
+**Root Cause**: The `att.content` field from Forward Email is NOT a base64 string - it's a Buffer object (e.g., `{type: "Buffer", data: [72, 101, 108, 108, 111, ...]}`). The current code tries to call `.includes()` on this object, which fails.
 
-### Issue 2: No Attachments Being Stored
-The email says "I've gone ahead and attached our deck and some demos" but no attachments appear because:
-- The `email-inbox-ingest` edge function has NO attachment handling code
-- It doesn't parse the `attachments` array from the webhook payload
-- It doesn't upload files to the `inbox-attachments` Supabase Storage bucket
-- It doesn't create records in the `inbox_attachments` table
+### Issue 2: Email Content Not Cleaned
+The displayed email still shows:
+- Myles Patel's signature block after "Best, Myles"
+- Quoted reply "On Tue, Jan 13, 2026 at 11:05 AM..."
+- Reply header block (From:/Sent:/To:/Subject:/When:/Where:)
+- Google Meet calendar content
 
-**Root Cause**: Attachment processing was never implemented in the edge function.
+**Root Cause**: The cleaning patterns exist but aren't aggressive enough. Specifically:
+1. The `--` signature marker detection works but the signature content AFTER it isn't being cut
+2. The inline quote pattern `On Tue, Jan 13...wrote:` should match but may not be matching the exact format
+3. The calendar content after "Where: Google; https://meet.google.com" isn't being stripped
 
 ---
 
-## Solution Architecture
+## Solution
 
-```text
-Forward Email Webhook
-        │
-        ▼
-┌───────────────────────────────────────┐
-│   email-inbox-ingest (Edge Function)  │
-│   ─────────────────────────────────── │
-│   1. Parse email fields               │
-│   2. Parse attachments array   ← NEW  │
-│   3. Upload to Storage bucket  ← NEW  │
-│   4. Insert inbox_items record        │
-│   5. Insert inbox_attachments  ← NEW  │
-└───────────────────────────────────────┘
-        │
-        ▼
-┌───────────────────────────────────────┐
-│   Frontend (InboxContentPane.tsx)     │
-│   ─────────────────────────────────── │
-│   1. Call cleanEmailContent()         │
-│   2. Enhanced cleaning rules   ← FIX  │
-│   3. Display cleaned content          │
-│   4. InboxAttachmentsSection renders  │
-└───────────────────────────────────────┘
-```
+### Part 1: Fix Attachment Buffer Handling
 
----
+**File: `supabase/functions/email-inbox-ingest/index.ts`**
 
-## Phase 1: Enhance Email Content Cleaning
-
-### File: `src/lib/emailCleaners.ts`
-
-#### 1.1 Add Google Calendar Content Patterns
-
-Add new patterns to detect and strip Google Calendar content:
+The `base64ToUint8Array` function must handle multiple input formats:
 
 ```typescript
-const CALENDAR_PATTERNS = [
-  "Invitation from Google Calendar",
-  "You are receiving this email because you are an attendee",
-  "Forwarding this invitation could allow any recipient",
-  "Join with Google Meet",
-  "View all guest info",
-  "Reply for ",
-  "More options<https://calendar.google.com",
-  "Yes<https://calendar.google.com/calendar/event?action=RESPOND",
-  "No<https://calendar.google.com/calendar/event?action=RESPOND",
-  "Maybe<https://calendar.google.com/calendar/event?action=RESPOND",
-];
-```
-
-#### 1.2 Enhance Forwarded Wrapper Stripping
-
-Currently the function strips content AFTER the forwarded marker. However, content BEFORE the marker (forwarder's signature) also needs to be stripped.
-
-**Current behavior**: Keeps content before "---------- Forwarded message ----------"
-**Needed behavior**: Discard content before the marker entirely
-
-Update `stripForwardedWrapper()` to:
-1. Find the forwarded marker
-2. Look at content BEFORE the marker
-3. If the content before is less than ~200 chars OR matches signature patterns, discard it completely
-
-#### 1.3 Add Quoted Reply Thread Stripping
-
-The `stripInlineQuotes` function exists but needs additional patterns for:
-- `On [date], [name] <email> wrote:` patterns
-- Horizontal rule blocks (`________________________________`)
-- Nested reply chains with `From:` / `Sent:` / `To:` headers
-
-#### 1.4 More Aggressive Disclaimer Removal
-
-The current logic stops at the FIRST disclaimer. For emails with DUPLICATE disclaimers:
-1. Find ALL disclaimer occurrences
-2. Strip from the EARLIEST one that appears after meaningful content
-
-#### 1.5 Strip Calendar Event Blocks
-
-Add a new function `stripCalendarContent()` that removes:
-- Lines starting with `Yes<`, `No<`, `Maybe<` (calendar RSVP links)
-- `When:` / `Where:` / `Guests:` metadata blocks
-- `This event has been updated` / `Changed:` lines
-- Content between "Join with Google Meet" and end of calendar block
-
----
-
-## Phase 2: Add Attachment Handling to Edge Function
-
-### File: `supabase/functions/email-inbox-ingest/index.ts`
-
-#### 2.1 Parse Attachments from Webhook Payload
-
-Forward Email webhooks include attachments in the payload. Common structures:
-
-```typescript
-// Option A: Base64 embedded
-payload.attachments = [
-  {
-    filename: "deck.pdf",
-    contentType: "application/pdf",
-    content: "base64-encoded-string...",
-    size: 12345
+function base64ToUint8Array(content: unknown): Uint8Array {
+  // If already Uint8Array
+  if (content instanceof Uint8Array) {
+    return content;
   }
-]
-
-// Option B: URL references
-payload.attachments = [
-  {
-    filename: "deck.pdf",
-    contentType: "application/pdf",
-    url: "https://...",
-    size: 12345
+  
+  // If it's a Buffer-like object with data array
+  if (typeof content === 'object' && content !== null) {
+    const obj = content as Record<string, unknown>;
+    
+    // Handle {type: "Buffer", data: [...]} format
+    if (obj.type === 'Buffer' && Array.isArray(obj.data)) {
+      return new Uint8Array(obj.data as number[]);
+    }
+    
+    // Handle plain array
+    if (Array.isArray(content)) {
+      return new Uint8Array(content as number[]);
+    }
   }
-]
-```
-
-#### 2.2 Upload Attachments to Supabase Storage
-
-For each attachment:
-1. Generate a unique path: `{user_id}/{inbox_item_id}/{uuid}.{ext}`
-2. Decode base64 content (or fetch from URL)
-3. Upload to `inbox-attachments` bucket
-4. Create `inbox_attachments` record
-
-```typescript
-// Pseudocode for attachment handling
-const attachments = payload.attachments || [];
-
-for (const att of attachments) {
-  // Validate size (max 10MB)
-  if (att.size > 10 * 1024 * 1024) {
-    console.warn("Skipping large attachment", att.filename);
-    continue;
+  
+  // If it's a base64 string
+  if (typeof content === 'string') {
+    let cleanBase64 = content;
+    // Handle data URIs
+    if (content.includes(',')) {
+      cleanBase64 = content.split(',')[1];
+    }
+    cleanBase64 = cleanBase64.replace(/\s/g, '');
+    
+    const binaryString = atob(cleanBase64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
   }
-
-  // Decode content
-  let fileBuffer: Uint8Array;
-  if (att.content) {
-    // Base64 encoded
-    fileBuffer = base64Decode(att.content);
-  } else if (att.url) {
-    // Fetch from URL
-    const response = await fetch(att.url);
-    fileBuffer = new Uint8Array(await response.arrayBuffer());
-  } else {
-    continue;
-  }
-
-  // Generate storage path
-  const ext = att.filename.split('.').pop() || '';
-  const storagePath = `${user.id}/${inboxItemId}/${crypto.randomUUID()}${ext ? `.${ext}` : ''}`;
-
-  // Upload to bucket
-  const { error: uploadError } = await supabaseClient.storage
-    .from("inbox-attachments")
-    .upload(storagePath, fileBuffer, {
-      contentType: att.contentType || "application/octet-stream",
-    });
-
-  if (uploadError) {
-    console.error("Attachment upload failed", uploadError);
-    continue;
-  }
-
-  // Create database record
-  await supabaseClient.from("inbox_attachments").insert({
-    inbox_item_id: inboxItemId,
-    filename: att.filename,
-    mime_type: att.contentType,
-    size_bytes: att.size,
-    storage_path: storagePath,
-    created_by: user.id,
-  });
+  
+  throw new Error(`Unsupported content format: ${typeof content}`);
 }
 ```
 
-#### 2.3 Return Inbox Item ID from Insert
-
-Currently the function doesn't capture the inserted inbox item's ID. Update to use `.select().single()` to get the ID for attachment linking:
+Also update the attachment processing to log the content type for debugging:
 
 ```typescript
-const { data: inboxItem, error: insertError } = await supabaseClient
-  .from("inbox_items")
-  .insert(inboxItemData)
-  .select("id")
-  .single();
+if (att.content) {
+  console.log("Processing attachment content", {
+    filename,
+    contentType: typeof att.content,
+    isBuffer: typeof att.content === 'object' && att.content?.type === 'Buffer',
+  });
+  // ...
+}
 ```
+
+### Part 2: Fix Email Cleaning Patterns
+
+**File: `src/lib/emailCleaners.ts`**
+
+#### 2.1 Enhanced Signature Detection
+
+The `--` signature marker is found but content after isn't being cut. Strengthen the `stripSignatures` function:
+
+```typescript
+// In SIGNATURE_MARKERS array - ensure we catch standalone --
+const SIGNATURE_MARKERS = [
+  "\n--\n",      // Standalone
+  "\n-- \n",     // With trailing space
+  "\n\n--\n",    // With preceding blank
+  // ...existing
+];
+
+// Also add: After finding --, cut AGGRESSIVELY
+// Current code continues looking for patterns after --, but should cut there
+```
+
+#### 2.2 More Aggressive Quote Stripping
+
+The current pattern may not match "On Tue, Jan 13, 2026 at 11:05 AM Harrison Kioko...wrote:". Add explicit patterns:
+
+```typescript
+const INLINE_QUOTE_PATTERNS = [
+  // Existing patterns...
+  // Add: Gmail's common format
+  /On \w{3}, \w{3} \d{1,2}, \d{4} at \d{1,2}:\d{2}\s*[AP]M\s+[^<]+<[^>]+>\s*wrote:/im,
+];
+```
+
+#### 2.3 Strip After "Best," or Sign-off
+
+Add detection for common sign-offs that indicate end of meaningful content:
+
+```typescript
+const SIGNOFF_PATTERNS = [
+  /^Best,?\s*$/im,
+  /^Thanks,?\s*$/im,
+  /^Regards,?\s*$/im,
+  /^Cheers,?\s*$/im,
+  /^Best regards,?\s*$/im,
+];
+
+// In cleanEmailContent after signature stripping:
+// Look for signoff followed by short name, then cut after that
+```
+
+#### 2.4 Fix Processing Order
+
+The current order is:
+1. Strip forwarded wrapper ✓
+2. Strip calendar content - patterns not matching
+3. Strip inline quotes - patterns not matching
+4. Strip disclaimers ✓
+5. Strip signatures - `--` found but not cutting
+
+**Recommended changes**:
+- Strip signatures BEFORE inline quotes (the `--` marks a clear boundary)
+- When `--` is found, cut EVERYTHING after it (don't look for more patterns)
+- Add "Best,\nName" as a signature anchor
 
 ---
 
-## Phase 3: Update InboxContentPane Display Logic
+## Implementation Details
 
-### File: `src/components/inbox/InboxContentPane.tsx`
-
-#### 3.1 Prefer Cleaned Text Over HTML When Heavily Cleaned
-
-If the cleaning process removed significant content (signatures, disclaimers, calendar blocks), prefer showing the cleaned plain text instead of trying to clean HTML which may still contain styled versions of the removed content.
+### Edge Function Changes
 
 ```typescript
-// Current logic is complex - simplify to:
-// If significant cleaning was done, prefer cleaned text
-const shouldUseText = cleanedEmail.cleaningApplied.length >= 2;
+// Line ~290 - Replace base64ToUint8Array function
+function base64ToUint8Array(content: unknown): Uint8Array {
+  // 1. Already Uint8Array
+  if (content instanceof Uint8Array) {
+    return content;
+  }
+  
+  // 2. Buffer object: {type: "Buffer", data: [...]}
+  if (typeof content === 'object' && content !== null) {
+    const obj = content as Record<string, unknown>;
+    if (obj.type === 'Buffer' && Array.isArray(obj.data)) {
+      return new Uint8Array(obj.data as number[]);
+    }
+    if (Array.isArray(content)) {
+      return new Uint8Array(content as number[]);
+    }
+  }
+  
+  // 3. Base64 string
+  if (typeof content === 'string') {
+    let cleanBase64 = content;
+    if (content.includes(',')) {
+      cleanBase64 = content.split(',')[1];
+    }
+    cleanBase64 = cleanBase64.replace(/\s/g, '');
+    const binaryString = atob(cleanBase64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+  }
+  
+  throw new Error(`Unsupported content type: ${typeof content}`);
+}
+```
+
+### Email Cleaner Changes
+
+**Enhanced stripSignatures function** - When `--` is found (double dash on its own line), cut everything after it including the line itself:
+
+```typescript
+// Find standalone -- or --\n pattern and cut there
+const dashDashPattern = /\n--\s*\n/;
+const dashMatch = result.match(dashDashPattern);
+if (dashMatch && dashMatch.index !== undefined && dashMatch.index > 50) {
+  result = result.substring(0, dashMatch.index).trim();
+  return result; // Early return - nothing useful after --
+}
+```
+
+**Enhanced stripInlineQuotes function** - Add the exact Gmail format pattern:
+
+```typescript
+// Add to INLINE_QUOTE_PATTERNS
+/On \w{3}, \w{3} \d{1,2}, \d{4} at \d{1,2}:\d{2}\s*(?:AM|PM)\s+.+?wrote:/im,
+
+// Also detect horizontal rule + From: pattern
+const horizRuleFromPattern = /\n_{20,}\n+From:/im;
+```
+
+**New sign-off anchor detection**:
+
+```typescript
+// After all other cleaning, look for sign-off patterns
+const signOffPattern = /\n\s*(Best|Thanks|Regards|Cheers),?\s*\n\s*([A-Z][a-z]+)/m;
+const signOffMatch = result.match(signOffPattern);
+if (signOffMatch && signOffMatch.index !== undefined) {
+  // Keep content through "Best,\nMyles" but nothing after
+  const afterSignOff = signOffMatch.index + signOffMatch[0].length;
+  // Check if there's junk after the name (signature block)
+  const remainingContent = result.substring(afterSignOff);
+  if (remainingContent.trim().startsWith('--') || 
+      remainingContent.trim().startsWith('[http') ||
+      /^\s*\n\s*\n/.test(remainingContent)) {
+    result = result.substring(0, afterSignOff).trim();
+  }
+}
 ```
 
 ---
 
 ## File Changes Summary
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/lib/emailCleaners.ts` | Modify | Add calendar patterns, enhance forwarder signature stripping, improve quote detection |
-| `supabase/functions/email-inbox-ingest/index.ts` | Modify | Add attachment parsing, upload to storage, create inbox_attachments records |
-| `src/components/inbox/InboxContentPane.tsx` | Modify | Simplify display logic to prefer cleaned text when significant cleaning occurred |
+| File | Change |
+|------|--------|
+| `supabase/functions/email-inbox-ingest/index.ts` | Fix `base64ToUint8Array` to handle Buffer objects, add logging |
+| `src/lib/emailCleaners.ts` | Enhance signature stripping (cut at `--`), add Gmail quote pattern, add sign-off detection |
 
 ---
 
-## Technical Details
+## Testing
 
-### Email Cleaning Enhancement Details
+After implementation:
+1. Forward a new test email to trigger edge function with attachment
+2. Verify `inbox_attachments` table has a record
+3. Verify the InboxAttachmentsSection shows the file
+4. Verify cleaned email shows only core content
 
-**New Pattern Categories:**
+---
 
-1. **Calendar Content** (strip entire blocks):
-   - `Invitation from Google Calendar`
-   - RSVP lines: `Yes<https://`, `No<https://`, `Maybe<https://`
-   - `View all guest info`, `More options`
-   - Event metadata: `When:`, `Where:`, `Guests:`
+## Expected Cleaned Output
 
-2. **Forwarder Signature** (strip before marker):
-   - If content before `---------- Forwarded message ----------` is < 300 chars
-   - OR contains signature patterns (phone numbers, email addresses, company logos)
-   - Discard it entirely
+For the Myles Patel email, the cleaned text should be:
 
-3. **Quoted Replies** (more patterns):
-   - `On [weekday], [month] [day], [year] at [time] [name] <email> wrote:`
-   - Horizontal lines: `________________________________`
-   - Reply headers: `From:` / `Sent:` / `To:` / `Subject:` blocks after main content
+```
+Hey Harry,
 
-### Attachment Handling Requirements
+No worries, we figured when your screen froze. Sorry for the delay in getting back - Wanted to get some stuff on the calendar before giving you availability. We should have time tomorrow. Feel free to use https://cal.com/myles-patel to make things easier and grab some time that works for you.
 
-1. **Size Limits**: Skip attachments > 10MB
-2. **Supported Types**: All types (PDF, images, documents, etc.)
-3. **Storage Path**: `{user_id}/{inbox_item_id}/{uuid}.{ext}`
-4. **Error Handling**: Continue processing other attachments if one fails
-5. **Logging**: Log successful uploads and failures
+I've gone ahead and attached our deck and some demos. Let me know if you have any questions as you dig through.
 
-### Forward Email Webhook Payload
+Platform Overview: https://www.loom.com/share/...
+PE Modeling: https://www.loom.com/share/...
+VC Scenario Modeling: https://drive.google.com/...
+PE IT Due Diligence: https://www.loom.com/share/...
 
-The webhook payload likely includes:
-```json
-{
-  "from": { "address": "...", "name": "..." },
-  "to": { "address": "...", "name": "..." },
-  "subject": "...",
-  "text": "...",
-  "html": "...",
-  "attachments": [
-    {
-      "filename": "deck.pdf",
-      "contentType": "application/pdf",
-      "content": "base64...",
-      "size": 12345
-    }
-  ]
-}
+Thanks, and talk soon!
+
+Best,
+Myles
 ```
 
-If attachments come as URLs instead of base64, fetch them inline.
+Everything after "Best,\nMyles" (the signature block, quoted replies, calendar content, disclaimers) should be stripped.
 
----
-
-## Implementation Order
-
-1. **Phase 1**: Email cleaning enhancements (frontend, immediate impact)
-   - Add calendar content patterns
-   - Improve forwarder signature stripping
-   - Enhance quoted reply detection
-   - More aggressive disclaimer removal
-
-2. **Phase 2**: Attachment ingestion (backend)
-   - Update edge function to parse attachments
-   - Upload to Supabase Storage
-   - Create inbox_attachments records
-   - Deploy and test with a real email
-
-3. **Phase 3**: Display logic cleanup
-   - Simplify InboxContentPane text vs HTML decision
-
----
-
-## Acceptance Criteria
-
-1. **Email Content**: The Myles Patel email displays only the main message body ("Hey Harry..." through "Thanks, and talk soon!") without:
-   - Harrison Kioko's signature at the top
-   - Google Calendar event details
-   - Quoted reply thread
-   - DISCLAIMER blocks
-
-2. **Attachments**: When an email with attachments arrives, they:
-   - Are uploaded to `inbox-attachments` storage bucket
-   - Have records created in `inbox_attachments` table
-   - Display in InboxAttachmentsSection
-   - Can be downloaded/previewed
-
-3. **Existing Functionality**: All existing inbox features continue working:
-   - Create Task (with attachment linking)
-   - Link Company
-   - Save to Company
-   - Archive/Complete/Snooze
