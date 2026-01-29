@@ -144,6 +144,9 @@ export function InboxActionRail({
             onClick={() => onCreateTask(item)}
             variant="outline"
           />
+          <p className="text-[10px] text-muted-foreground italic ml-7 -mt-0.5 mb-1">
+            Will include email attachments
+          </p>
           <ActionButton
             icon={StickyNote}
             label="Add Note"

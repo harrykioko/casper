@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
-import { ListTodo, Check, Archive } from "lucide-react";
+import { ListTodo, Check, Archive, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { InboxItem } from "@/types/inbox";
@@ -7,6 +7,7 @@ import type { InboxItem } from "@/types/inbox";
 interface InboxItemRowProps {
   item: InboxItem;
   isSelected?: boolean;
+  attachmentCount?: number;
   onClick: () => void;
   onCreateTask: () => void;
   onMarkComplete: () => void;
@@ -16,6 +17,7 @@ interface InboxItemRowProps {
 export function InboxItemRow({
   item,
   isSelected,
+  attachmentCount = 0,
   onClick,
   onCreateTask,
   onMarkComplete,
@@ -54,6 +56,14 @@ export function InboxItemRow({
           </span>
           {!item.isRead && (
             <div className="w-2 h-2 rounded-full bg-sky-500 flex-shrink-0" />
+          )}
+          {attachmentCount > 0 && (
+            <div className="flex items-center gap-0.5 text-muted-foreground" title={`${attachmentCount} attachment${attachmentCount !== 1 ? 's' : ''}`}>
+              <Paperclip className="h-3 w-3" />
+              {attachmentCount > 1 && (
+                <span className="text-[10px]">{attachmentCount}</span>
+              )}
+            </div>
           )}
           <span className="text-[11px] text-muted-foreground ml-auto flex-shrink-0 w-20 text-right group-hover:hidden">
             {formatDistanceToNow(new Date(item.receivedAt), { addSuffix: true })}

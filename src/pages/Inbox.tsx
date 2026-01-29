@@ -378,7 +378,7 @@ export default function Inbox() {
       <AddTaskDialog
         open={isTaskDialogOpen}
         onOpenChange={setIsTaskDialogOpen}
-        onAddTask={(content) => createTask({ content })}
+        onAddTask={(taskData) => createTask(taskData)}
         prefill={taskPrefill || undefined}
       />
     </div>

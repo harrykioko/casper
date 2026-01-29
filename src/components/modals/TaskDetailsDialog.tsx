@@ -7,8 +7,8 @@ import { TaskDetailsForm } from "./task-details/TaskDetailsForm";
 import { useTaskDetails } from "@/hooks/useTaskDetails";
 import { toast } from "@/hooks/use-toast";
 import { TaskNotesSection } from "@/components/notes/TaskNotesSection";
+import { TaskAttachmentsSection } from "@/components/tasks/TaskAttachmentsSection";
 import { useFloatingNote } from "@/contexts/FloatingNoteContext";
-
 interface TaskDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -131,6 +131,11 @@ export function TaskDetailsDialog({
             {/* Notes section */}
             <div className="mt-4 pt-4 border-t border-muted">
               <TaskNotesSection taskId={task.id} />
+            </div>
+
+            {/* Attachments section (from source inbox item) */}
+            <div className="mt-4 pt-4 border-t border-muted">
+              <TaskAttachmentsSection taskId={task.id} />
             </div>
           </>
         )}

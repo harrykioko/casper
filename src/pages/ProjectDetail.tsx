@@ -252,8 +252,8 @@ export default function ProjectDetail() {
       <AddTaskDialog
         open={isAddTaskOpen}
         onOpenChange={setIsAddTaskOpen}
-        onAddTask={(content) => {
-          addTask(content);
+        onAddTask={(taskData) => {
+          addTask(taskData.content);
           setIsAddTaskOpen(false);
         }}
       />
