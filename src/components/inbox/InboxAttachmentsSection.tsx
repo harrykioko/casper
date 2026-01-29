@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Download, FileText, Image, File, FileVideo, FileAudio, Eye, EyeOff, X } from "lucide-react";
+import { Download, FileText, Image, File, FileVideo, FileAudio, Eye, EyeOff, X, Building2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   useInboxAttachments, 
   formatFileSize, 
@@ -12,6 +13,9 @@ import { cn } from "@/lib/utils";
 
 interface InboxAttachmentsSectionProps {
   inboxItemId: string;
+  linkedCompanyId?: string;
+  linkedCompanyName?: string;
+  onSaveToCompany?: (attachment: InboxAttachment) => void;
 }
 
 const FileIconMap = {
@@ -26,16 +30,28 @@ function AttachmentCard({
   attachment, 
   onDownload, 
   onPreview,
+  onSaveToCompany,
   isPreviewOpen,
+  linkedCompanyId,
+  linkedCompanyName,
+  isSaving,
 }: { 
   attachment: InboxAttachment; 
   onDownload: () => void;
   onPreview?: () => void;
+  onSaveToCompany?: () => void;
   isPreviewOpen?: boolean;
+  linkedCompanyId?: string;
+  linkedCompanyName?: string;
+  isSaving?: boolean;
 }) {
   const iconType = getFileIcon(attachment.mimeType);
   const IconComponent = FileIconMap[iconType];
   const canPreview = canPreviewInline(attachment.mimeType);
+
+  const saveTooltip = linkedCompanyName 
+    ? `Save to ${linkedCompanyName}` 
+    : "Save to company...";
 
   return (
     <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-background/50 hover:bg-muted/50 transition-colors">
@@ -77,6 +93,28 @@ function AttachmentCard({
         >
           <Download className="h-3.5 w-3.5" />
         </Button>
+        {onSaveToCompany && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={onSaveToCompany}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Building2 className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>{saveTooltip}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
       </div>
     </div>
   );
@@ -124,10 +162,16 @@ function AttachmentPreview({
   );
 }
 
-export function InboxAttachmentsSection({ inboxItemId }: InboxAttachmentsSectionProps) {
+export function InboxAttachmentsSection({ 
+  inboxItemId,
+  linkedCompanyId,
+  linkedCompanyName,
+  onSaveToCompany,
+}: InboxAttachmentsSectionProps) {
   const { attachments, isLoading, getSignedUrl } = useInboxAttachments(inboxItemId);
   const [previewAttachmentId, setPreviewAttachmentId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [savingAttachmentId, setSavingAttachmentId] = useState<string | null>(null);
 
   const handleDownload = async (attachment: InboxAttachment) => {
     const url = await getSignedUrl(attachment.storagePath);
@@ -154,6 +198,16 @@ export function InboxAttachmentsSection({ inboxItemId }: InboxAttachmentsSection
         setPreviewAttachmentId(attachment.id);
         setPreviewUrl(url);
       }
+    }
+  };
+
+  const handleSaveToCompany = async (attachment: InboxAttachment) => {
+    if (!onSaveToCompany) return;
+    setSavingAttachmentId(attachment.id);
+    try {
+      await onSaveToCompany(attachment);
+    } finally {
+      setSavingAttachmentId(null);
     }
   };
 
@@ -185,7 +239,11 @@ export function InboxAttachmentsSection({ inboxItemId }: InboxAttachmentsSection
               attachment={attachment}
               onDownload={() => handleDownload(attachment)}
               onPreview={canPreviewInline(attachment.mimeType) ? () => handlePreview(attachment) : undefined}
+              onSaveToCompany={onSaveToCompany ? () => handleSaveToCompany(attachment) : undefined}
               isPreviewOpen={previewAttachmentId === attachment.id}
+              linkedCompanyId={linkedCompanyId}
+              linkedCompanyName={linkedCompanyName}
+              isSaving={savingAttachmentId === attachment.id}
             />
             
             {previewAttachmentId === attachment.id && previewUrl && (

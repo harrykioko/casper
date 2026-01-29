@@ -214,6 +214,7 @@ interface InboxDetailDrawerProps {
   onLinkCompany?: (item: InboxItem) => void;
   onSaveAttachments?: (item: InboxItem) => void;
   onApproveSuggestion?: (item: InboxItem, suggestion: StructuredSuggestion) => void;
+  onSaveAttachmentToCompany?: (item: InboxItem, attachment: any) => void;
   attachmentCount?: number;
 }
 
@@ -230,6 +231,7 @@ export function InboxDetailDrawer({
   onLinkCompany,
   onSaveAttachments,
   onApproveSuggestion,
+  onSaveAttachmentToCompany,
   attachmentCount = 0,
 }: InboxDetailDrawerProps) {
   if (!item) return null;
@@ -248,6 +250,7 @@ export function InboxDetailDrawer({
         onLinkCompany={onLinkCompany}
         onSaveAttachments={onSaveAttachments}
         onApproveSuggestion={onApproveSuggestion}
+        onSaveAttachmentToCompany={onSaveAttachmentToCompany ? (attachment) => onSaveAttachmentToCompany(item, attachment) : undefined}
         attachmentCount={attachmentCount}
       />
     );

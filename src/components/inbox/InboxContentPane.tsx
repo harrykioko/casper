@@ -8,14 +8,16 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cleanEmailContent } from "@/lib/emailCleaners";
 import { InboxAttachmentsSection } from "./InboxAttachmentsSection";
 import type { InboxItem } from "@/types/inbox";
+import type { InboxAttachment } from "@/hooks/useInboxAttachments";
 
 interface InboxContentPaneProps {
   item: InboxItem;
   onClose: () => void;
   hideCloseButton?: boolean;
+  onSaveAttachmentToCompany?: (attachment: InboxAttachment) => void;
 }
 
-export function InboxContentPane({ item, onClose, hideCloseButton = false }: InboxContentPaneProps) {
+export function InboxContentPane({ item, onClose, hideCloseButton = false, onSaveAttachmentToCompany }: InboxContentPaneProps) {
   const [isRawOpen, setIsRawOpen] = useState(false);
   
   // Prefer server-cleaned content, fallback to client-side cleaning for old items
@@ -177,7 +179,12 @@ export function InboxContentPane({ item, onClose, hideCloseButton = false }: Inb
 
         {/* Attachments Section */}
         <div className="mt-6">
-          <InboxAttachmentsSection inboxItemId={item.id} />
+          <InboxAttachmentsSection 
+            inboxItemId={item.id}
+            linkedCompanyId={item.relatedCompanyId || undefined}
+            linkedCompanyName={item.relatedCompanyName || undefined}
+            onSaveToCompany={onSaveAttachmentToCompany}
+          />
         </div>
 
         {/* Collapsible raw/original section */}
