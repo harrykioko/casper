@@ -47,7 +47,7 @@ export function useNotesForTarget({ targetType, targetId }: { targetType: NoteTa
       const { data: links, error: linksError } = await supabase
         .from('note_links')
         .select('note_id')
-        .eq('target_type', targetType)
+        .eq('target_type', targetType as any)
         .eq('target_id', targetId);
 
       if (linksError) throw linksError;
@@ -206,7 +206,7 @@ export async function createNote(payload: CreateNotePayload): Promise<Note | nul
 
     const { error: linksError } = await supabase
       .from('note_links')
-      .insert(linksToInsert);
+      .insert(linksToInsert as any);
 
     if (linksError) throw linksError;
 
