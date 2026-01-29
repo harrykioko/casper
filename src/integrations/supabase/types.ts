@@ -817,6 +817,47 @@ export type Database = {
           },
         ]
       }
+      pipeline_attachments: {
+        Row: {
+          created_at: string
+          created_by: string
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          pipeline_company_id: string
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          pipeline_company_id: string
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          pipeline_company_id?: string
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_attachments_pipeline_company_id_fkey"
+            columns: ["pipeline_company_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_companies: {
         Row: {
           close_date: string | null

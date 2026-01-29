@@ -3,6 +3,7 @@ import { usePipelineCompanyDetail } from '@/hooks/usePipelineCompanyDetail';
 import { usePipelineTasks } from '@/hooks/usePipelineTasks';
 import { usePipelineInteractions } from '@/hooks/usePipelineInteractions';
 import { usePipelineTimeline } from '@/hooks/usePipelineTimeline';
+import { usePipelineAttachments } from '@/hooks/usePipelineAttachments';
 import { DealRoomLayout } from '@/components/pipeline-detail/DealRoomLayout';
 import { DealRoomHero } from '@/components/pipeline-detail/DealRoomHero';
 import { DealRoomTabs } from '@/components/pipeline-detail/DealRoomTabs';
@@ -27,6 +28,7 @@ export default function PipelineCompanyDetail() {
   const { company, loading: companyLoading, refetch: refetchCompany } = usePipelineCompanyDetail(companyId);
   const { tasks, loading: tasksLoading, createTask, updateTask, deleteTask } = usePipelineTasks(companyId);
   const { interactions, loading: interactionsLoading, createInteraction } = usePipelineInteractions(companyId);
+  const { attachments, loading: attachmentsLoading } = usePipelineAttachments(companyId);
   const timelineEvents = usePipelineTimeline(interactions, tasks);
 
   if (!companyId) {
@@ -50,7 +52,7 @@ export default function PipelineCompanyDetail() {
   const notesCount = interactions.filter(i => 
     ['note', 'call', 'meeting', 'update'].includes(i.interaction_type)
   ).length;
-  const filesCount = 0; // Will be implemented with attachments
+  const filesCount = attachments.length;
   const commsCount = 0; // Placeholder
 
   const tabCounts = {
@@ -68,6 +70,7 @@ export default function PipelineCompanyDetail() {
             company={company}
             tasks={tasks}
             interactions={interactions}
+            attachments={attachments}
             onRefetch={refetchCompany}
             onCreateTask={createTask}
             onViewAllTasks={() => setActiveTab('tasks')}
@@ -135,6 +138,7 @@ export default function PipelineCompanyDetail() {
             tasks={tasks}
             interactions={interactions}
             timelineEvents={timelineEvents}
+            attachments={attachments}
           />
         }
       />

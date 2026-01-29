@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, ArrowRight, Plus, CheckSquare } from 'lucide-react';
+import { FileText, ArrowRight, Plus, CheckSquare, File } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { GlassPanel, GlassPanelHeader, GlassSubcard } from '@/components/ui/glass-panel';
 import { PipelineCompanyDetail, PipelineInteraction } from '@/types/pipelineExtended';
 import { usePipeline } from '@/hooks/usePipeline';
+import { PipelineAttachment } from '@/hooks/usePipelineAttachments';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -21,6 +22,7 @@ interface OverviewTabProps {
   company: PipelineCompanyDetail;
   tasks: PipelineTask[];
   interactions: PipelineInteraction[];
+  attachments: PipelineAttachment[];
   onRefetch: () => void;
   onCreateTask: (content: string, options?: { scheduled_for?: string; priority?: string }) => Promise<any>;
   onViewAllTasks: () => void;
@@ -48,6 +50,7 @@ export function OverviewTab({
   company,
   tasks,
   interactions,
+  attachments,
   onRefetch,
   onCreateTask,
   onViewAllTasks,
@@ -243,16 +246,32 @@ export function OverviewTab({
           }
         />
         <div className="p-4">
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <FileText className="w-10 h-10 text-muted-foreground/50 mb-3" />
-            <p className="text-sm text-muted-foreground mb-2">
-              No files uploaded yet
-            </p>
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <Plus className="w-4 h-4" />
-              Upload File
-            </Button>
-          </div>
+          {attachments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <FileText className="w-10 h-10 text-muted-foreground/50 mb-3" />
+              <p className="text-sm text-muted-foreground mb-2">
+                No files uploaded yet
+              </p>
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={onViewAllFiles}>
+                <Plus className="w-4 h-4" />
+                Upload File
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {attachments.slice(0, 3).map((attachment) => (
+                <GlassSubcard key={attachment.id} className="flex items-center gap-3 p-3">
+                  <File className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-foreground truncate">{attachment.file_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(attachment.created_at), 'MMM d, yyyy')}
+                    </p>
+                  </div>
+                </GlassSubcard>
+              ))}
+            </div>
+          )}
         </div>
       </GlassPanel>
 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PipelineCompany, RoundEnum, SectorEnum, PipelineStatus } from '@/types/pipeline';
 import { usePipeline } from '@/hooks/usePipeline';
 import { useToast } from '@/hooks/use-toast';
-import { Trash2, Globe, Upload, Check, X, Loader2 } from 'lucide-react';
+import { Trash2, Globe, Upload, Check, X, Loader2, ExternalLink } from 'lucide-react';
 import { fetchCompanyLogo } from '@/services/logoService';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -26,6 +27,7 @@ const sectors: SectorEnum[] = [
 const statuses: PipelineStatus[] = ['new', 'active', 'passed', 'to_share', 'interesting', 'pearls'];
 
 export function PipelineDetailModal({ company, isOpen, onClose }: PipelineDetailModalProps) {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState<Partial<PipelineCompany>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { updateCompany, deleteCompany } = usePipeline();
@@ -36,6 +38,13 @@ export function PipelineDetailModal({ company, isOpen, onClose }: PipelineDetail
   const [fetchingLogo, setFetchingLogo] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleOpenFullPage = () => {
+    if (company) {
+      onClose();
+      navigate(`/pipeline/${company.id}`);
+    }
+  };
 
   // Update form data when company changes
   useEffect(() => {
@@ -181,15 +190,26 @@ export function PipelineDetailModal({ company, isOpen, onClose }: PipelineDetail
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
-            Edit Company
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleDelete}
-              className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <span>Edit Company</span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenFullPage}
+                className="gap-1.5"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open Full Page
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleDelete}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
@@ -336,7 +356,7 @@ export function PipelineDetailModal({ company, isOpen, onClose }: PipelineDetail
                 ) : formData.logo_url ? (
                   <div className="space-y-1">
                     <p className="text-sm text-foreground">Logo set</p>
-                    <Button type="button" size="sm" variant="ghost" onClick={clearLogo} className="text-rose-500 hover:text-rose-600 h-7 px-2">
+                    <Button type="button" size="sm" variant="ghost" onClick={clearLogo} className="text-destructive hover:text-destructive h-7 px-2">
                       Remove
                     </Button>
                   </div>
@@ -388,7 +408,7 @@ export function PipelineDetailModal({ company, isOpen, onClose }: PipelineDetail
             )}
           </div>
 
-          <div className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+          <div className="flex items-center justify-between p-3 rounded-lg bg-warning/10 border border-warning/20">
             <div>
               <Label htmlFor="top_of_mind" className="text-sm font-medium">Top of Mind</Label>
               <p className="text-xs text-muted-foreground">Show on Dashboard for quick access</p>
