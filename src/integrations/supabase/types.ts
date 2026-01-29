@@ -1616,6 +1616,123 @@ export type Database = {
           },
         ]
       }
+      work_items: {
+        Row: {
+          id: string
+          created_by: string
+          source_type: string
+          source_id: string
+          status: string
+          reason_codes: string[]
+          priority: number
+          snooze_until: string | null
+          last_touched_at: string | null
+          reviewed_at: string | null
+          trusted_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          created_by: string
+          source_type: string
+          source_id: string
+          status?: string
+          reason_codes?: string[]
+          priority?: number
+          snooze_until?: string | null
+          last_touched_at?: string | null
+          reviewed_at?: string | null
+          trusted_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          created_by?: string
+          source_type?: string
+          source_id?: string
+          status?: string
+          reason_codes?: string[]
+          priority?: number
+          snooze_until?: string | null
+          last_touched_at?: string | null
+          reviewed_at?: string | null
+          trusted_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      entity_links: {
+        Row: {
+          id: string
+          created_by: string
+          source_type: string
+          source_id: string
+          target_type: string
+          target_id: string
+          link_reason: string | null
+          confidence: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          created_by: string
+          source_type: string
+          source_id: string
+          target_type: string
+          target_id: string
+          link_reason?: string | null
+          confidence?: number | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          created_by?: string
+          source_type?: string
+          source_id?: string
+          target_type?: string
+          target_id?: string
+          link_reason?: string | null
+          confidence?: number | null
+          created_at?: string
+        }
+        Relationships: []
+      }
+      item_extracts: {
+        Row: {
+          id: string
+          created_by: string
+          source_type: string
+          source_id: string
+          extract_type: string
+          content: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          created_by: string
+          source_type: string
+          source_id: string
+          extract_type: string
+          content?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          created_by?: string
+          source_type?: string
+          source_id?: string
+          extract_type?: string
+          content?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           avatar_url: string | null
