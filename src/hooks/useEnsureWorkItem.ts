@@ -158,15 +158,23 @@ async function runDeterministicEnrichment(
     case 'calendar_event': {
       const { data: event } = await supabase
         .from("calendar_events")
-        .select("attendees, subject, linked_company_id")
+        .select("attendees, title")
         .eq("id", sourceId)
         .single();
 
       if (event) {
-        if (event.linked_company_id) {
+        // Check for existing calendar_event_links
+        const { data: calendarLink } = await supabase
+          .from("calendar_event_links")
+          .select("company_id")
+          .eq("calendar_event_id", sourceId)
+          .limit(1)
+          .maybeSingle();
+
+        if (calendarLink?.company_id) {
           links.push({
             targetType: 'company',
-            targetId: event.linked_company_id,
+            targetId: calendarLink.company_id,
             reason: 'calendar_link',
             confidence: 1.0,
           });

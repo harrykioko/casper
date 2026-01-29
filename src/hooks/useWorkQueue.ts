@@ -209,90 +209,80 @@ async function fetchSourceTitles(
     byType[item.source_type].push(item.source_id);
   }
 
-  const fetches: Promise<void>[] = [];
+  const fetches: (() => Promise<void>)[] = [];
 
   if (byType['email']?.length) {
-    fetches.push(
-      supabase
+    fetches.push(async () => {
+      const { data } = await supabase
         .from("inbox_items")
         .select("id, subject, snippet, display_subject, display_snippet")
-        .in("id", byType['email'])
-        .then(({ data }) => {
-          for (const row of data || []) {
-            result[`email:${row.id}`] = {
-              title: row.display_subject || row.subject || 'No subject',
-              snippet: row.display_snippet || row.snippet || undefined,
-            };
-          }
-        })
-    );
+        .in("id", byType['email']);
+      for (const row of data || []) {
+        result[`email:${row.id}`] = {
+          title: row.display_subject || row.subject || 'No subject',
+          snippet: row.display_snippet || row.snippet || undefined,
+        };
+      }
+    });
   }
 
   if (byType['calendar_event']?.length) {
-    fetches.push(
-      supabase
+    fetches.push(async () => {
+      const { data } = await supabase
         .from("calendar_events")
-        .select("id, subject")
-        .in("id", byType['calendar_event'])
-        .then(({ data }) => {
-          for (const row of data || []) {
-            result[`calendar_event:${row.id}`] = {
-              title: row.subject || 'No subject',
-            };
-          }
-        })
-    );
+        .select("id, title")
+        .in("id", byType['calendar_event']);
+      for (const row of data || []) {
+        result[`calendar_event:${row.id}`] = {
+          title: row.title || 'No title',
+        };
+      }
+    });
   }
 
   if (byType['task']?.length) {
-    fetches.push(
-      supabase
+    fetches.push(async () => {
+      const { data } = await supabase
         .from("tasks")
         .select("id, content")
-        .in("id", byType['task'])
-        .then(({ data }) => {
-          for (const row of data || []) {
-            result[`task:${row.id}`] = {
-              title: row.content || 'Untitled task',
-            };
-          }
-        })
-    );
+        .in("id", byType['task']);
+      for (const row of data || []) {
+        result[`task:${row.id}`] = {
+          title: row.content || 'Untitled task',
+        };
+      }
+    });
   }
 
   if (byType['note']?.length) {
-    fetches.push(
-      supabase
+    fetches.push(async () => {
+      const { data } = await supabase
         .from("project_notes")
         .select("id, title, content")
-        .in("id", byType['note'])
-        .then(({ data }) => {
-          for (const row of data || []) {
-            result[`note:${row.id}`] = {
-              title: row.title || 'Untitled note',
-              snippet: row.content?.substring(0, 120) || undefined,
-            };
-          }
-        })
-    );
+        .in("id", byType['note']);
+      for (const row of data || []) {
+        result[`note:${row.id}`] = {
+          title: row.title || 'Untitled note',
+          snippet: row.content?.substring(0, 120) || undefined,
+        };
+      }
+    });
   }
 
   if (byType['reading']?.length) {
-    fetches.push(
-      supabase
+    fetches.push(async () => {
+      const { data } = await supabase
         .from("reading_items")
         .select("id, title, url")
-        .in("id", byType['reading'])
-        .then(({ data }) => {
-          for (const row of data || []) {
-            result[`reading:${row.id}`] = {
-              title: row.title || row.url || 'Untitled',
-            };
-          }
-        })
-    );
+        .in("id", byType['reading']);
+      for (const row of data || []) {
+        result[`reading:${row.id}`] = {
+          title: row.title || row.url || 'Untitled',
+        };
+      }
+    });
   }
 
-  await Promise.all(fetches);
+  await Promise.all(fetches.map(fn => fn()));
   return result;
 }
