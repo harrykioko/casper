@@ -1,250 +1,500 @@
 
-# Pipeline Detail Overview Redesign
 
-## Current State Analysis
+# Harmonic Company Enrichment Implementation Plan
 
-The existing Overview tab consists of 5 stacked GlassPanel cards:
-1. **Next Steps** - Large textarea for freeform notes
-2. **Open Tasks Preview** - Quick add input + up to 5 tasks in subcards
-3. **Recent Notes Preview** - Up to 3 notes in subcards
-4. **Recent Files Preview** - Up to 3 files or large empty state with illustration
-5. **Communications Preview** - Always shows "Connect emails..." placeholder
+## Overview
 
-**Right rail** duplicates some content with 3 more cards:
-- RelationshipSummary (counts + last activity)
-- NextActionsCard (tasks + next steps fallback)
-- ActivityFeed (timeline preview)
-
-**Problems identified:**
-- 8 total cards between main content and rail = visual overwhelm
-- Empty states announce absence loudly ("No notes yet", file illustration)
-- Redundancy between main content and rail (tasks appear twice, next steps shown twice)
-- Fixed card heights waste space when empty
-- Feels like a form, not a workspace
+This plan implements on-demand company enrichment using the Harmonic API for the Pipeline Company Detail page's Overview tab. The feature allows users to enrich pipeline companies with background information, funding data, and key people from Harmonic's database.
 
 ---
 
-## New Architecture
+## Part 1: Fix Existing Build Errors
 
-### Zone 1: Deal Snapshot (Top - replaces current implicit hero metadata)
+Before implementing new features, the existing TypeScript errors in edge functions must be fixed. These are simple type safety issues where `error` is typed as `unknown`.
 
-Currently, the hero (`DealRoomHero.tsx`) shows company info but in a generic "back + name + actions" pattern. We'll enhance the hero when viewing Overview to include a **Deal Snapshot** section that appears just below the existing header row.
+### Files to Fix
 
-**Data displayed (only if present - no placeholders):**
-- Status pill (already in hero)
-- Stage/Round (already in hero)
-- Sector (already in hero)
-- Raise amount (already in hero)
-- Close date (already in hero)
-- Website (already in hero)
-- **NEW: Editable one-line thesis** - inline text input, autosaves on blur
-- **Last touched** relative timestamp (already in hero)
-
-**Implementation:** Add a `thesis` or `working_summary` field display below the existing metadata row in the hero, shown only on Overview tab. This requires passing `activeTab` to DealRoomHero or creating a conditional "snapshot" slot.
-
-### Zone 2: Momentum Panel (Primary focus - single card)
-
-Replaces: Next Steps, Open Tasks Preview, NextActionsCard (from rail)
-
-**Component:** `MomentumPanel.tsx` (new)
-
-**Structure:**
-```text
-┌────────────────────────────────────────────────────┐
-│ Momentum                                           │
-│ What's next for this deal?                         │
-│                                                    │
-│ ┌────────────────────────────────────────────────┐ │
-│ │ ⊕  Capture your next step or takeaway...      │ │
-│ └────────────────────────────────────────────────┘ │
-│                                                    │
-│ ○ Follow up on term sheet questions        Due Fri│
-│ ○ Schedule partner meeting                Tomorrow │
-│                                                    │
-│ [View all tasks →]                                │
-└────────────────────────────────────────────────────┘
-```
-
-**Behavior:**
-- Input field always visible at top (supports task creation on Enter)
-- Shows max 2-3 open tasks with due dates (sorted by urgency)
-- Falls back to `next_steps` freeform text if no tasks exist
-- "View all tasks" link navigates to Tasks tab
-- No nested cards inside - flat list with dividers
-
-### Zone 3: Deal Signals (Compressed evidence)
-
-Replaces: Recent Notes Preview, Recent Files Preview, Communications Preview
-
-**Component:** `DealSignals.tsx` (new)
-
-**Conditions:** Only renders if any signal exists. If empty, entire section is omitted.
-
-**Structure:**
-```text
-Signals
-──────────────────────────────────────────────────────
-📝 "Call with Alex - discussed timeline..."    2 days ago  → Notes
-📎 pitch_deck_v3.pdf                           Yesterday   → Files  
-✉️ "Re: Partnership discussion"                3 days ago  → Comms
-✓  Sent follow-up email                        4 days ago  → Tasks
-──────────────────────────────────────────────────────
-```
-
-**Data sources:**
-- Most recent note (from `interactions` where type is note/call/meeting)
-- Most recent file (from `attachments`)
-- Most recent comms item (from `linkedCommunications`)
-- Last completed task (from `tasks` where completed=true)
-
-**Behavior:**
-- Max 5 rows total
-- Each row is a single line with icon, title (truncated), timestamp, and click-to-navigate
-- No empty state - if no signals, section doesn't render
-- Flat list with hairline dividers, no card wrapping per item
+| File | Issue | Fix |
+|------|-------|-----|
+| `supabase/functions/fetch-company-logo/index.ts` | `error` is `unknown` | Cast to `(error as Error).message` |
+| `supabase/functions/inbox-suggest-v2/index.ts` | Type inference on `.data` returns `never` | Add explicit type annotations for query results |
+| `supabase/functions/microsoft-auth/index.ts` | `dbException` is `unknown` | Cast to `(dbException as Error).message` |
+| `supabase/functions/sync-outlook-calendar/index.ts` | `error` is `unknown` | Cast to `(error as Error).message` |
 
 ---
 
-## Right Rail Refinement
+## Part 2: Database Schema
 
-### Replace current 3 cards with 2 lightweight sections
+### New Table: `pipeline_company_enrichments`
 
-**A. Status Snapshot** (compact metrics)
-```text
-┌────────────────────────────────────┐
-│ ○ 3 open tasks                     │
-│ ○ 5 notes                          │
-│ ○ 2 files                          │
-│ ○ 4 days since last activity       │
-└────────────────────────────────────┘
+A 1:1 relationship with `pipeline_companies` storing normalized Harmonic enrichment data.
+
+```sql
+CREATE TABLE pipeline_company_enrichments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pipeline_company_id UUID UNIQUE NOT NULL REFERENCES pipeline_companies(id) ON DELETE CASCADE,
+  
+  -- Harmonic identifiers
+  harmonic_company_id TEXT,
+  match_method TEXT CHECK (match_method IN ('domain', 'linkedin', 'search')),
+  confidence TEXT CHECK (confidence IN ('high', 'medium', 'low')),
+  
+  -- Company info
+  description_short TEXT,
+  description_long TEXT,
+  hq_city TEXT,
+  hq_region TEXT,
+  hq_country TEXT,
+  employee_range TEXT,
+  founding_year INTEGER,
+  
+  -- Funding info
+  funding_stage TEXT,
+  total_funding_usd NUMERIC,
+  last_funding_date DATE,
+  
+  -- Links
+  linkedin_url TEXT,
+  twitter_url TEXT,
+  
+  -- Key people (founders, executives)
+  key_people JSONB DEFAULT '[]',
+  
+  -- Full response for debugging
+  source_payload JSONB,
+  
+  -- Timestamps
+  enriched_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_refreshed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_by UUID NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  
+  CONSTRAINT fk_created_by FOREIGN KEY (created_by) REFERENCES auth.users(id)
+);
+
+-- Index for lookups
+CREATE INDEX idx_enrichments_pipeline_company ON pipeline_company_enrichments(pipeline_company_id);
+
+-- Enable RLS
+ALTER TABLE pipeline_company_enrichments ENABLE ROW LEVEL SECURITY;
+
+-- RLS policies matching pipeline_companies patterns
+CREATE POLICY "Users can view enrichments for their pipeline companies"
+ON pipeline_company_enrichments FOR SELECT
+USING (EXISTS (
+  SELECT 1 FROM pipeline_companies 
+  WHERE id = pipeline_company_enrichments.pipeline_company_id 
+  AND created_by = auth.uid()
+));
+
+CREATE POLICY "Users can create enrichments for their pipeline companies"
+ON pipeline_company_enrichments FOR INSERT
+WITH CHECK (EXISTS (
+  SELECT 1 FROM pipeline_companies 
+  WHERE id = pipeline_company_enrichments.pipeline_company_id 
+  AND created_by = auth.uid()
+));
+
+CREATE POLICY "Users can update enrichments for their pipeline companies"
+ON pipeline_company_enrichments FOR UPDATE
+USING (EXISTS (
+  SELECT 1 FROM pipeline_companies 
+  WHERE id = pipeline_company_enrichments.pipeline_company_id 
+  AND created_by = auth.uid()
+));
+
+CREATE POLICY "Users can delete enrichments for their pipeline companies"
+ON pipeline_company_enrichments FOR DELETE
+USING (EXISTS (
+  SELECT 1 FROM pipeline_companies 
+  WHERE id = pipeline_company_enrichments.pipeline_company_id 
+  AND created_by = auth.uid()
+));
 ```
-- Icon + label + value on single line each
-- Borderless or very subtle container
-- Replaces RelationshipSummary card
-
-**B. Recent Activity** (timeline preview)
-```text
-┌────────────────────────────────────┐
-│ Activity                           │
-│ ─────────────────────────────────  │
-│ Today                              │
-│   📝 Added note about pricing      │
-│   ✓ Completed: Send deck           │
-│ Yesterday                          │
-│   📞 Call with founder             │
-│                                    │
-│ [View full timeline →]             │
-└────────────────────────────────────┘
-```
-- Max 5 items
-- Groups by date (Today/Yesterday/Earlier)
-- Link to Timeline tab
-- Replaces ActivityFeed and NextActionsCard
 
 ---
 
-## Files Changed
+## Part 3: Edge Function
+
+### New Edge Function: `supabase/functions/harmonic-enrich-company/index.ts`
+
+**Purpose**: Keep Harmonic API key server-side and provide a unified integration contract.
+
+### Inputs (JSON body)
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `pipeline_company_id` | string | Yes | UUID of the pipeline company |
+| `mode` | string | Yes | One of: `enrich_by_domain`, `enrich_by_linkedin`, `refresh`, `search_candidates` |
+| `website_domain` | string | No | Normalized domain (e.g., `palm.com`) |
+| `linkedin_url` | string | No | Company LinkedIn URL |
+| `query_name` | string | No | For candidate search only |
+
+### Mode Behaviors
+
+**A. `enrich_by_domain`**
+```
+GET https://api.harmonic.ai/companies?website_domain={domain}
+Header: apikey: {HARMONIC_API_KEY}
+```
+- Parse response, extract normalized fields
+- Upsert into `pipeline_company_enrichments`
+- Return enrichment data
+
+**B. `enrich_by_linkedin`**
+```
+GET https://api.harmonic.ai/companies?linkedin_url={linkedin_url}
+Header: apikey: {HARMONIC_API_KEY}
+```
+- Same processing as domain mode
+
+**C. `refresh`**
+- Check if enrichment exists
+- If exists: re-call Harmonic with stored domain/linkedin
+- Update `last_refreshed_at`
+- If not exists: return error prompting initial enrichment
+
+**D. `search_candidates`** (for ambiguous matches)
+- Use Harmonic company search with `query_name`
+- Return array of candidates with minimal fields for picker UI
+
+### Error Handling
+
+| Status | Scenario | Response |
+|--------|----------|----------|
+| 401 | Missing/invalid Harmonic key | `{ error: "Harmonic API key invalid or missing" }` |
+| 429 | Rate limited | Retry with backoff, then error |
+| 404 | No company found | `{ error: "No matching company found in Harmonic" }` |
+| 500 | API failure | `{ error: "Harmonic API error", details: "..." }` |
+
+### Response Shape (success)
+
+```typescript
+{
+  success: true,
+  enrichment: {
+    harmonic_company_id: string,
+    confidence: 'high' | 'medium' | 'low',
+    description_short: string | null,
+    description_long: string | null,
+    hq: { city?: string, region?: string, country?: string },
+    employee_range: string | null,
+    founding_year: number | null,
+    funding_stage: string | null,
+    total_funding_usd: number | null,
+    last_funding_date: string | null,
+    linkedin_url: string | null,
+    twitter_url: string | null,
+    key_people: Array<{ name: string, title: string, linkedin_url?: string }>,
+    enriched_at: string,
+    last_refreshed_at: string
+  }
+}
+```
+
+---
+
+## Part 4: Frontend Types
+
+### New File: `src/types/enrichment.ts`
+
+```typescript
+export interface HarmonicEnrichment {
+  id: string;
+  pipeline_company_id: string;
+  harmonic_company_id?: string | null;
+  match_method?: 'domain' | 'linkedin' | 'search' | null;
+  confidence?: 'high' | 'medium' | 'low' | null;
+  description_short?: string | null;
+  description_long?: string | null;
+  hq_city?: string | null;
+  hq_region?: string | null;
+  hq_country?: string | null;
+  employee_range?: string | null;
+  founding_year?: number | null;
+  funding_stage?: string | null;
+  total_funding_usd?: number | null;
+  last_funding_date?: string | null;
+  linkedin_url?: string | null;
+  twitter_url?: string | null;
+  key_people?: Array<{ name: string; title: string; linkedin_url?: string }>;
+  enriched_at: string;
+  last_refreshed_at: string;
+}
+
+export interface HarmonicCandidate {
+  harmonic_id: string;
+  name: string;
+  domain?: string | null;
+  logo_url?: string | null;
+  hq?: string | null;
+  employee_range?: string | null;
+  description_short?: string | null;
+  funding_stage?: string | null;
+}
+
+export type EnrichmentMode = 'enrich_by_domain' | 'enrich_by_linkedin' | 'refresh' | 'search_candidates';
+```
+
+---
+
+## Part 5: Frontend Hook
+
+### New File: `src/hooks/usePipelineEnrichment.ts`
+
+```typescript
+export function usePipelineEnrichment(companyId: string | undefined) {
+  // State
+  const [enrichment, setEnrichment] = useState<HarmonicEnrichment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [enriching, setEnriching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch existing enrichment from database
+  const fetchEnrichment = useCallback(async () => { ... });
+
+  // Trigger enrichment via edge function
+  const enrichCompany = async (
+    mode: EnrichmentMode,
+    options?: { website_domain?: string; linkedin_url?: string; query_name?: string }
+  ) => { ... };
+
+  // Search for candidates (when domain/linkedin missing)
+  const searchCandidates = async (queryName: string): Promise<HarmonicCandidate[]> => { ... };
+
+  // Refresh existing enrichment
+  const refreshEnrichment = async () => { ... };
+
+  return {
+    enrichment,
+    loading,
+    enriching,
+    error,
+    enrichCompany,
+    searchCandidates,
+    refreshEnrichment,
+    refetch: fetchEnrichment
+  };
+}
+```
+
+---
+
+## Part 6: UI Components
+
+### A. Company Context Card (Main Overview)
+
+**New File: `src/components/pipeline-detail/overview/CompanyContextCard.tsx`**
+
+Displays below MomentumPanel in OverviewTab.
+
+**Empty State (no enrichment)**
+```
+┌─────────────────────────────────────────────────────┐
+│ Company context                                      │
+│                                                      │
+│ Add Harmonic enrichment for background + key people. │
+│                                                      │
+│ [🔗 Enrich with Harmonic]  or  [🔍 Find match]      │
+└─────────────────────────────────────────────────────┘
+```
+
+- Show "Enrich with Harmonic" if company has `primary_domain` or `website`
+- Show "Find match" if neither exists (opens candidate picker modal)
+
+**Enriched State**
+```
+┌─────────────────────────────────────────────────────┐
+│ Company context                            [⟳] [✎]  │
+│                                                      │
+│ Short description here, clamped to 2 lines...       │
+│ [Read more]                                          │
+│                                                      │
+│ [📍 SF, CA] [👥 51-200] [🎂 2019] [💰 Series A]     │
+│                                                      │
+│ Last refreshed: 3 days ago   Confidence: High ●      │
+└─────────────────────────────────────────────────────┘
+```
+
+Chips only render if value exists and NOT already shown in hero header:
+- HQ (city, region/country)
+- Employee range
+- Founded year
+- Funding stage (only if different from `current_round` in header)
+
+**Actions:**
+- Refresh (⟳): calls `refreshEnrichment()`
+- Change match (✎): opens candidate picker modal
+
+### B. Key People Card
+
+**New File: `src/components/pipeline-detail/overview/KeyPeopleCard.tsx`**
+
+Only renders if `key_people` array has entries.
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Key people                                           │
+│                                                      │
+│ 👤 Alex Johnson • CEO                       [in] [+] │
+│ 👤 Sarah Chen • Co-Founder & CTO            [in] [+] │
+│                                                      │
+└─────────────────────────────────────────────────────┘
+```
+
+- LinkedIn icon links to their profile
+- [+] triggers "Add relationship note" → opens existing Add Note flow
+
+### C. Match Company Modal
+
+**New File: `src/components/pipeline-detail/overview/HarmonicMatchModal.tsx`**
+
+Opens when user clicks "Find match" or "Change match".
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Match company in Harmonic                        [×] │
+│                                                      │
+│ Search: [Company name...     ] [Search]              │
+│                                                      │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ 🏢 Palm Inc.  •  palm.com  •  SF, CA            │ │
+│ │ AI-powered payroll platform • 51-200 • Series B │ │
+│ │                                    [Select →]    │ │
+│ └─────────────────────────────────────────────────┘ │
+│                                                      │
+│ ┌─────────────────────────────────────────────────┐ │
+│ │ 🏢 Palm Technologies  •  palmtech.io            │ │
+│ │ Enterprise software • 11-50 • Seed              │ │
+│ │                                    [Select →]    │ │
+│ └─────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────┘
+```
+
+- Pre-fills search with company name
+- Calls edge function `mode='search_candidates'`
+- Selecting a candidate calls `enrich_by_domain` or `enrich_by_linkedin`
+
+---
+
+## Part 7: Update OverviewTab
+
+**File: `src/components/pipeline-detail/tabs/OverviewTab.tsx`**
+
+Add CompanyContextCard and KeyPeopleCard between MomentumPanel and DealSignals:
+
+```tsx
+export function OverviewTab({ company, ... }: OverviewTabProps) {
+  const { enrichment, loading: enrichmentLoading, ... } = usePipelineEnrichment(company.id);
+
+  return (
+    <div className="space-y-6">
+      <MomentumPanel ... />
+      
+      {/* NEW: Company context from Harmonic */}
+      <CompanyContextCard
+        company={company}
+        enrichment={enrichment}
+        loading={enrichmentLoading}
+        onEnrich={...}
+        onRefresh={...}
+        onChangeMatch={...}
+      />
+      
+      {/* NEW: Key people (only if enriched) */}
+      {enrichment?.key_people?.length > 0 && (
+        <KeyPeopleCard
+          people={enrichment.key_people}
+          companyId={company.id}
+        />
+      )}
+      
+      <DealSignals ... />
+    </div>
+  );
+}
+```
+
+---
+
+## Part 8: Right Rail Update
+
+**File: `src/components/pipeline-detail/overview/StatusSnapshot.tsx`**
+
+Add one line showing Harmonic connection status:
+
+```tsx
+// Add to StatusSnapshot props
+enrichment?: HarmonicEnrichment | null;
+
+// Add to render (after existing metrics)
+<div className="flex items-center gap-2 text-sm">
+  <Sparkles className="w-4 h-4" />
+  <span className="text-muted-foreground">
+    {enrichment ? (
+      <>Harmonic: Connected <span className="text-xs">• {formatDistanceToNow(new Date(enrichment.last_refreshed_at))} ago</span></>
+    ) : (
+      'Harmonic: Not connected'
+    )}
+  </span>
+</div>
+```
+
+---
+
+## Part 9: Secret Management
+
+Before the edge function can work, the Harmonic API key must be added:
+
+**Required Secret: `HARMONIC_API_KEY`**
+
+This will be added via the Supabase secrets UI and accessed in the edge function via `Deno.env.get("HARMONIC_API_KEY")`.
+
+---
+
+## Files Changed Summary
 
 | File | Change Type | Description |
 |------|-------------|-------------|
-| `src/components/pipeline-detail/tabs/OverviewTab.tsx` | **Major rewrite** | Replace 5 GlassPanels with MomentumPanel + DealSignals |
-| `src/components/pipeline-detail/overview/MomentumPanel.tsx` | **New file** | Primary focus component with task input + preview |
-| `src/components/pipeline-detail/overview/DealSignals.tsx` | **New file** | Compressed signals row list |
-| `src/components/pipeline-detail/overview/StatusSnapshot.tsx` | **New file** | Compact rail metrics |
-| `src/components/pipeline-detail/shared/RelationshipSummary.tsx` | Delete or deprecate | Replaced by StatusSnapshot |
-| `src/components/pipeline-detail/shared/NextActionsCard.tsx` | Delete or deprecate | Functionality merged into MomentumPanel |
-| `src/components/pipeline-detail/shared/ActivityFeed.tsx` | **Update** | Simplify for rail-only use, add "View full timeline" link |
-| `src/components/pipeline-detail/DealRoomContextRail.tsx` | **Update** | Use StatusSnapshot + simplified ActivityFeed |
-| `src/components/pipeline-detail/DealRoomHero.tsx` | **Update** | Add optional thesis/summary inline field for Overview |
-| `src/pages/PipelineCompanyDetail.tsx` | **Minor update** | Pass `activeTab` to hero if needed for conditional thesis field |
+| `supabase/functions/fetch-company-logo/index.ts` | Fix | Type cast for `error` |
+| `supabase/functions/inbox-suggest-v2/index.ts` | Fix | Type annotations for query results |
+| `supabase/functions/microsoft-auth/index.ts` | Fix | Type cast for `dbException` |
+| `supabase/functions/sync-outlook-calendar/index.ts` | Fix | Type cast for `error` |
+| `supabase/migrations/xxx_add_enrichments.sql` | New | Create enrichments table with RLS |
+| `supabase/functions/harmonic-enrich-company/index.ts` | New | Edge function for Harmonic API |
+| `supabase/config.toml` | Update | Add harmonic-enrich-company function config |
+| `src/types/enrichment.ts` | New | TypeScript types for enrichment |
+| `src/hooks/usePipelineEnrichment.ts` | New | Hook for fetching/triggering enrichment |
+| `src/components/pipeline-detail/overview/CompanyContextCard.tsx` | New | Main enrichment display card |
+| `src/components/pipeline-detail/overview/KeyPeopleCard.tsx` | New | Key people display |
+| `src/components/pipeline-detail/overview/HarmonicMatchModal.tsx` | New | Candidate picker modal |
+| `src/components/pipeline-detail/tabs/OverviewTab.tsx` | Update | Add enrichment components |
+| `src/components/pipeline-detail/overview/StatusSnapshot.tsx` | Update | Add Harmonic status line |
+| `src/components/pipeline-detail/overview/index.ts` | Update | Export new components |
 
 ---
 
-## Component Specifications
+## Implementation Order
 
-### MomentumPanel.tsx
-
-```typescript
-interface MomentumPanelProps {
-  tasks: PipelineTask[];
-  nextSteps?: string | null;
-  onCreateTask: (content: string) => Promise<any>;
-  onViewAllTasks: () => void;
-}
-```
-
-**Styling:**
-- Single GlassPanel container (reduced padding: `padding="md"`)
-- Header: "Momentum" with subtle subtext
-- Input: inline text field with Plus icon, no button until typing
-- Task rows: flex layout, checkbox-style icon, content truncated, due badge right-aligned
-- Max 3 visible items
-- "View all" link at bottom if more exist
-
-### DealSignals.tsx
-
-```typescript
-interface DealSignalsProps {
-  recentNote?: PipelineInteraction | null;
-  recentFile?: PipelineAttachment | null;
-  recentComm?: LinkedCommunication | null;
-  lastCompletedTask?: PipelineTask | null;
-  onNavigate: (tab: DealRoomTab) => void;
-}
-```
-
-**Styling:**
-- Light container (no GlassPanel, just subtle border-top or divider)
-- Header: "Signals" in small caps
-- Rows: icon (16px) + title (truncated) + relative time + → indicator
-- Clickable rows navigate to respective tabs
-
-### StatusSnapshot.tsx
-
-```typescript
-interface StatusSnapshotProps {
-  openTasksCount: number;
-  notesCount: number;
-  filesCount: number;
-  daysSinceLastActivity: number | null;
-}
-```
-
-**Styling:**
-- Minimal card (variant="subtle" or borderless)
-- 4 rows max, icon + label + count
-- No "Relationship Summary" header - implicit context
+1. **Fix build errors** in existing edge functions
+2. **Add secret** for HARMONIC_API_KEY
+3. **Run migration** for enrichments table
+4. **Create edge function** for Harmonic API
+5. **Create types** for enrichment data
+6. **Create hook** usePipelineEnrichment
+7. **Create UI components** (CompanyContextCard, KeyPeopleCard, HarmonicMatchModal)
+8. **Update OverviewTab** to integrate components
+9. **Update StatusSnapshot** for rail indicator
+10. **Test end-to-end** with a real pipeline company
 
 ---
 
-## Visual Guidelines Applied
+## Non-Goals (Confirmed Not Changing)
 
-| Guideline | Implementation |
-|-----------|----------------|
-| Reduce card usage by ~40% | 2 cards in main (Momentum + Signals) vs current 5 |
-| Prefer dividers over borders | Signals uses hairline dividers, not subcards |
-| Reduce padding by 15-20% | MomentumPanel uses `padding="md"`, Signals uses minimal wrapper |
-| Typography creates hierarchy | Section headers in small caps, content in regular text |
-| Empty states collapse space | DealSignals not rendered if empty, MomentumPanel adapts |
-| No tables, no pagination | Flat lists with hard caps (3 tasks, 5 signals) |
+- Left-side tab navigation remains unchanged
+- Hero header is not redesigned
+- Tasks/Notes/Files tabs are not modified
+- No automatic background enrichment
+- No AI suggestions for enrichment
+- No new routes added
 
----
-
-## Success Metrics (Qualitative)
-
-1. Overview renders shorter when empty (no "No X yet" messages)
-2. Clear visual distinction from Tasks/Notes tabs (no item grids)
-3. Momentum panel immediately answers "what's next?"
-4. Signals provide evidence without requiring tab navigation
-5. Rail feels informational, not action-heavy
-
----
-
-## Technical Notes
-
-- No database changes required
-- No new routes
-- No changes to left tab navigation (`DealRoomTabs.tsx` untouched)
-- All data already available via existing hooks
-- Existing actions (Add Task, Add Note, Upload File) preserved in hero
-- Inline thesis field uses same autosave pattern as existing next_steps
