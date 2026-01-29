@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 import { createClient as createSupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { extractBrief } from "../_shared/email-cleaner.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -12,8 +13,6 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 const MAX_COMBINED_BODY_BYTES = 1 * 1024 * 1024; // ~1 MB of text+html
 const MAX_TEXT_BODY = 60 * 1024; // 60 KB stored text
 const MAX_HTML_BODY = 120 * 1024; // 120 KB stored html
-const MAX_HTML_FOR_PROCESSING = 120 * 1024; // 120 KB html -> text
-const SNIPPET_LENGTH = 280;
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB per attachment
 
 serve(async (req) => {
@@ -46,9 +45,9 @@ serve(async (req) => {
       });
     }
 
-    // Truncate bodies
-    let textBody = rawTextBody.slice(0, MAX_TEXT_BODY);
-    let htmlBody = rawHtmlBody.slice(0, MAX_HTML_BODY);
+    // Truncate bodies for storage
+    const textBody = rawTextBody.slice(0, MAX_TEXT_BODY);
+    const htmlBody = rawHtmlBody.slice(0, MAX_HTML_BODY);
 
     // Parse sender (you) – used for user lookup
     const senderEmail: string | null =
@@ -83,27 +82,51 @@ serve(async (req) => {
       });
     }
 
-    // Derive plain-text version
-    const plainBody = textBody || htmlToPlainText(htmlBody) || "";
+    // ============ Server-Side Email Cleaning ============
+    // Process email through cleaning pipeline to get cleaned content and signals
+    const cleanedResult = extractBrief(
+      textBody,
+      htmlBody,
+      smtpSubject,
+      senderEmail,
+      senderName
+    );
 
-    // Parse forwarded sender + subject
-    const forwardedMeta = parseForwardedMetadata(plainBody);
-    const displayFromEmail = forwardedMeta.fromEmail || senderEmail;
-    const displayFromName = forwardedMeta.fromName || senderName;
-    const displaySubject = forwardedMeta.subject || stripFwdPrefix(smtpSubject);
+    console.log("Email cleaning complete", {
+      originalLength: textBody.length,
+      cleanedLength: cleanedResult.cleanedText.length,
+      signals: cleanedResult.signals,
+      displaySubject: cleanedResult.displaySubject,
+      displayFromEmail: cleanedResult.displayFromEmail,
+    });
 
-    // Build snippet
-    const snippetSource = forwardedMeta.bodyWithoutHeader || plainBody;
-    const snippet = snippetSource.substring(0, SNIPPET_LENGTH);
-
+    // Build inbox item data with both raw and cleaned fields
     const inboxItemData = {
-      subject: displaySubject,
-      from_name: displayFromName,
-      from_email: displayFromEmail,
+      // Raw fields (audit/fallback)
+      subject: smtpSubject,
+      from_name: senderName,
+      from_email: senderEmail,
       to_email: toEmail,
-      snippet,
-      text_body: plainBody || null,
+      text_body: textBody || null,
       html_body: htmlBody || null,
+      
+      // Cleaned fields (display)
+      cleaned_text: cleanedResult.cleanedText,
+      display_snippet: cleanedResult.snippet,
+      display_subject: cleanedResult.displaySubject,
+      display_from_email: cleanedResult.displayFromEmail,
+      display_from_name: cleanedResult.displayFromName,
+      
+      // Legacy snippet (uses cleaned content now)
+      snippet: cleanedResult.snippet,
+      
+      // Signals
+      is_forwarded: cleanedResult.signals.isForwarded,
+      has_thread: cleanedResult.signals.hasThread,
+      has_disclaimer: cleanedResult.signals.hasDisclaimer,
+      has_calendar: cleanedResult.signals.hasCalendar,
+      
+      // Metadata
       received_at: new Date().toISOString(),
       is_read: false,
       is_resolved: false,
@@ -130,8 +153,9 @@ serve(async (req) => {
     const inboxItemId = inboxItem.id;
     console.log("Inserted inbox item", {
       id: inboxItemId,
-      subject: displaySubject,
-      from: displayFromEmail,
+      subject: cleanedResult.displaySubject,
+      from: cleanedResult.displayFromEmail || senderEmail,
+      isForwarded: cleanedResult.signals.isForwarded,
     });
 
     // Process attachments
@@ -313,113 +337,26 @@ function contentToUint8Array(content: unknown): Uint8Array {
   
   // 3. Base64 string
   if (typeof content === 'string') {
-    let cleanBase64 = content;
-    // Handle data URIs
-    if (content.includes(',')) {
-      cleanBase64 = content.split(',')[1];
-    }
-    // Remove whitespace
-    cleanBase64 = cleanBase64.replace(/\s/g, '');
-    
-    const binaryString = atob(cleanBase64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
+    return base64ToUint8Array(content);
   }
   
   throw new Error(`Unsupported content format: ${typeof content}`);
 }
 
-// HTML → plain text with capped input
-function htmlToPlainText(html: string | null): string {
-  if (!html) return "";
-
-  const limited = html.slice(0, MAX_HTML_FOR_PROCESSING);
-
-  return limited
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<\/(div|p|br|li|tr|h[1-6])>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-// Strip "Fwd:" / "FW:" prefixes for display
-function stripFwdPrefix(subject: string): string {
-  return subject.replace(/^\s*(fw|fwd):\s*/i, "").trim();
-}
-
-// Parse Gmail-style forwarded header block
-function parseForwardedMetadata(body: string): {
-  fromName: string | null;
-  fromEmail: string | null;
-  subject: string | null;
-  bodyWithoutHeader: string | null;
-} {
-  let fromName: string | null = null;
-  let fromEmail: string | null = null;
-  let subject: string | null = null;
-
-  const lines = body.split(/\r?\n/);
-
-  let headerStartIndex = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (/forwarded message/i.test(lines[i])) {
-      headerStartIndex = i;
-      break;
-    }
+// Base64 to Uint8Array helper
+function base64ToUint8Array(base64: string): Uint8Array {
+  let cleanBase64 = base64;
+  // Handle data URIs
+  if (base64.includes(',')) {
+    cleanBase64 = base64.split(',')[1];
   }
-
-  if (headerStartIndex === -1) {
-    const fromMatch = body.match(/From:\s*(.+?)\s*<(.+?)>/i) || body.match(/From:\s*<?([^>\n]+)>?/i);
-
-    if (fromMatch) {
-      if (fromMatch.length >= 3) {
-        fromName = fromMatch[1].trim();
-        fromEmail = fromMatch[2].trim();
-      } else {
-        fromEmail = fromMatch[1].trim();
-      }
-    }
-
-    const subjectMatch = body.match(/Subject:\s*(.+)/i);
-    if (subjectMatch) {
-      subject = subjectMatch[1].trim();
-    }
-
-    return { fromName, fromEmail, subject, bodyWithoutHeader: null };
+  // Remove whitespace
+  cleanBase64 = cleanBase64.replace(/\s/g, '');
+  
+  const binaryString = atob(cleanBase64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
   }
-
-  for (let i = headerStartIndex + 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-
-    if (!line) continue;
-
-    if (/^From:/i.test(line) && !fromEmail) {
-      const m = line.match(/^From:\s*(.+?)\s*<(.+?)>$/i) || line.match(/^From:\s*<?([^>]+)>?$/i);
-
-      if (m) {
-        if (m.length >= 3) {
-          fromName = m[1].trim();
-          fromEmail = m[2].trim();
-        } else {
-          fromEmail = m[1].trim();
-        }
-      }
-    } else if (/^Subject:/i.test(line) && !subject) {
-      const m = line.match(/^Subject:\s*(.+)$/i);
-      if (m) subject = m[1].trim();
-    }
-
-    if (fromEmail && subject && line === "") {
-      break;
-    }
-  }
-
-  const bodyWithoutHeader = headerStartIndex >= 0 ? lines.slice(headerStartIndex + 1).join("\n") : null;
-
-  return { fromName, fromEmail, subject, bodyWithoutHeader };
+  return bytes;
 }

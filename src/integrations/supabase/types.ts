@@ -464,13 +464,22 @@ export type Database = {
       }
       inbox_items: {
         Row: {
+          cleaned_text: string | null
           created_at: string
           created_by: string
+          display_from_email: string | null
+          display_from_name: string | null
+          display_snippet: string | null
+          display_subject: string | null
           from_email: string
           from_name: string | null
+          has_calendar: boolean
+          has_disclaimer: boolean
+          has_thread: boolean
           html_body: string | null
           id: string
           is_deleted: boolean
+          is_forwarded: boolean
           is_read: boolean
           is_resolved: boolean
           is_top_priority: boolean
@@ -485,13 +494,22 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cleaned_text?: string | null
           created_at?: string
           created_by: string
+          display_from_email?: string | null
+          display_from_name?: string | null
+          display_snippet?: string | null
+          display_subject?: string | null
           from_email: string
           from_name?: string | null
+          has_calendar?: boolean
+          has_disclaimer?: boolean
+          has_thread?: boolean
           html_body?: string | null
           id?: string
           is_deleted?: boolean
+          is_forwarded?: boolean
           is_read?: boolean
           is_resolved?: boolean
           is_top_priority?: boolean
@@ -506,13 +524,22 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cleaned_text?: string | null
           created_at?: string
           created_by?: string
+          display_from_email?: string | null
+          display_from_name?: string | null
+          display_snippet?: string | null
+          display_subject?: string | null
           from_email?: string
           from_name?: string | null
+          has_calendar?: boolean
+          has_disclaimer?: boolean
+          has_thread?: boolean
           html_body?: string | null
           id?: string
           is_deleted?: boolean
+          is_forwarded?: boolean
           is_read?: boolean
           is_resolved?: boolean
           is_top_priority?: boolean
