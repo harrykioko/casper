@@ -4,6 +4,7 @@ import { usePipelineTasks } from '@/hooks/usePipelineTasks';
 import { usePipelineInteractions } from '@/hooks/usePipelineInteractions';
 import { usePipelineTimeline } from '@/hooks/usePipelineTimeline';
 import { usePipelineAttachments } from '@/hooks/usePipelineAttachments';
+import { useCompanyLinkedCommunications } from '@/hooks/useCompanyLinkedCommunications';
 import { DealRoomLayout } from '@/components/pipeline-detail/DealRoomLayout';
 import { DealRoomHero } from '@/components/pipeline-detail/DealRoomHero';
 import { DealRoomTabs } from '@/components/pipeline-detail/DealRoomTabs';
@@ -29,7 +30,8 @@ export default function PipelineCompanyDetail() {
   const { tasks, loading: tasksLoading, createTask, updateTask, deleteTask } = usePipelineTasks(companyId);
   const { interactions, loading: interactionsLoading, createInteraction } = usePipelineInteractions(companyId);
   const { attachments, loading: attachmentsLoading } = usePipelineAttachments(companyId);
-  const timelineEvents = usePipelineTimeline(interactions, tasks);
+  const { linkedCommunications } = useCompanyLinkedCommunications(company?.primary_domain, companyId);
+  const timelineEvents = usePipelineTimeline(interactions, tasks, linkedCommunications);
 
   if (!companyId) {
     return <Navigate to="/pipeline" replace />;
@@ -53,7 +55,7 @@ export default function PipelineCompanyDetail() {
     ['note', 'call', 'meeting', 'update'].includes(i.interaction_type)
   ).length;
   const filesCount = attachments.length;
-  const commsCount = 0; // Placeholder
+  const commsCount = linkedCommunications.length;
 
   const tabCounts = {
     tasks: openTasksCount,
@@ -139,6 +141,7 @@ export default function PipelineCompanyDetail() {
             interactions={interactions}
             timelineEvents={timelineEvents}
             attachments={attachments}
+            linkedCommunications={linkedCommunications}
           />
         }
       />

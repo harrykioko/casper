@@ -48,11 +48,13 @@ interface InboxItemRow {
 }
 
 export function useCompanyLinkedCommunications(
-  primaryDomain: string | null | undefined
+  primaryDomain: string | null | undefined,
+  companyId?: string | null
 ) {
   const { user } = useAuth();
   const [calendarEvents, setCalendarEvents] = useState<CalendarEventRow[]>([]);
   const [inboxItems, setInboxItems] = useState<InboxItemRow[]>([]);
+  const [linkedInboxItems, setLinkedInboxItems] = useState<InboxItemRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -77,7 +79,7 @@ export function useCompanyLinkedCommunications(
         .lte('start_time', future14Days)
         .order('start_time', { ascending: false });
 
-      // Fetch recent inbox items (not resolved/deleted)
+      // Fetch recent inbox items (not resolved/deleted) for domain matching
       const { data: emails } = await supabase
         .from('inbox_items')
         .select('id, subject, from_email, from_name, to_email, received_at')
@@ -86,6 +88,20 @@ export function useCompanyLinkedCommunications(
         .eq('is_deleted', false)
         .order('received_at', { ascending: false })
         .limit(200);
+
+      // Fetch explicitly linked inbox items by company ID
+      let linkedEmails: InboxItemRow[] = [];
+      if (companyId) {
+        const { data: linked } = await supabase
+          .from('inbox_items')
+          .select('id, subject, from_email, from_name, to_email, received_at')
+          .eq('created_by', user.id)
+          .eq('related_company_id', companyId)
+          .eq('is_deleted', false)
+          .order('received_at', { ascending: false })
+          .limit(50);
+        linkedEmails = linked || [];
+      }
 
       // Parse attendees from JSON
       const parsedEvents: CalendarEventRow[] = (events || []).map(event => ({
@@ -97,68 +113,91 @@ export function useCompanyLinkedCommunications(
 
       setCalendarEvents(parsedEvents);
       setInboxItems(emails || []);
+      setLinkedInboxItems(linkedEmails);
       setLoading(false);
     };
 
     fetchData();
-  }, [user]);
+  }, [user, companyId]);
 
   const linkedCommunications = useMemo((): LinkedCommunication[] => {
-    // If no primary domain, return empty
-    if (!primaryDomain || typeof primaryDomain !== 'string' || !primaryDomain.includes('.')) {
-      return [];
-    }
-
     const communications: LinkedCommunication[] = [];
+    const seenEmailIds = new Set<string>();
 
-    // Filter calendar events by attendee domain match
-    for (const event of calendarEvents) {
-      if (attendeeEmailsMatchCompany(event.attendees, primaryDomain)) {
-        const startDate = parseISO(event.start_time);
-        let subtitle = format(startDate, 'MMM d, h:mm a');
-        if (event.end_time) {
-          const endDate = parseISO(event.end_time);
-          subtitle += ` – ${format(endDate, 'h:mm a')}`;
-        }
+    // First, add explicitly linked inbox items (via related_company_id)
+    for (const email of linkedInboxItems) {
+      const receivedDate = parseISO(email.received_at);
+      const relativeTime = formatDistanceToNow(receivedDate, { addSuffix: true });
+      const senderName = email.from_name || email.from_email;
 
-        communications.push({
-          id: `event-${event.id}`,
-          type: 'event',
-          title: event.title,
-          subtitle,
-          timestamp: event.start_time,
-          eventData: {
-            id: event.id,
-            title: event.title,
-            start_time: event.start_time,
-            end_time: event.end_time,
-            location: event.location,
-          },
-        });
-      }
+      communications.push({
+        id: `email-${email.id}`,
+        type: 'email',
+        title: email.subject,
+        subtitle: `${senderName} · ${relativeTime}`,
+        timestamp: email.received_at,
+        emailData: {
+          id: email.id,
+          subject: email.subject,
+          from_email: email.from_email,
+          from_name: email.from_name,
+          received_at: email.received_at,
+        },
+      });
+      seenEmailIds.add(email.id);
     }
 
-    // Filter inbox items by sender/recipient domain match
-    for (const email of inboxItems) {
-      if (inboxItemMatchesCompany(email.from_email, email.to_email, primaryDomain)) {
-        const receivedDate = parseISO(email.received_at);
-        const relativeTime = formatDistanceToNow(receivedDate, { addSuffix: true });
-        const senderName = email.from_name || email.from_email;
+    // Then add domain-matched items (if primary domain is valid)
+    if (primaryDomain && typeof primaryDomain === 'string' && primaryDomain.includes('.')) {
+      // Filter calendar events by attendee domain match
+      for (const event of calendarEvents) {
+        if (attendeeEmailsMatchCompany(event.attendees, primaryDomain)) {
+          const startDate = parseISO(event.start_time);
+          let subtitle = format(startDate, 'MMM d, h:mm a');
+          if (event.end_time) {
+            const endDate = parseISO(event.end_time);
+            subtitle += ` – ${format(endDate, 'h:mm a')}`;
+          }
 
-        communications.push({
-          id: `email-${email.id}`,
-          type: 'email',
-          title: email.subject,
-          subtitle: `${senderName} · ${relativeTime}`,
-          timestamp: email.received_at,
-          emailData: {
-            id: email.id,
-            subject: email.subject,
-            from_email: email.from_email,
-            from_name: email.from_name,
-            received_at: email.received_at,
-          },
-        });
+          communications.push({
+            id: `event-${event.id}`,
+            type: 'event',
+            title: event.title,
+            subtitle,
+            timestamp: event.start_time,
+            eventData: {
+              id: event.id,
+              title: event.title,
+              start_time: event.start_time,
+              end_time: event.end_time,
+              location: event.location,
+            },
+          });
+        }
+      }
+
+      // Filter inbox items by sender/recipient domain match (deduped)
+      for (const email of inboxItems) {
+        if (!seenEmailIds.has(email.id) && inboxItemMatchesCompany(email.from_email, email.to_email, primaryDomain)) {
+          const receivedDate = parseISO(email.received_at);
+          const relativeTime = formatDistanceToNow(receivedDate, { addSuffix: true });
+          const senderName = email.from_name || email.from_email;
+
+          communications.push({
+            id: `email-${email.id}`,
+            type: 'email',
+            title: email.subject,
+            subtitle: `${senderName} · ${relativeTime}`,
+            timestamp: email.received_at,
+            emailData: {
+              id: email.id,
+              subject: email.subject,
+              from_email: email.from_email,
+              from_name: email.from_name,
+              received_at: email.received_at,
+            },
+          });
+        }
       }
     }
 
@@ -166,7 +205,7 @@ export function useCompanyLinkedCommunications(
     return communications
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 10);
-  }, [primaryDomain, calendarEvents, inboxItems]);
+  }, [primaryDomain, companyId, calendarEvents, inboxItems, linkedInboxItems]);
 
   return {
     linkedCommunications,
