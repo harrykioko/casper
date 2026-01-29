@@ -1,287 +1,294 @@
 
-# Server-Side Email Cleaning Pipeline
+# Fix Email-Company Linking Visibility
 
-## Overview
+## Problem Summary
 
-This plan moves email content cleaning from the client (React `cleanEmailContent`) to the server (`email-inbox-ingest` edge function). The cleaned output is stored in the database, making it the single source of truth for all UI views and AI features.
+When a user links an email to a pipeline company (Proxify), the linked email is correctly stored in the database (`related_company_id` is set), but it does not appear in:
 
-## Why This Change?
+1. The **Comms tab** on the pipeline company detail page
+2. The **Relationship Summary** (shows "Comms: 0")
+3. The **Activity feed** on the context rail
+4. The **Activity dropdown** in the inbox detail drawer
 
-The current client-side cleaning has fundamental issues:
+## Root Cause
 
-1. **Inconsistent results** - Different views may clean differently
-2. **Pattern failures** - Complex forwarded emails (like the Myles Patel calendar invite) aren't being cleaned properly because the frontend logic runs too late
-3. **AI sees raw content** - The inbox suggestions edge function receives unprocessed bodies
-4. **Performance** - Cleaning runs on every render instead of once at ingestion
+The communication linking uses **domain matching only** - it checks if the sender/recipient email domain matches the company's `primary_domain`. This misses emails that are **manually linked** via `related_company_id`, which is the case here:
 
-Moving to server-side cleaning solves all of these by processing once at ingestion time.
+- Sender: `harrison@canapi.com` (domain: canapi.com)
+- Company domain: `proxify.ai`
+- Domain match: **FAIL**
+- But `related_company_id` is correctly set to the Proxify company ID
 
-## Database Schema Changes
+## Solution
 
-Add new columns to `inbox_items` to store cleaned content and signals:
+Update the communication fetching to use a **dual approach**:
 
-```text
-inbox_items (existing + new columns)
-├── text_body           (raw, keep for audit)
-├── html_body           (raw, keep for audit)
-├── cleaned_text        ← NEW: cleaned plain text for UI
-├── display_snippet     ← NEW: cleaned snippet (280 chars)
-├── display_subject     ← NEW: canonicalized subject (no Re:/Fwd:)
-├── display_from_email  ← NEW: original sender (for forwards)
-├── display_from_name   ← NEW: original sender name
-├── is_forwarded        ← NEW: boolean signal
-├── has_thread          ← NEW: boolean (quoted reply detected)
-├── has_disclaimer      ← NEW: boolean (legal disclaimer detected)
-└── has_calendar        ← NEW: boolean (calendar invite detected)
-```
+1. **Domain matching** (existing) - for automatic linking
+2. **Explicit link check** (new) - for manually linked emails via `related_company_id`
 
-## Edge Function Changes
+Additionally, update the inbox activity section to show tasks created from the email.
 
-### File: `supabase/functions/email-inbox-ingest/index.ts`
+---
 
-The edge function will be updated to:
+## File Changes
 
-1. **Clean content at ingestion** using a new `extract-inbox-brief` helper module
-2. **Store both raw and cleaned** in the database
-3. **Set display fields** for canonicalized subject, original sender, etc.
+### 1. Update `src/hooks/useCompanyLinkedCommunications.ts`
 
-### New Helper: `supabase/functions/_shared/email-cleaner.ts`
-
-Create a shared module with the cleaning logic:
+Add a new parameter to accept the company ID and fetch emails that are explicitly linked:
 
 ```text
-email-cleaner.ts
-├── stripHtml()           - HTML to plain text
-├── detectForwarded()     - Find forwarded marker, extract original sender
-├── canonicalizeSubject() - Remove Re:/Fwd:/FW:/AW: prefixes
-├── stripQuotedReplies()  - Remove "On X wrote:" and following content
-├── stripSignatures()     - Remove -- markers, mobile signatures
-├── stripDisclaimers()    - Remove legal blocks
-├── stripCalendarContent() - Remove Google Calendar metadata
-├── normalizeWhitespace() - Collapse blank lines
-├── capLength()           - Limit to ~4000 chars
-└── extractBrief()        - Main pipeline (calls all above)
+Current: useCompanyLinkedCommunications(primaryDomain)
+New:     useCompanyLinkedCommunications(primaryDomain, companyId?)
 ```
 
-### Processing Pipeline
+Changes:
+- Accept optional `companyId` parameter
+- Fetch inbox items where `related_company_id = companyId` (explicit links)
+- Also fetch inbox items matching by domain (implicit links)
+- Merge and dedupe the two result sets
+- Return unified list of linked communications
 
-The cleaning order matters:
+Query logic:
+```typescript
+// Fetch explicitly linked emails
+const { data: linkedEmails } = await supabase
+  .from('inbox_items')
+  .select('id, subject, from_email, from_name, to_email, received_at')
+  .eq('related_company_id', companyId)
+  .eq('is_resolved', false)
+  .eq('is_deleted', false);
 
-```text
-1. HTML → Plain text (if no text_body)
-2. Detect forwarded message + extract original sender
-3. Canonicalize subject
-4. Strip calendar blocks (aggressive cut)
-5. Strip at signature delimiter (--)
-6. Strip quoted reply threads
-7. Strip disclaimers
-8. Normalize whitespace
-9. Cap length at ~4000 chars
-10. Generate snippet (first 280 chars of cleaned text)
+// Combine with domain-matched emails, dedupe by ID
 ```
 
-### Key Pattern Additions
+### 2. Update `src/components/pipeline-detail/tabs/CommsTab.tsx`
 
-These patterns are critical for the Myles Patel-style email:
-
-**Calendar Block Indicators** (cut from first match):
-- "Join with Google Meet"
-- "This event has been updated"
-- "action=RESPOND&eid="
-- "Invitation from Google Calendar"
-- Standalone "When" / "Location" / "Guests" lines
-
-**Forwarded Wrapper** - Strip everything BEFORE the marker:
-- If content before `---------- Forwarded message ----------` is < 300 chars or looks like a signature, discard it
-
-**Quoted Replies**:
-- `On [Day], [Month] [Date], [Year] at [Time] [Name] <email> wrote:`
-- Horizontal rule + `From:` header block
-
-**Signature Delimiters**:
-- Standard RFC `--` on its own line
-- Mobile: "Sent from my iPhone/iPad"
-- Outlook: Name | Title patterns
-
-## Frontend Changes
-
-### File: `src/components/inbox/InboxContentPane.tsx`
-
-Update to use the pre-cleaned fields:
-
-```text
-// Old: clean on render
-const cleanedEmail = useMemo(() => {
-  return cleanEmailContent(bodyContent, item.htmlBody);
-}, [bodyContent, item.htmlBody]);
-
-// New: use pre-cleaned fields from DB
-const displayBody = item.cleanedText || item.body || item.preview || "";
-const isForwarded = item.isForwarded || false;
-const originalSender = item.displayFromEmail || item.senderEmail;
-```
-
-### File: `src/types/inbox.ts`
-
-Extend the InboxItem interface:
+Pass the company ID to the hook:
 
 ```typescript
-export interface InboxItem {
-  // ...existing fields...
-  cleanedText?: string | null;
-  displaySnippet?: string | null;
-  displaySubject?: string | null;
-  displayFromEmail?: string | null;
-  displayFromName?: string | null;
-  isForwarded?: boolean;
-  hasThread?: boolean;
-  hasDisclaimer?: boolean;
-  hasCalendar?: boolean;
+// Before
+const { linkedCommunications, loading } = useCompanyLinkedCommunications(company.primary_domain);
+
+// After
+const { linkedCommunications, loading } = useCompanyLinkedCommunications(
+  company.primary_domain,
+  company.id
+);
+```
+
+### 3. Update `src/hooks/usePipelineTimeline.ts`
+
+Add linked emails as timeline events:
+
+```typescript
+// Accept a new parameter for linked communications
+export function usePipelineTimeline(
+  interactions: PipelineInteraction[],
+  tasks: PipelineTask[],
+  linkedEmails?: LinkedCommunication[]
+): PipelineTimelineEvent[]
+
+// Add email linked events to the timeline
+for (const email of linkedEmails || []) {
+  if (email.type === 'email') {
+    events.push({
+      id: `email-linked-${email.id}`,
+      type: 'email',
+      timestamp: email.timestamp,
+      title: 'Email linked',
+      description: email.title,
+      icon: 'email',
+      metadata: { email },
+    });
+  }
 }
 ```
 
-### File: `src/hooks/useInboxItems.ts`
+### 4. Update `src/pages/PipelineCompanyDetail.tsx`
 
-Update the row transformer to include new fields.
+Pass linked communications to the timeline hook:
 
-### File: `src/lib/emailCleaners.ts`
+```typescript
+// Fetch linked communications for the company
+const { linkedCommunications } = useCompanyLinkedCommunications(
+  company?.primary_domain,
+  companyId
+);
 
-Keep as a **fallback only** for existing items that don't have `cleaned_text` populated. The file remains but is no longer the primary cleaner.
+// Pass to timeline hook
+const timelineEvents = usePipelineTimeline(
+  interactions, 
+  tasks, 
+  linkedCommunications.filter(c => c.type === 'email')
+);
+```
 
-## Data Migration
+### 5. Update `src/components/inbox/InboxActionRail.tsx`
 
-Existing inbox items won't have cleaned fields. Two options:
+Fetch and display tasks created from this email in the Activity section:
 
-1. **Lazy migration** - If `cleaned_text` is null, fall back to client-side cleaning (already works)
-2. **Backfill script** - Optional: run a one-time query to update existing items
+```typescript
+// Add hook to fetch related tasks
+import { useTasks } from '@/hooks/useTasks';
 
-The lazy approach requires no migration and handles the transition gracefully.
+// Inside the component:
+const { tasks: allTasks } = useTasks();
+
+// Filter tasks created from this inbox item
+const relatedTasks = useMemo(() => {
+  return allTasks.filter(t => t.sourceInboxItemId === item.id);
+}, [allTasks, item.id]);
+
+// Map to activity items
+const activityItems = useMemo(() => {
+  return relatedTasks.map(task => ({
+    action: `Created task: "${task.content}"`,
+    timestamp: formatDistanceToNow(new Date(task.createdAt), { addSuffix: true }),
+  }));
+}, [relatedTasks]);
+```
+
+### 6. Update `src/components/pipeline-detail/shared/RelationshipSummary.tsx`
+
+The Comms count should reflect explicitly linked emails. This is already passed from the parent, but ensure it counts linked inbox items:
+
+The parent component (`DealRoomContextRail`) calculates `commsCount` - update it to use the linked communications count:
+
+```typescript
+// In DealRoomContextRail.tsx
+const commsCount = linkedCommunications.length; // Use actual count
+```
+
+Wait - I need to check what `DealRoomContextRail` currently receives:
+
+---
+
+## Additional Investigation Needed
+
+Looking at `DealRoomContextRail.tsx`:
+
+```typescript
+const commsCount = 0; // Placeholder
+```
+
+This is a hardcoded placeholder! It needs to receive the actual linked communications count.
+
+### 7. Update `src/components/pipeline-detail/DealRoomContextRail.tsx`
+
+Add linked communications to the props and use for count:
+
+```typescript
+interface DealRoomContextRailProps {
+  // ...existing props
+  linkedCommunications: LinkedCommunication[];
+}
+
+// In component
+const commsCount = linkedCommunications.length;
+```
+
+### 8. Update `src/pages/PipelineCompanyDetail.tsx`
+
+Fetch and pass linked communications to the context rail:
+
+```typescript
+const { linkedCommunications, loading: commsLoading } = useCompanyLinkedCommunications(
+  company?.primary_domain,
+  companyId
+);
+
+<DealRoomContextRail
+  company={company}
+  tasks={tasks}
+  interactions={interactions}
+  timelineEvents={timelineEvents}
+  attachments={attachments}
+  linkedCommunications={linkedCommunications}
+/>
+```
+
+---
 
 ## Files Changed Summary
 
-| File | Action |
+| File | Change |
 |------|--------|
-| `supabase/migrations/XXXXXX_inbox_cleaned_fields.sql` | Add 8 new columns |
-| `supabase/functions/_shared/email-cleaner.ts` | NEW: Server-side cleaning logic |
-| `supabase/functions/email-inbox-ingest/index.ts` | Import cleaner, store cleaned fields |
-| `src/types/inbox.ts` | Extend InboxItem interface |
-| `src/hooks/useInboxItems.ts` | Map new DB columns |
-| `src/components/inbox/InboxContentPane.tsx` | Use pre-cleaned fields |
-| `src/components/dashboard/InboxDetailDrawer.tsx` | Use pre-cleaned fields |
-| `src/lib/emailCleaners.ts` | Keep as fallback |
+| `src/hooks/useCompanyLinkedCommunications.ts` | Add `companyId` param, fetch explicitly linked emails |
+| `src/components/pipeline-detail/tabs/CommsTab.tsx` | Pass company ID to hook |
+| `src/hooks/usePipelineTimeline.ts` | Include linked emails as timeline events |
+| `src/pages/PipelineCompanyDetail.tsx` | Fetch linked comms, pass to timeline + context rail |
+| `src/components/pipeline-detail/DealRoomContextRail.tsx` | Accept linked comms, compute count |
+| `src/components/inbox/InboxActionRail.tsx` | Show tasks created from email in Activity section |
+| `src/types/inbox.ts` | Add `sourceInboxItemId` to InboxItem if missing |
 
-## Technical Details
+---
 
-### New Database Columns
-
-```sql
-ALTER TABLE inbox_items
-  ADD COLUMN cleaned_text text,
-  ADD COLUMN display_snippet text,
-  ADD COLUMN display_subject text,
-  ADD COLUMN display_from_email text,
-  ADD COLUMN display_from_name text,
-  ADD COLUMN is_forwarded boolean NOT NULL DEFAULT false,
-  ADD COLUMN has_thread boolean NOT NULL DEFAULT false,
-  ADD COLUMN has_disclaimer boolean NOT NULL DEFAULT false,
-  ADD COLUMN has_calendar boolean NOT NULL DEFAULT false;
-
-COMMENT ON COLUMN inbox_items.cleaned_text IS 'Cleaned email body for UI display';
-COMMENT ON COLUMN inbox_items.display_subject IS 'Canonicalized subject without Re:/Fwd: prefixes';
-COMMENT ON COLUMN inbox_items.display_from_email IS 'Original sender email (extracted from forwards)';
-```
-
-### Cleaning Function Interface
-
-```typescript
-interface CleanedEmailResult {
-  cleanedText: string;
-  snippet: string;
-  displaySubject: string;
-  displayFromEmail: string | null;
-  displayFromName: string | null;
-  signals: {
-    isForwarded: boolean;
-    hasThread: boolean;
-    hasDisclaimer: boolean;
-    hasCalendar: boolean;
-  };
-}
-
-function extractBrief(
-  textBody: string,
-  htmlBody: string | null,
-  subject: string,
-  fromEmail: string,
-  fromName: string | null
-): CleanedEmailResult;
-```
-
-### Edge Function Flow
+## Data Flow After Fix
 
 ```text
-Webhook Payload
-     │
-     ▼
-┌────────────────────────────────┐
-│  1. Parse email fields         │
-│  2. Call extractBrief()        │
-│     - Clean text               │
-│     - Detect forwards          │
-│     - Canonicalize subject     │
-│  3. Insert into inbox_items    │
-│     - Raw: text_body, html_body│
-│     - Cleaned: cleaned_text    │
-│     - Display: display_*       │
-│     - Signals: is_forwarded... │
-│  4. Process attachments        │
-└────────────────────────────────┘
+Email Linked to Company
+        │
+        ▼
+┌────────────────────────────────────┐
+│  inbox_items.related_company_id    │
+│  = pipeline_company.id             │
+└────────────────────────────────────┘
+        │
+        ▼
+┌────────────────────────────────────┐
+│  useCompanyLinkedCommunications()  │
+│  - Fetches by related_company_id   │
+│  - Also matches by domain          │
+│  - Returns merged, deduped list    │
+└────────────────────────────────────┘
+        │
+        ├──────────────────────────────────┐
+        │                                  │
+        ▼                                  ▼
+┌──────────────────────┐     ┌──────────────────────────┐
+│  CommsTab            │     │  DealRoomContextRail     │
+│  Shows linked emails │     │  - RelationshipSummary   │
+│  and meetings        │     │    (shows Comms count)   │
+└──────────────────────┘     │  - ActivityFeed          │
+                             │    (shows email events)  │
+                             └──────────────────────────┘
 ```
+
+---
 
 ## Expected Result
 
-For the Myles Patel email, the `cleaned_text` column will contain:
+After implementation:
 
+1. **Comms tab** - Shows the Neil Agarwal email under "Emails (1)"
+2. **Relationship Summary** - Shows "Comms: 1"
+3. **Activity feed** - Shows "Email linked" event with timestamp
+4. **Inbox Activity dropdown** - Shows "Created task: Follow up with Neil..." entry
+
+---
+
+## Technical Notes
+
+### Deduplication
+
+When merging domain-matched and explicitly-linked emails, dedupe by `id` to avoid showing the same email twice:
+
+```typescript
+const allEmails = [...linkedEmails, ...domainMatchedEmails];
+const uniqueEmails = Array.from(
+  new Map(allEmails.map(e => [e.id, e])).values()
+);
 ```
-Hey Harry,
 
-No worries, we figured when your screen froze. Sorry for the delay in getting back - Wanted to get some stuff on the calendar before giving you availability. We should have time tomorrow. Feel free to use https://cal.com/myles-patel to make things easier and grab some time that works for you.
+### Query Cache Invalidation
 
-I've gone ahead and attached our deck and some demos. Let me know if you have any questions as you dig through.
+After linking a company to an email, invalidate the communications query:
 
-Platform Overview: https://www.loom.com/share/...
-PE Modeling: https://www.loom.com/share/...
-VC Scenario Modeling: https://drive.google.com/...
-PE IT Due Diligence: https://www.loom.com/share/...
-
-Thanks, and talk soon!
-
-Best,
-Myles
+```typescript
+// In useInboxItems.ts linkCompanyMutation onSuccess:
+queryClient.invalidateQueries({ queryKey: ["company_linked_communications"] });
 ```
 
-With signals:
-- `is_forwarded: true`
-- `has_calendar: true`
-- `has_thread: true`
-- `has_disclaimer: true`
-- `display_from_email: myles@pathlit.ai`
-- `display_subject: 30 Min Meeting between Myles Patel and Harry Kioko`
+### Build Error Fixes
 
-## Acceptance Criteria
-
-1. New forwarded emails display only the core message body
-2. Calendar metadata, disclaimers, signatures, and quoted threads are stripped
-3. Existing inbox items continue to work (fallback to client-side cleaning)
-4. Attachments continue to be processed correctly
-5. AI suggestions receive cleaned content for better analysis
-6. "View original email" still shows the raw content
-
-## Implementation Order
-
-1. Database migration (add columns)
-2. Create `_shared/email-cleaner.ts` module
-3. Update `email-inbox-ingest/index.ts` to use cleaner
-4. Update frontend types and hooks
-5. Update UI components to prefer cleaned fields
-6. Deploy and test with a new forwarded email
+The plan should also include fixing the existing build errors mentioned (TypeScript issues in edge functions) - these are separate from the linking issue but need to be resolved.
