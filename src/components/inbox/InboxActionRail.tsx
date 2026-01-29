@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { 
   ListTodo, 
   StickyNote, 
@@ -25,11 +25,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useInboxSuggestionsV2 } from "@/hooks/useInboxSuggestionsV2";
+import { useTasks } from "@/hooks/useTasks";
 import { SuggestionCard } from "@/components/inbox/SuggestionCard";
 import { EMAIL_INTENT_LABELS } from "@/types/inboxSuggestions";
 import type { StructuredSuggestion } from "@/types/inboxSuggestions";
 import { cn } from "@/lib/utils";
 import type { InboxItem } from "@/types/inbox";
+import { formatDistanceToNow } from "date-fns";
 
 interface InboxActionRailProps {
   item: InboxItem;
@@ -114,6 +116,24 @@ export function InboxActionRail({
     dismissSuggestion,
   } = useInboxSuggestionsV2(item.id);
 
+  // Get tasks created from this inbox item
+  const { tasks } = useTasks();
+  
+  // Filter tasks that originated from this inbox item
+  const relatedTasks = useMemo(() => {
+    return tasks.filter(t => t.source_inbox_item_id === item.id);
+  }, [tasks, item.id]);
+
+  // Build activity items from related tasks
+  const activityItems = useMemo(() => {
+    return relatedTasks.map(task => ({
+      action: `Created task: "${task.content.length > 40 ? task.content.slice(0, 40) + '...' : task.content}"`,
+      timestamp: task.created_at 
+        ? formatDistanceToNow(new Date(task.created_at), { addSuffix: true })
+        : 'recently',
+    }));
+  }, [relatedTasks]);
+
   const handleSnooze = (hours: number) => {
     if (!onSnooze) return;
     const until = new Date();
@@ -144,9 +164,6 @@ export function InboxActionRail({
     // Open task dialog with prefilled title for editing
     onCreateTask(item, suggestion.title);
   };
-
-  // Placeholder activity - will be replaced with actual activity log from tasks
-  const activityItems: { action: string; timestamp: string }[] = [];
 
   return (
     <div className="h-full p-4 space-y-5 bg-muted/30">

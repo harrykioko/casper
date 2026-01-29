@@ -30,6 +30,7 @@ export interface Task {
   inbox?: boolean;
   snoozed_until?: string | null;
   is_top_priority?: boolean;
+  source_inbox_item_id?: string | null;
 }
 
 // Transform database row to frontend Task type
@@ -53,6 +54,7 @@ const transformTask = (row: TaskRow & { project?: any; category?: any }): Task =
     inbox: row.is_quick_task || false,
     snoozed_until: row.snoozed_until || null,
     is_top_priority: row.is_top_priority || false,
+    source_inbox_item_id: row.source_inbox_item_id || null,
   };
 };
 

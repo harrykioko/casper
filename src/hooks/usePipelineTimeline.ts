@@ -2,10 +2,12 @@ import { useMemo } from 'react';
 import { PipelineInteraction, PipelineTimelineEvent } from '@/types/pipelineExtended';
 import { PipelineTask } from './usePipelineTasks';
 import { InteractionType } from '@/types/portfolio';
+import { LinkedCommunication } from './useCompanyLinkedCommunications';
 
 export function usePipelineTimeline(
   interactions: PipelineInteraction[],
-  tasks: PipelineTask[]
+  tasks: PipelineTask[],
+  linkedCommunications?: LinkedCommunication[]
 ): PipelineTimelineEvent[] {
   return useMemo(() => {
     const events: PipelineTimelineEvent[] = [];
@@ -35,7 +37,7 @@ export function usePipelineTimeline(
         metadata: { task },
       });
 
-      // Add task completed events
+    // Add task completed events
       if (task.completed && task.completed_at) {
         events.push({
           id: `task-completed-${task.id}`,
@@ -49,13 +51,28 @@ export function usePipelineTimeline(
       }
     }
 
+    // Add linked email events
+    for (const comm of linkedCommunications || []) {
+      if (comm.type === 'email' && comm.emailData) {
+        events.push({
+          id: `email-linked-${comm.id}`,
+          type: 'interaction',
+          timestamp: comm.timestamp,
+          title: 'Email linked',
+          description: comm.title,
+          icon: 'email',
+          metadata: { email: comm.emailData },
+        });
+      }
+    }
+
     // Sort by timestamp descending
     events.sort((a, b) => 
       new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
     return events;
-  }, [interactions, tasks]);
+  }, [interactions, tasks, linkedCommunications]);
 }
 
 function getInteractionTitle(type: InteractionType): string {

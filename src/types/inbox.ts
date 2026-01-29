@@ -14,6 +14,8 @@ export interface InboxItem {
   snoozedUntil: string | null;
   relatedCompanyId?: string;
   relatedCompanyName?: string;
+  relatedCompanyType?: 'pipeline' | 'portfolio';
+  relatedCompanyLogoUrl?: string;
   createdBy: string;
   isTopPriority?: boolean;
   

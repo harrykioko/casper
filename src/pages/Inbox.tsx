@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
@@ -8,7 +8,6 @@ import {
   SlidersHorizontal
 } from "lucide-react";
 import { useInboxItems } from "@/hooks/useInboxItems";
-import { useInboxAttachments } from "@/hooks/useInboxAttachments";
 import { useTasks } from "@/hooks/useTasks";
 import { useIsDesktop } from "@/hooks/use-mobile";
 import { useGlobalInboxDrawer } from "@/contexts/GlobalInboxDrawerContext";
@@ -18,7 +17,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { InboxFilters } from "@/components/inbox/InboxFilters";
 import { InboxItemRow } from "@/components/inbox/InboxItemRow";
 import { InboxEmptyState } from "@/components/inbox/InboxEmptyState";
-import { InboxDetailDrawer } from "@/components/dashboard/InboxDetailDrawer";
 import { InboxSummaryPanel } from "@/components/inbox/InboxSummaryPanel";
 import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
 import { LinkCompanyModal } from "@/components/inbox/LinkCompanyModal";
@@ -26,7 +24,10 @@ import { SaveAttachmentsModal } from "@/components/inbox/SaveAttachmentsModal";
 import { isActionRequired, isWaitingOn } from "@/components/inbox/inboxHelpers";
 import type { InboxItem, TaskPrefillOptions, InboxViewFilter } from "@/types/inbox";
 import type { StructuredSuggestion } from "@/types/inboxSuggestions";
+import type { InboxAttachment } from "@/hooks/useInboxAttachments";
 import { usePipeline } from "@/hooks/usePipeline";
+import { useAuth } from "@/contexts/AuthContext";
+import { copyInboxAttachmentToPipeline } from "@/lib/inbox/copyAttachmentToCompany";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -37,11 +38,12 @@ type SortOption = "newest" | "oldest" | "unread";
 export default function Inbox() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
-  const { openDrawer: openGlobalDrawer, closeDrawer: closeGlobalDrawer } = useGlobalInboxDrawer();
-  const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze, linkCompany } = useInboxItems();
+  const { openDrawer: openGlobalDrawer } = useGlobalInboxDrawer();
+  const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze, linkCompany, unlinkCompany } = useInboxItems();
   const { inboxItems: archivedItems, isLoading: isLoadingArchived } = useInboxItems({ onlyArchived: true });
   const { createTask } = useTasks();
   const { createCompany: createPipelineCompany } = usePipeline();
+  const { user } = useAuth();
 
   // Snooze handler
   const handleSnooze = (id: string, until: Date) => {
@@ -50,7 +52,6 @@ export default function Inbox() {
 
   // Add note handler (placeholder - opens floating note or modal)
   const handleAddNote = (item: InboxItem) => {
-    // For now, just show a toast - can be wired to AddNoteModal or FloatingNote
     toast.info("Add note feature coming soon");
   };
   
@@ -64,9 +65,6 @@ export default function Inbox() {
   // View filter from summary panel
   const [viewFilter, setViewFilter] = useState<InboxViewFilter>("all");
   
-  // Detail pane state (for desktop embedded mode)
-  const [selectedItem, setSelectedItem] = useState<InboxItem | null>(null);
-  
   // Task creation state
   const [taskPrefill, setTaskPrefill] = useState<TaskPrefillOptions | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
@@ -76,9 +74,6 @@ export default function Inbox() {
   
   // Save Attachments modal state
   const [saveAttachmentsItem, setSaveAttachmentsItem] = useState<InboxItem | null>(null);
-  
-  // Attachment count for selected item
-  const { attachments: selectedItemAttachments } = useInboxAttachments(selectedItem?.id);
 
   // Get the base items based on view filter
   const baseItems = useMemo(() => {
@@ -163,31 +158,24 @@ export default function Inbox() {
     });
   }, [baseItems, statusFilter, dateFilter, search, sortBy, viewFilter]);
 
+  // Always use global drawer for detail view
   const openInboxDetail = (item: InboxItem) => {
     if (!item.isRead) {
       markAsRead(item.id);
     }
     
-    if (isDesktop) {
-      // Desktop: Use embedded mode in 3-column layout
-      setSelectedItem(item);
-    } else {
-      // Mobile: Use global drawer
-      openGlobalDrawer(item, {
-        onCreateTask: handleCreateTask,
-        onMarkComplete: handleMarkComplete,
-        onArchive: handleArchive,
-        onSnooze: handleSnooze,
-        onAddNote: handleAddNote,
-        onLinkCompany: handleLinkCompany,
-        onSaveAttachments: handleSaveAttachments,
-        onApproveSuggestion: handleApproveSuggestion,
-      });
-    }
-  };
-
-  const closeDetail = () => {
-    setSelectedItem(null);
+    openGlobalDrawer(item, {
+      onCreateTask: handleCreateTask,
+      onMarkComplete: handleMarkComplete,
+      onArchive: handleArchive,
+      onSnooze: handleSnooze,
+      onAddNote: handleAddNote,
+      onLinkCompany: handleLinkCompany,
+      onSaveAttachments: handleSaveAttachments,
+      onApproveSuggestion: handleApproveSuggestion,
+      onSaveAttachmentToCompany: handleSaveAttachmentToCompany,
+      onUnlinkCompany: unlinkCompany,
+    });
   };
 
   const handleCreateTask = (item: InboxItem, suggestionTitle?: string) => {
@@ -198,7 +186,6 @@ export default function Inbox() {
       sourceInboxItemId: item.id,
     });
     setIsTaskDialogOpen(true);
-    closeDetail();
   };
 
   const handleMarkComplete = (id: string) => {
@@ -220,6 +207,31 @@ export default function Inbox() {
 
   const handleSaveAttachments = (item: InboxItem) => {
     setSaveAttachmentsItem(item);
+  };
+
+  // Handler for saving a single attachment to a linked company
+  const handleSaveAttachmentToCompany = async (item: InboxItem, attachment: InboxAttachment) => {
+    if (!user) {
+      toast.error("You must be logged in");
+      return;
+    }
+
+    if (item.relatedCompanyId) {
+      // Company is linked - save directly
+      const result = await copyInboxAttachmentToPipeline(
+        attachment,
+        item.relatedCompanyId,
+        user.id
+      );
+      if (result.success) {
+        toast.success(`Saved "${attachment.filename}" to ${item.relatedCompanyName || "company"}`);
+      } else {
+        toast.error(result.error || "Failed to save attachment");
+      }
+    } else {
+      // No company linked - open the save attachments modal
+      setSaveAttachmentsItem(item);
+    }
   };
 
   const handleApproveSuggestion = async (item: InboxItem, suggestion: StructuredSuggestion) => {
@@ -303,9 +315,9 @@ export default function Inbox() {
     }
   };
 
-  const handleCompanyLinked = (companyId: string, companyName: string, companyType: 'pipeline' | 'portfolio') => {
+  const handleCompanyLinked = (companyId: string, companyName: string, companyType: 'pipeline' | 'portfolio', companyLogoUrl?: string | null) => {
     if (linkCompanyItem) {
-      linkCompany(linkCompanyItem.id, companyId, companyName);
+      linkCompany(linkCompanyItem.id, companyId, companyName, companyType, companyLogoUrl);
       setLinkCompanyItem(null);
     }
   };
@@ -324,21 +336,19 @@ export default function Inbox() {
 
   const isLoadingAny = isLoading || isLoadingArchived;
 
-  // Determine grid columns based on desktop and selected item
+  // 2-column layout: summary panel + message list
   const gridClasses = cn(
     "grid gap-5",
-    isDesktop && selectedItem
-      ? "grid-cols-[280px_minmax(320px,1fr)_minmax(460px,1.4fr)] 2xl:grid-cols-[320px_minmax(400px,1.2fr)_minmax(560px,1.4fr)]"
-      : isDesktop
-        ? "grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[320px_1fr]"
-        : "grid-cols-1"
+    isDesktop
+      ? "grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[320px_1fr]"
+      : "grid-cols-1"
   );
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl border-b border-border">
-        <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-6 py-4">
+        <div className="max-w-[1400px] 2xl:max-w-[1600px] mx-auto px-6 py-4">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <Button
@@ -412,8 +422,8 @@ export default function Inbox() {
         </div>
       </div>
 
-      {/* Content - 3 column layout on desktop with selected item */}
-      <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-4 lg:px-6 py-4">
+      {/* Content - 2 column layout on desktop */}
+      <div className="max-w-[1400px] 2xl:max-w-[1600px] mx-auto px-4 lg:px-6 py-4">
         <div className={gridClasses}>
           {/* Left: Summary Panel (sticky) */}
           <div className="hidden lg:block sticky top-24 self-start">
@@ -428,7 +438,7 @@ export default function Inbox() {
             />
           </div>
 
-          {/* Middle: Message List (scrollable) */}
+          {/* Right: Message List (scrollable) */}
           <div className="lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto pr-1">
             {isLoadingAny ? (
               <div className="space-y-3">
@@ -457,7 +467,7 @@ export default function Inbox() {
                   >
                     <InboxItemRow
                       item={item}
-                      isSelected={selectedItem?.id === item.id}
+                      isSelected={false}
                       onClick={() => openInboxDetail(item)}
                       onCreateTask={() => handleCreateTask(item)}
                       onMarkComplete={() => handleMarkComplete(item.id)}
@@ -468,27 +478,6 @@ export default function Inbox() {
               </div>
             )}
           </div>
-
-          {/* Right: Email Detail (embedded on desktop) */}
-          {isDesktop && selectedItem && (
-            <div className="sticky top-24 self-start h-[calc(100vh-8rem)]">
-              <InboxDetailDrawer
-                mode="embedded"
-                open={true}
-                onClose={closeDetail}
-                item={selectedItem}
-                onCreateTask={handleCreateTask}
-                onMarkComplete={handleMarkComplete}
-                onArchive={handleArchive}
-                onSnooze={handleSnooze}
-                onAddNote={handleAddNote}
-                onLinkCompany={handleLinkCompany}
-                onSaveAttachments={handleSaveAttachments}
-                onApproveSuggestion={handleApproveSuggestion}
-                attachmentCount={selectedItemAttachments.length}
-              />
-            </div>
-          )}
         </div>
       </div>
 

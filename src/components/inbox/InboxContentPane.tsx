@@ -1,22 +1,34 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { format, formatDistanceToNow } from "date-fns";
-import { ChevronDown, Building2, X, Forward, MessageSquareQuote, FileWarning, Calendar } from "lucide-react";
+import { ChevronDown, X, Forward, MessageSquareQuote, FileWarning, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cleanEmailContent } from "@/lib/emailCleaners";
 import { InboxAttachmentsSection } from "./InboxAttachmentsSection";
 import type { InboxItem } from "@/types/inbox";
+import type { InboxAttachment } from "@/hooks/useInboxAttachments";
 
 interface InboxContentPaneProps {
   item: InboxItem;
   onClose: () => void;
   hideCloseButton?: boolean;
+  onSaveAttachmentToCompany?: (attachment: InboxAttachment) => void;
+  onUnlinkCompany?: (id: string) => void;
 }
 
-export function InboxContentPane({ item, onClose, hideCloseButton = false }: InboxContentPaneProps) {
+export function InboxContentPane({ 
+  item, 
+  onClose, 
+  hideCloseButton = false, 
+  onSaveAttachmentToCompany,
+  onUnlinkCompany,
+}: InboxContentPaneProps) {
   const [isRawOpen, setIsRawOpen] = useState(false);
+  const navigate = useNavigate();
   
   // Prefer server-cleaned content, fallback to client-side cleaning for old items
   const hasServerCleanedContent = !!item.cleanedText;
@@ -73,6 +85,22 @@ export function InboxContentPane({ item, onClose, hideCloseButton = false }: Inb
   // Check if any cleaning was applied (for showing "View original" toggle)
   const hasCleanedContent = hasServerCleanedContent || 
     (clientCleanedEmail?.cleaningApplied?.length || 0) > 0;
+
+  // Handle company click - navigate to the correct page
+  const handleCompanyClick = () => {
+    if (item.relatedCompanyId && item.relatedCompanyType) {
+      const path = item.relatedCompanyType === 'pipeline' 
+        ? `/pipeline/${item.relatedCompanyId}`
+        : `/portfolio/${item.relatedCompanyId}`;
+      navigate(path);
+    }
+  };
+
+  // Handle unlink
+  const handleUnlink = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onUnlinkCompany?.(item.id);
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -142,30 +170,23 @@ export function InboxContentPane({ item, onClose, hideCloseButton = false }: Inb
           {displaySubject}
         </h1>
 
-        {/* Signal badges and linked entities */}
-        <div className="flex flex-wrap gap-2">
-          {/* Processing signal badges */}
-          {signalBadges.map(({ icon: Icon, label }) => (
-            <Tooltip key={label}>
-              <TooltipTrigger asChild>
-                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/50 border border-border text-[10px] text-muted-foreground">
-                  <Icon className="h-3 w-3" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{label}</p>
-              </TooltipContent>
-            </Tooltip>
-          ))}
-          
-          {/* Linked company */}
-          {item.relatedCompanyName && (
-            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 border border-border text-xs">
-              <Building2 className="h-3 w-3 text-muted-foreground" />
-              <span className="text-foreground">{item.relatedCompanyName}</span>
-            </div>
-          )}
-        </div>
+        {/* Signal badges */}
+        {signalBadges.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {signalBadges.map(({ icon: Icon, label }) => (
+              <Tooltip key={label}>
+                <TooltipTrigger asChild>
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/50 border border-border text-[10px] text-muted-foreground">
+                    <Icon className="h-3 w-3" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{label}</p>
+                </TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Scrollable Body */}
@@ -177,10 +198,62 @@ export function InboxContentPane({ item, onClose, hideCloseButton = false }: Inb
 
         {/* Attachments Section */}
         <div className="mt-6">
-          <InboxAttachmentsSection inboxItemId={item.id} />
+          <InboxAttachmentsSection 
+            inboxItemId={item.id}
+            linkedCompanyId={item.relatedCompanyId || undefined}
+            linkedCompanyName={item.relatedCompanyName || undefined}
+            onSaveToCompany={onSaveAttachmentToCompany}
+          />
         </div>
 
-        {/* Collapsible raw/original section */}
+        {/* Linked Entities Section - now before View original email */}
+        {item.relatedCompanyId && (
+          <div className="mt-6">
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-3">
+              Linked Entities
+            </h3>
+            <div className="space-y-2">
+              <div 
+                className="flex items-center gap-3 p-2 rounded-lg border border-border bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors group"
+                onClick={handleCompanyClick}
+              >
+                {/* Company Logo or Fallback */}
+                <Avatar className="h-8 w-8">
+                  <AvatarImage 
+                    src={item.relatedCompanyLogoUrl || undefined} 
+                    alt={item.relatedCompanyName || 'Company'} 
+                  />
+                  <AvatarFallback className="text-xs bg-background border border-border">
+                    {item.relatedCompanyName?.slice(0, 2).toUpperCase() || 'CO'}
+                  </AvatarFallback>
+                </Avatar>
+                
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {item.relatedCompanyName}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground capitalize">
+                    {item.relatedCompanyType || 'Company'}
+                  </p>
+                </div>
+                
+                {/* Remove link button */}
+                {onUnlinkCompany && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={handleUnlink}
+                  >
+                    <X className="h-3 w-3 text-muted-foreground" />
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Collapsible raw/original section - now after Linked Entities */}
         {hasCleanedContent && (
           <Collapsible 
             open={isRawOpen} 
@@ -204,26 +277,6 @@ export function InboxContentPane({ item, onClose, hideCloseButton = false }: Inb
               </div>
             </CollapsibleContent>
           </Collapsible>
-        )}
-
-        {/* Linked Entities Section */}
-        {item.relatedCompanyId && (
-          <div className="mt-8 pt-6 border-t border-border">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-3">
-              Linked Entities
-            </h3>
-            <div className="space-y-2">
-              <div className="flex items-center gap-3 p-2 rounded-lg border border-border bg-muted/30">
-                <div className="w-8 h-8 rounded bg-background border border-border flex items-center justify-center flex-shrink-0">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground">{item.relatedCompanyName}</p>
-                  <p className="text-[10px] text-muted-foreground">Company</p>
-                </div>
-              </div>
-            </div>
-          </div>
         )}
       </div>
     </div>

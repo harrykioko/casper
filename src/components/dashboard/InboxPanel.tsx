@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { Inbox, Check, Archive, Mail, ExternalLink, Loader2 } from "lucide-react";
@@ -10,9 +11,19 @@ import {
   ActionPanelFooter,
   CountBadge,
 } from "@/components/ui/action-panel";
-import { TaskPrefillOptions } from "@/types/inbox";
+import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
+import { LinkCompanyModal } from "@/components/inbox/LinkCompanyModal";
+import { SaveAttachmentsModal } from "@/components/inbox/SaveAttachmentsModal";
+import { TaskPrefillOptions, InboxItem } from "@/types/inbox";
 import { useInboxItems } from "@/hooks/useInboxItems";
+import { useTasks } from "@/hooks/useTasks";
+import { usePipeline } from "@/hooks/usePipeline";
+import { useAuth } from "@/contexts/AuthContext";
 import { useGlobalInboxDrawer } from "@/contexts/GlobalInboxDrawerContext";
+import { copyInboxAttachmentToPipeline } from "@/lib/inbox/copyAttachmentToCompany";
+import type { StructuredSuggestion } from "@/types/inboxSuggestions";
+import type { InboxAttachment } from "@/hooks/useInboxAttachments";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface InboxPanelProps {
@@ -21,10 +32,23 @@ interface InboxPanelProps {
 
 export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
   const navigate = useNavigate();
-  const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze } = useInboxItems();
+  const { user } = useAuth();
+  const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze, linkCompany, unlinkCompany } = useInboxItems();
+  const { createTask } = useTasks();
+  const { createCompany: createPipelineCompany } = usePipeline();
   const { openDrawer } = useGlobalInboxDrawer();
 
-  const openInboxDetail = (item: typeof inboxItems[0]) => {
+  // Task creation state
+  const [taskPrefill, setTaskPrefill] = useState<TaskPrefillOptions | null>(null);
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+
+  // Link Company modal state
+  const [linkCompanyItem, setLinkCompanyItem] = useState<InboxItem | null>(null);
+
+  // Save Attachments modal state
+  const [saveAttachmentsItem, setSaveAttachmentsItem] = useState<InboxItem | null>(null);
+
+  const openInboxDetail = (item: InboxItem) => {
     if (!item.isRead) {
       markAsRead(item.id);
     }
@@ -33,7 +57,12 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
       onMarkComplete: handleMarkComplete,
       onArchive: handleArchive,
       onSnooze: handleSnooze,
-      onAddNote: undefined,
+      onAddNote: handleAddNote,
+      onLinkCompany: handleLinkCompany,
+      onSaveAttachments: handleSaveAttachments,
+      onApproveSuggestion: handleApproveSuggestion,
+      onSaveAttachmentToCompany: handleSaveAttachmentToCompany,
+      onUnlinkCompany: unlinkCompany,
     });
   };
 
@@ -49,25 +78,118 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
     snooze(id, until);
   };
 
-  const handleCreateTaskFromEmail = (item: typeof inboxItems[0], suggestionTitle?: string) => {
-    onOpenTaskCreate({
+  const handleAddNote = (item: InboxItem) => {
+    toast.info("Add note feature coming soon");
+  };
+
+  const handleCreateTaskFromEmail = (item: InboxItem, suggestionTitle?: string) => {
+    setTaskPrefill({
       content: suggestionTitle || item.subject,
       description: item.preview || undefined,
       companyName: item.relatedCompanyName,
+      sourceInboxItemId: item.id,
     });
+    setIsTaskDialogOpen(true);
+  };
+
+  const handleLinkCompany = (item: InboxItem) => {
+    setLinkCompanyItem(item);
+  };
+
+  const handleSaveAttachments = (item: InboxItem) => {
+    setSaveAttachmentsItem(item);
+  };
+
+  const handleSaveAttachmentToCompany = async (item: InboxItem, attachment: InboxAttachment) => {
+    if (!user) {
+      toast.error("You must be logged in");
+      return;
+    }
+
+    if (item.relatedCompanyId) {
+      const result = await copyInboxAttachmentToPipeline(
+        attachment,
+        item.relatedCompanyId,
+        user.id
+      );
+      if (result.success) {
+        toast.success(`Saved "${attachment.filename}" to ${item.relatedCompanyName || "company"}`);
+      } else {
+        toast.error(result.error || "Failed to save attachment");
+      }
+    } else {
+      setSaveAttachmentsItem(item);
+    }
+  };
+
+  const handleApproveSuggestion = async (item: InboxItem, suggestion: StructuredSuggestion) => {
+    switch (suggestion.type) {
+      case "LINK_COMPANY": {
+        if (suggestion.company_id) {
+          linkCompany(item.id, suggestion.company_id, suggestion.company_name || null);
+          toast.success(`Linked to ${suggestion.company_name || "company"}`);
+        } else {
+          setLinkCompanyItem(item);
+        }
+        break;
+      }
+      case "CREATE_PIPELINE_COMPANY": {
+        const companyName = suggestion.company_name || item.senderName;
+        try {
+          const newCompany = await createPipelineCompany({
+            company_name: companyName,
+            current_round: "unknown" as any,
+            website: item.senderEmail ? item.senderEmail.split("@")[1] : undefined,
+          });
+          if (newCompany?.id) {
+            linkCompany(item.id, newCompany.id, companyName);
+          }
+          toast.success(`${companyName} added to pipeline`);
+        } catch {
+          toast.error("Failed to create pipeline company");
+        }
+        break;
+      }
+      case "CREATE_FOLLOW_UP_TASK":
+      case "CREATE_PERSONAL_TASK":
+      case "CREATE_INTRO_TASK": {
+        setTaskPrefill({
+          content: suggestion.title,
+          description: item.preview || undefined,
+          companyId: suggestion.company_id || item.relatedCompanyId || undefined,
+          companyType: suggestion.company_type || undefined,
+          companyName: suggestion.company_name || item.relatedCompanyName || undefined,
+          sourceInboxItemId: item.id,
+        });
+        setIsTaskDialogOpen(true);
+        break;
+      }
+      default: {
+        handleCreateTaskFromEmail(item, suggestion.title);
+        break;
+      }
+    }
+  };
+
+  const handleCompanyLinked = (companyId: string, companyName: string, companyType: 'pipeline' | 'portfolio', companyLogoUrl?: string | null) => {
+    if (linkCompanyItem) {
+      linkCompany(linkCompanyItem.id, companyId, companyName, companyType, companyLogoUrl);
+      setLinkCompanyItem(null);
+    }
   };
 
   const unreadCount = inboxItems.filter((item) => !item.isRead).length;
 
   return (
-    <ActionPanel accentColor="sky" className="h-full">
-      <ActionPanelHeader
-        icon={<Inbox className="h-4 w-4" />}
-        title="Inbox"
-        subtitle={`${unreadCount} new messages`}
-        badge={unreadCount > 0 ? <CountBadge count={unreadCount} label="unread" accentColor="sky" /> : undefined}
-        accentColor="sky"
-      />
+    <>
+      <ActionPanel accentColor="sky" className="h-full">
+        <ActionPanelHeader
+          icon={<Inbox className="h-4 w-4" />}
+          title="Inbox"
+          subtitle={`${unreadCount} new messages`}
+          badge={unreadCount > 0 ? <CountBadge count={unreadCount} label="unread" accentColor="sky" /> : undefined}
+          accentColor="sky"
+        />
 
         {isLoading ? (
           <ActionPanelListArea accentColor="sky" className="flex items-center justify-center">
@@ -190,5 +312,39 @@ export function InboxPanel({ onOpenTaskCreate }: InboxPanelProps) {
           </ActionPanelFooter>
         )}
       </ActionPanel>
+
+      {/* Task Creation Dialog */}
+      <AddTaskDialog
+        open={isTaskDialogOpen}
+        onOpenChange={setIsTaskDialogOpen}
+        onAddTask={(taskData) => createTask(taskData)}
+        prefill={taskPrefill || undefined}
+      />
+
+      {/* Link Company Modal */}
+      {linkCompanyItem && (
+        <LinkCompanyModal
+          open={!!linkCompanyItem}
+          onOpenChange={(open) => !open && setLinkCompanyItem(null)}
+          inboxItem={linkCompanyItem}
+          onLinked={handleCompanyLinked}
+        />
+      )}
+
+      {/* Save Attachments Modal */}
+      {saveAttachmentsItem && (
+        <SaveAttachmentsModal
+          open={!!saveAttachmentsItem}
+          onOpenChange={(open) => !open && setSaveAttachmentsItem(null)}
+          inboxItemId={saveAttachmentsItem.id}
+          linkedCompanyId={saveAttachmentsItem.relatedCompanyId}
+          linkedCompanyName={saveAttachmentsItem.relatedCompanyName}
+          linkedCompanyType={saveAttachmentsItem.relatedCompanyId ? 'pipeline' : undefined}
+          onLinkCompany={(companyId, companyName) => {
+            linkCompany(saveAttachmentsItem.id, companyId, companyName);
+          }}
+        />
+      )}
+    </>
   );
 }
