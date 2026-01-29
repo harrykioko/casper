@@ -1,170 +1,282 @@
 
+# Inbox Sender + Summary Normalization
 
-# Fix: Logo Not Displaying for Linked Calendar Event Companies
+## Current State Analysis
 
-## Problem
+The database and edge function **already have most of the required infrastructure** in place:
 
-The ComplyCo link shows initials instead of the logo because:
+### Already Implemented
+| Field | Exists | Notes |
+|-------|--------|-------|
+| `is_forwarded` | ✅ | boolean default false |
+| `display_from_name` | ✅ | Original sender name (for forwards) |
+| `display_from_email` | ✅ | Original sender email (for forwards) |
+| `display_subject` | ✅ | Canonicalized subject (Fwd:/Re: stripped) |
+| `display_snippet` | ✅ | ~280 char cleaned preview |
+| `cleaned_text` | ✅ | Full cleaned body |
+| `has_thread/disclaimer/calendar` | ✅ | Signal flags |
 
-1. **Database shows NULL logo**: The `calendar_event_links` row has `company_logo_url = NULL`
-2. **Link was created before logo support**: This link was created before we added the `company_logo_url` column
-3. **`acceptSuggestion` bug**: When accepting suggestions, the code passes `logoUrl: null` instead of fetching the actual logo
+### What's Missing
+| Field | Purpose |
+|-------|---------|
+| `forwarded_by_email` | Track who forwarded the email |
+| `summary` | Short (~120 char) one-sentence summary |
+| `summary_source` | 'heuristic' or 'ai' |
+| `summary_updated_at` | When summary was last updated |
 
-## Database Evidence
+### Root Cause of "From Harrison Kioko" Bug
+The **UI components are not using the `display_*` fields**. `InboxItemRow.tsx` uses `item.senderName` and `item.subject` instead of `displayFromName` and `displaySubject`.
 
-```
-calendar_event_links:
-- company_name: ComplyCo
-- company_logo_url: NULL  ← Missing!
+---
 
-pipeline_companies:
-- company_name: ComplyCo  
-- logo_url: https://www.google.com/s2/favicons?domain=complyco.com&sz=128  ← Logo exists!
-```
+## Solution Overview
 
-## Solution
+### Part 1: Database Schema (Minimal + Additive)
 
-### Part A: Fix the `acceptSuggestion` function
-
-When accepting a suggestion, fetch the company's logo before creating the link.
-
-**File: `src/hooks/useCalendarEventLinking.ts`**
-
-Update the `acceptSuggestion` function (around line 285-307):
-
-```typescript
-const acceptSuggestion = useCallback(async (suggestion: CompanySuggestion) => {
-  if (!event?.id || !user) return;
-
-  try {
-    // Update suggestion status
-    await supabase
-      .from('calendar_event_link_suggestions')
-      .update({ status: 'accepted' })
-      .eq('id', suggestion.id);
-
-    // Fetch the company's logo before linking
-    let logoUrl: string | null = null;
-    if (suggestion.companyType === 'pipeline') {
-      const { data } = await supabase
-        .from('pipeline_companies')
-        .select('logo_url')
-        .eq('id', suggestion.companyId)
-        .single();
-      logoUrl = data?.logo_url || null;
-    } else {
-      const { data } = await supabase
-        .from('companies')
-        .select('logo_url')
-        .eq('id', suggestion.companyId)
-        .single();
-      logoUrl = data?.logo_url || null;
-    }
-
-    // Create the actual link with the logo
-    await linkCompany({
-      id: suggestion.companyId,
-      name: suggestion.companyName,
-      type: suggestion.companyType,
-      primaryDomain: suggestion.matchedDomain,
-      logoUrl: logoUrl,  // Now includes actual logo!
-    });
-  } catch (err) {
-    console.error('Error accepting suggestion:', err);
-    toast.error('Failed to accept suggestion');
-  }
-}, [event?.id, user, linkCompany]);
-```
-
-### Part B: Add fallback in display logic
-
-When rendering the linked company, if `companyLogoUrl` is null, look it up from the parent company table as a fallback.
-
-**File: `src/components/dashboard/EventDetailsModal.tsx`**
-
-Add a fallback logo fetch when the linked company doesn't have a stored logo:
-
-```typescript
-// Add state for fallback logo
-const [fallbackLogoUrl, setFallbackLogoUrl] = useState<string | null>(null);
-
-// Fetch fallback logo if linkedCompany has no logo
-useEffect(() => {
-  if (linkedCompany && !linkedCompany.companyLogoUrl) {
-    const fetchFallbackLogo = async () => {
-      const table = linkedCompany.companyType === 'pipeline' 
-        ? 'pipeline_companies' 
-        : 'companies';
-      const { data } = await supabase
-        .from(table)
-        .select('logo_url')
-        .eq('id', linkedCompany.companyId)
-        .single();
-      if (data?.logo_url) {
-        setFallbackLogoUrl(data.logo_url);
-      }
-    };
-    fetchFallbackLogo();
-  } else {
-    setFallbackLogoUrl(null);
-  }
-}, [linkedCompany]);
-
-// Use in Avatar
-const displayLogoUrl = linkedCompany?.companyLogoUrl || fallbackLogoUrl;
-```
-
-Then update the Avatar to use `displayLogoUrl`:
-
-```tsx
-<Avatar className="h-5 w-5">
-  <AvatarImage 
-    src={displayLogoUrl || undefined} 
-    alt={linkedCompany.companyName} 
-  />
-  <AvatarFallback className="text-[9px] bg-background border border-border">
-    {linkedCompany.companyName.slice(0, 2).toUpperCase()}
-  </AvatarFallback>
-</Avatar>
-```
-
-### Part C: Backfill existing links (one-time data fix)
-
-Run a migration to update existing links with their company logos:
+Add 3 new columns to `inbox_items`:
 
 ```sql
--- Backfill pipeline company logos
-UPDATE calendar_event_links cel
-SET company_logo_url = pc.logo_url
-FROM pipeline_companies pc
-WHERE cel.company_id = pc.id
-  AND cel.company_type = 'pipeline'
-  AND cel.company_logo_url IS NULL
-  AND pc.logo_url IS NOT NULL;
+ALTER TABLE inbox_items
+ADD COLUMN forwarded_by_email TEXT,
+ADD COLUMN summary TEXT,
+ADD COLUMN summary_source TEXT DEFAULT 'heuristic',
+ADD COLUMN summary_updated_at TIMESTAMPTZ;
+```
 
--- Backfill portfolio company logos  
-UPDATE calendar_event_links cel
-SET company_logo_url = c.logo_url
-FROM companies c
-WHERE cel.company_id = c.id
-  AND cel.company_type = 'portfolio'
-  AND cel.company_logo_url IS NULL
-  AND c.logo_url IS NOT NULL;
+### Part 2: Update Edge Function (email-inbox-ingest)
+
+Enhance the ingestion pipeline:
+
+1. **Track forwarded_by_email** - Store the email of the user who forwarded the message
+2. **Generate one-sentence summary** - Create a ~120 char heuristic summary synchronously
+
+The `extractBrief` function in `email-cleaner.ts` will be enhanced to:
+- Return a new `summary` field (first sentence, max 120 chars)
+- The existing cleaned pipeline already handles forward detection and sender extraction
+
+### Part 3: Update TypeScript Types
+
+Update `src/types/inbox.ts`:
+
+```typescript
+export interface InboxItem {
+  // ... existing fields ...
+  
+  // NEW fields
+  forwardedByEmail?: string | null;
+  summary?: string | null;
+  summarySource?: 'heuristic' | 'ai' | null;
+  summaryUpdatedAt?: string | null;
+}
+```
+
+### Part 4: Fix InboxItemRow (Critical!)
+
+Update `src/components/inbox/InboxItemRow.tsx` to use display fields:
+
+```tsx
+// Current (broken)
+{item.senderName}
+{item.subject}
+{item.preview}
+
+// Fixed
+{item.displayFromName || item.senderName}
+{item.displaySubject || item.subject}
+{item.summary || item.displaySnippet || item.preview}
+```
+
+Add subtle badges:
+- "Forwarded" badge if `item.isForwarded`
+- "Note" badge if sender is the current user (sent from self)
+
+### Part 5: Fix InboxContentPane (Detail Pane)
+
+Currently already correct! It uses `displayFromName`, `displayFromEmail`, `displaySubject`, and shows "Forwarded by" section. No changes needed.
+
+---
+
+## Detailed File Changes
+
+### 1. Database Migration
+
+```sql
+-- Add summary and forwarded_by tracking
+ALTER TABLE inbox_items
+ADD COLUMN IF NOT EXISTS forwarded_by_email TEXT,
+ADD COLUMN IF NOT EXISTS summary TEXT,
+ADD COLUMN IF NOT EXISTS summary_source TEXT DEFAULT 'heuristic',
+ADD COLUMN IF NOT EXISTS summary_updated_at TIMESTAMPTZ;
+```
+
+### 2. `supabase/functions/_shared/email-cleaner.ts`
+
+Add summary generation to `CleanedEmailResult`:
+
+```typescript
+export interface CleanedEmailResult {
+  // ... existing ...
+  summary: string;  // NEW: ~120 char one-sentence summary
+}
+```
+
+Update `extractBrief` to generate summary:
+- Take first meaningful sentence from cleaned text
+- Strip greetings ("Hi [Name]," etc.)
+- Truncate to 120 chars
+- Return as `summary` field
+
+### 3. `supabase/functions/email-inbox-ingest/index.ts`
+
+Update to store new fields:
+
+```typescript
+const inboxItemData = {
+  // ... existing ...
+  forwarded_by_email: cleanedResult.signals.isForwarded ? senderEmail : null,
+  summary: cleanedResult.summary,
+  summary_source: 'heuristic',
+  summary_updated_at: new Date().toISOString(),
+};
+```
+
+### 4. `src/types/inbox.ts`
+
+Add new type fields:
+
+```typescript
+export interface InboxItem {
+  // ... existing ...
+  forwardedByEmail?: string | null;
+  summary?: string | null;
+  summarySource?: 'heuristic' | 'ai' | null;
+  summaryUpdatedAt?: string | null;
+}
+```
+
+### 5. `src/hooks/useInboxItems.ts`
+
+Update `InboxItemRow` interface and `transformRow`:
+
+```typescript
+interface InboxItemRow {
+  // ... existing ...
+  forwarded_by_email?: string | null;
+  summary?: string | null;
+  summary_source?: string | null;
+  summary_updated_at?: string | null;
+}
+
+function transformRow(row: InboxItemRow): InboxItem {
+  return {
+    // ... existing ...
+    forwardedByEmail: row.forwarded_by_email,
+    summary: row.summary,
+    summarySource: row.summary_source as 'heuristic' | 'ai' | null,
+    summaryUpdatedAt: row.summary_updated_at,
+  };
+}
+```
+
+### 6. `src/components/inbox/InboxItemRow.tsx` (Critical Fix!)
+
+Replace raw sender/subject with display fields:
+
+```tsx
+export function InboxItemRow({ item, ... }) {
+  // Use display fields with fallbacks
+  const displayName = item.displayFromName || item.senderName;
+  const displaySubject = item.displaySubject || item.subject;
+  const displayPreview = item.summary || item.displaySnippet || item.preview;
+  const initial = displayName.charAt(0).toUpperCase();
+
+  return (
+    <div ...>
+      {/* Avatar */}
+      <div className="w-10 h-10 ...">
+        <span className="...">{initial}</span>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-0.5">
+          <span className={cn("text-sm truncate", ...)}>
+            {displayName}
+          </span>
+          {/* NEW: Forwarded badge */}
+          {item.isForwarded && (
+            <Badge variant="outline" className="text-[9px] h-4 px-1.5">
+              Fwd
+            </Badge>
+          )}
+          {/* ... rest unchanged ... */}
+        </div>
+        <p className={cn("text-sm truncate", ...)}>
+          {displaySubject}
+        </p>
+        {displayPreview && (
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
+            {displayPreview}
+          </p>
+        )}
+      </div>
+      {/* ... actions unchanged ... */}
+    </div>
+  );
+}
 ```
 
 ---
 
-## Files Changed
+## Visual Before/After
+
+```text
+BEFORE (broken):
+┌─────────────────────────────────────────────────────────┐
+│ [H] Harrison Kioko                           2 hours ago│
+│     Fwd: Intro - Alex Chen <> ComplyCo                  │
+│     ---------- Forwarded message ---------- From: Al... │
+└─────────────────────────────────────────────────────────┘
+
+AFTER (fixed):
+┌─────────────────────────────────────────────────────────┐
+│ [A] Alex Chen                 [Fwd]          2 hours ago│
+│     Intro - ComplyCo                                    │
+│     Would love to connect regarding the partnership...  │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Files Changed Summary
 
 | File | Change |
 |------|--------|
-| `src/hooks/useCalendarEventLinking.ts` | Fix `acceptSuggestion` to fetch logo before linking |
-| `src/components/dashboard/EventDetailsModal.tsx` | Add fallback logo fetch for existing links |
-| `supabase/migrations/xxx_backfill_calendar_link_logos.sql` | Backfill existing links with logos |
+| `supabase/migrations/xxx_add_inbox_summary.sql` | Add 4 columns |
+| `supabase/functions/_shared/email-cleaner.ts` | Add summary generation |
+| `supabase/functions/email-inbox-ingest/index.ts` | Store new fields |
+| `src/types/inbox.ts` | Add 4 new type fields |
+| `src/hooks/useInboxItems.ts` | Transform new fields |
+| `src/components/inbox/InboxItemRow.tsx` | Use display_* fields, add badges |
 
-## Expected Result
+---
 
-- ComplyCo (and other existing links) will display their logos immediately after the backfill
-- Future links created via suggestion acceptance will include the logo
-- The UI has a fallback mechanism to fetch logos for any links that don't have them stored
+## Non-Goals (Explicitly Excluded)
 
+- No changes to auth, routing, or permissions
+- No changes to inbox architecture
+- No new inbox actions
+- No AI summary (async) - future enhancement
+- No styling changes outside inbox components
+- No broad refactors
+
+---
+
+## Success Criteria
+
+1. Inbox rows show original sender (not "Harrison Kioko") for forwarded emails
+2. Subject line is clean (no "Fwd:" prefix)
+3. Preview shows one-sentence summary instead of raw forwarded headers
+4. "Fwd" badge indicates forwarded emails
+5. Detail pane continues to work correctly (already does)
+6. System is correct when additional users are added
