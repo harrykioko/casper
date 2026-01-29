@@ -1,9 +1,9 @@
 import { PipelineCompanyDetail, PipelineInteraction, PipelineTimelineEvent } from '@/types/pipelineExtended';
 import { PipelineAttachment } from '@/hooks/usePipelineAttachments';
 import { LinkedCommunication } from '@/hooks/useCompanyLinkedCommunications';
-import { RelationshipSummary } from './shared/RelationshipSummary';
-import { NextActionsCard } from './shared/NextActionsCard';
+import { StatusSnapshot } from './overview/StatusSnapshot';
 import { ActivityFeed } from './shared/ActivityFeed';
+import { differenceInDays } from 'date-fns';
 
 interface Task {
   id: string;
@@ -20,6 +20,7 @@ interface DealRoomContextRailProps {
   timelineEvents: PipelineTimelineEvent[];
   attachments: PipelineAttachment[];
   linkedCommunications: LinkedCommunication[];
+  onViewFullTimeline?: () => void;
 }
 
 export function DealRoomContextRail({ 
@@ -28,32 +29,32 @@ export function DealRoomContextRail({
   interactions, 
   timelineEvents,
   attachments,
-  linkedCommunications 
+  onViewFullTimeline,
 }: DealRoomContextRailProps) {
   const openTasks = tasks.filter(t => !t.completed);
   const notesCount = interactions.filter(i => 
     ['note', 'call', 'meeting', 'update'].includes(i.interaction_type)
   ).length;
   const filesCount = attachments.length;
-  const commsCount = linkedCommunications.length;
+
+  // Calculate days since last activity
+  const daysSinceLastActivity = company.last_interaction_at
+    ? differenceInDays(new Date(), new Date(company.last_interaction_at))
+    : null;
 
   return (
     <div className="space-y-4">
-      <RelationshipSummary
+      <StatusSnapshot
         openTasksCount={openTasks.length}
         notesCount={notesCount}
         filesCount={filesCount}
-        commsCount={commsCount}
-        lastActivityAt={company.last_interaction_at}
-      />
-
-      <NextActionsCard
-        tasks={openTasks}
-        nextSteps={company.next_steps}
+        daysSinceLastActivity={daysSinceLastActivity}
       />
 
       <ActivityFeed
         events={timelineEvents}
+        onViewFullTimeline={onViewFullTimeline}
+        maxItems={5}
       />
     </div>
   );

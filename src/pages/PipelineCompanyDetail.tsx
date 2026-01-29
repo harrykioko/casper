@@ -73,11 +73,13 @@ export default function PipelineCompanyDetail() {
             tasks={tasks}
             interactions={interactions}
             attachments={attachments}
+            linkedCommunications={linkedCommunications}
             onRefetch={refetchCompany}
             onCreateTask={createTask}
             onViewAllTasks={() => setActiveTab('tasks')}
             onViewAllNotes={() => setActiveTab('notes')}
             onViewAllFiles={() => setActiveTab('files')}
+            onNavigateTab={setActiveTab}
           />
         );
       case 'tasks':
@@ -142,6 +144,7 @@ export default function PipelineCompanyDetail() {
             timelineEvents={timelineEvents}
             attachments={attachments}
             linkedCommunications={linkedCommunications}
+            onViewFullTimeline={() => setActiveTab('timeline')}
           />
         }
       />
