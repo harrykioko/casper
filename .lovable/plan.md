@@ -1,354 +1,304 @@
 
 
-# Harmonic Enrichment Integration - Implementation Plan
+# AI-Driven Pipeline Company Creation from Inbox
 
-## Summary
+## Overview
 
-This plan fixes the Edge Function to correctly use the Harmonic API (POST for enrichment, typeahead for search), handles async enrichment polling, and enhances the existing Company Context Card to become an information-dense workspace panel after enrichment.
+This feature enhances the Inbox AI Suggested Actions system to support first-class creation of new Pipeline Companies directly from introduction emails. When the AI detects an intro email for an unrecognized company, it suggests a `CREATE_PIPELINE_COMPANY` action. Clicking this opens a pre-populated modal where the user reviews and approves the AI-extracted data before creation.
 
 ---
 
-## Part 1: Edge Function Fixes
-
-### Current Issues Identified
-
-1. **Enrichment uses GET instead of POST** - Harmonic's `/companies` enrichment endpoint requires POST
-2. **Search uses wrong endpoint** - Currently uses `GET /search/companies` which returns 405. Should use `GET /search/typeahead?query=...&search_type=COMPANY`
-3. **No async enrichment handling** - Harmonic returns 404 with an enrichment ID when data needs fetching; current code treats this as "not found"
-4. **Response parsing mismatch** - The `HarmonicCompany` interface doesn't match Harmonic's actual response structure
-
-### Changes to `supabase/functions/harmonic-enrich-company/index.ts`
-
-**A. Update `HarmonicCompany` interface to match actual API response:**
+## Architecture
 
 ```text
-Based on API docs, structure is:
-- id: number (not string)
-- name: string
-- description: string
-- short_description: string
-- website: { url: string, domain: string }
-- location: { city, region, country, ... }
-- socials: { linkedin: { url }, twitter: { url } }
-- founding_date: { date: string }
-- headcount: number (not string)
-- stage: string (e.g., "SEED", "SERIES_A")
-- funding: { total_raised_usd, last_funding_round_date, ... }
-- people: array of employee objects with full_name, title, socials.linkedin.url
-```
-
-**B. Fix enrichment to use POST:**
-
-```typescript
-// Change from GET to POST
-const response = await fetch(url.toString(), {
-  method: "POST",  // <-- Was "GET"
-  headers: {
-    apikey: apiKey,
-    "Content-Type": "application/json",
-  },
-});
-```
-
-**C. Handle async enrichment (201/404 with enrichment_id):**
-
-```typescript
-// If 201 or 404 with enrichment URN, poll for completion
-if (response.status === 201 || (response.status === 404 && data?.entity_urn?.includes('enrichment'))) {
-  const enrichmentUrn = data.entity_urn || data.urn;
-  console.log(`Async enrichment triggered: ${enrichmentUrn}`);
-  
-  // Poll up to 10 times at 1s intervals
-  for (let attempt = 0; attempt < 10; attempt++) {
-    await new Promise(r => setTimeout(r, 1000));
-    
-    const statusResponse = await fetch(
-      `https://api.harmonic.ai/enrichment_status?urns=${enrichmentUrn}`,
-      { headers: { apikey } }
-    );
-    const statusData = await statusResponse.json();
-    
-    if (statusData[0]?.status === 'COMPLETE') {
-      // Fetch enriched company
-      const companyUrn = statusData[0].enriched_entity_urn;
-      const companyResponse = await fetch(
-        `https://api.harmonic.ai/companies/${companyUrn}`,
-        { method: 'GET', headers: { apikey } }
-      );
-      return { data: await companyResponse.json() };
-    }
-    
-    if (statusData[0]?.status === 'FAILED' || statusData[0]?.status === 'NOT_FOUND') {
-      return { data: null, error: 'Enrichment failed or company not found', asyncFailed: true };
-    }
-  }
-  
-  // Timeout - return pending state
-  return { data: null, error: 'Enrichment still processing', asyncPending: true, enrichmentUrn };
-}
-```
-
-**D. Fix search to use typeahead endpoint:**
-
-```typescript
-// For search mode, use typeahead endpoint (GET, not POST)
-if (params.query) {
-  const typeaheadUrl = new URL("https://api.harmonic.ai/search/typeahead");
-  typeaheadUrl.searchParams.set("query", params.query);
-  typeaheadUrl.searchParams.set("search_type", "COMPANY");
-  
-  const response = await fetch(typeaheadUrl.toString(), {
-    method: "GET",
-    headers: { apikey: apiKey },
-  });
-  
-  // Response contains results with entity_urn, text (company name), alt_text
-  // Then fetch full company details for top N results
-}
-```
-
-**E. Update `parseHarmonicResponse` to match actual response:**
-
-```typescript
-function parseHarmonicResponse(data: HarmonicApiCompany, matchMethod: string) {
-  // Extract key people from people array (filter for founders/executives)
-  const keyPeople = (data.people || [])
-    .filter(p => p.is_current && (
-      p.highlights?.some(h => h.category === 'FOUNDER') ||
-      /ceo|founder|chief|co-founder|president/i.test(p.title || '')
-    ))
-    .slice(0, 5)
-    .map(p => ({
-      name: p.full_name || 'Unknown',
-      title: p.title || '',
-      linkedin_url: p.socials?.linkedin?.url || null,
-    }));
-
-  return {
-    harmonic_company_id: String(data.id),
-    match_method: matchMethod,
-    confidence: 'high' as const,
-    description_short: data.short_description || data.description?.slice(0, 300) || null,
-    description_long: data.description || null,
-    hq_city: data.location?.city || null,
-    hq_region: data.location?.region || data.location?.state || null,
-    hq_country: data.location?.country || null,
-    employee_range: data.headcount ? formatHeadcount(data.headcount) : null,
-    founding_year: data.founding_date?.date ? new Date(data.founding_date.date).getFullYear() : null,
-    funding_stage: data.stage || null,
-    total_funding_usd: data.funding?.total_raised_usd || null,
-    last_funding_date: data.funding?.last_funding_round_date || null,
-    linkedin_url: data.socials?.linkedin?.url || null,
-    twitter_url: data.socials?.twitter?.url || null,
-    key_people: keyPeople,
-    source_payload: data,
-  };
-}
-
-function formatHeadcount(count: number): string {
-  if (count < 10) return '1-10';
-  if (count < 50) return '11-50';
-  if (count < 200) return '51-200';
-  if (count < 500) return '201-500';
-  if (count < 1000) return '501-1000';
-  return '1000+';
-}
-```
-
-**F. Add comprehensive debug response:**
-
-```typescript
-// Success response
-return new Response(JSON.stringify({ 
-  success: true, 
-  enrichment,
-  harmonic_debug: {
-    triggered_async: wasAsync,
-    enrichment_id: enrichmentUrn || null,
-    response_status: responseStatus,
-    match_method: matchMethod,
-  }
-}), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-// Error response
-return new Response(JSON.stringify({ 
-  error: message,
-  harmonic_debug: {
-    status: response.status,
-    body_snippet: rawText.slice(0, 500),
-  }
-}), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
++---------------------------+
+|   inbox-suggest-v2        |
+|   (Edge Function)         |
+|   - Detects intro emails  |
+|   - Returns structured    |
+|     metadata for company  |
+|     creation in metadata  |
++-------------+-------------+
+              |
+              v
++---------------------------+
+|   SuggestionCard          |
+|   - Displays "Add to      |
+|     Pipeline" action      |
+|   - onClick -> opens      |
+|     CreatePipelineModal   |
++-------------+-------------+
+              |
+              v
++---------------------------+
+|   CreatePipelineModal     |
+|   (New Component)         |
+|   - Pre-filled fields     |
+|   - User reviews/edits    |
+|   - "Create" / "Cancel"   |
++-------------+-------------+
+              |
+              v
++---------------------------+
+|   usePipeline.createCompany|
+|   + linkCompany (inbox)   |
+|   + createContact         |
++---------------------------+
 ```
 
 ---
 
-## Part 2: Frontend Component Updates
+## Implementation Details
 
-### A. Enhanced CompanyContextCard
+### Part 1: Edge Function Enhancement (`inbox-suggest-v2`)
 
-The existing card already has empty, loading, and enriched states. Updates:
+Update the AI system prompt and tool schema to return rich metadata when suggesting `CREATE_PIPELINE_COMPANY`.
 
-**Enriching state (skeleton):**
-- Show 2-3 skeleton text lines
-- Show skeleton chips for HQ, Employees, Founded
+**Changes to `supabase/functions/inbox-suggest-v2/index.ts`:**
 
-**Enriched state (dense layout within same card):**
+1. **Update system prompt** to instruct the AI to extract company details for intro emails:
+   - Company name (from signature, subject, or body)
+   - Domain (extracted from sender email or mentioned URLs)
+   - Sender name and email as primary contact
+   - One-liner description (AI-generated)
+   - Notes summary (intro context, traction mentions, founder background, any links)
+   - Suggested tags (e.g., "fintech", "AI", "Series A")
 
+2. **Update tool schema** to include `metadata` structure for `CREATE_PIPELINE_COMPANY`:
+
+```typescript
+metadata: {
+  extracted_company_name: string;
+  extracted_domain: string | null;
+  primary_contact_name: string;
+  primary_contact_email: string;
+  description_oneliner: string;
+  notes_summary: string;
+  suggested_tags: string[];
+  intro_source: string; // e.g., "Warm Intro from Harrison Kioko"
+}
+```
+
+3. **Prioritize `CREATE_PIPELINE_COMPANY`** when:
+   - Intent is `intro_first_touch`
+   - No candidate companies match (empty `candidate_companies` or low scores)
+   - Subject contains intro signals ("Intro", "Introduction", "Meet", "Connecting you")
+
+### Part 2: New Types
+
+**File: `src/types/inboxSuggestions.ts`**
+
+Add interface for pipeline company creation metadata:
+
+```typescript
+export interface CreatePipelineCompanyMetadata {
+  extracted_company_name: string;
+  extracted_domain: string | null;
+  primary_contact_name: string;
+  primary_contact_email: string;
+  description_oneliner: string;
+  notes_summary: string;
+  suggested_tags: string[];
+  intro_source: string;
+}
+```
+
+### Part 3: New Modal Component
+
+**File: `src/components/inbox/CreatePipelineFromInboxModal.tsx`**
+
+A lightweight, approval-oriented modal with AI-extracted data pre-populated:
+
+**Layout:**
 ```text
 +--------------------------------------------------+
-| [Sparkles] Company context          [Refresh][Edit] |
+| [Building2] Add to Pipeline                   [X] |
 +--------------------------------------------------+
-| [Description 2-3 lines, clamped]                    |
-| "Read more" inline toggle                           |
-|                                                     |
-| [HQ: City, Region] [Employees: 51-200] [Founded: 2019] |
-| [Funding: Series A - $12M - 2023-05]                |
-|                                                     |
-| ---- Key People ----                                |
-| [Avatar] Jane Doe          CEO           [LinkedIn] |
-| [Avatar] John Smith        CTO           [LinkedIn] |
-| [Avatar] Alice Chen        CFO           [LinkedIn] |
-| (If empty: "No key people available from Harmonic") |
-|                                                     |
-| [View raw JSON] (collapsed toggle)                  |
-|                                                     |
-| Footer: "Refreshed 2h ago"     [Confidence: High]   |
+| [AI badge] Extracted from email                   |
+|                                                   |
+| Company Name *         [___________________]      |
+| Domain                 [___________________]      |
+| Stage                  [Seed v]                   |
+| Source                 [Warm Intro]               |
+|                                                   |
+| ---- Primary Contact ----                         |
+| Name                   [___________________]      |
+| Email                  [___________________]      |
+|                                                   |
+| Description            [___________________]      |
+| (AI one-liner, editable)                          |
+|                                                   |
+| Notes                                             |
+| [__________________________________]              |
+| [__________________________________]              |
+| (AI summary with intro context)                   |
+|                                                   |
+| Tags                   [fintech] [AI] [+]         |
+|                                                   |
++--------------------------------------------------+
+|              [Cancel]   [Create Company]          |
 +--------------------------------------------------+
 ```
 
-**Key changes to CompanyContextCard.tsx:**
+**Features:**
+- All fields are editable (user has full control)
+- Company Name is required
+- Default stage: "new" (first pipeline status)
+- Source defaults to "Warm Intro" (stored in `next_steps` or a future source field)
+- Tags displayed as editable chips
+- "Create Company" button triggers creation flow
 
-1. **Merge KeyPeopleCard into this card** - Move key people rendering inline (not a separate card)
-2. **Add funding info row** - Show formatted `total_funding_usd` + `last_funding_date`
-3. **Add "View raw" collapsible** - JSON viewer for `source_payload` with copy button
-4. **Better enriching state** - Show skeleton with chips layout
+**Props:**
+```typescript
+interface CreatePipelineFromInboxModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  inboxItem: InboxItem;
+  prefillData: CreatePipelineCompanyMetadata;
+  onCompanyCreated: (companyId: string, companyName: string) => void;
+}
+```
 
-### B. Update OverviewTab
+**Creation Flow:**
+1. Call `usePipeline().createCompany()` with extracted data
+2. Call `usePipelineContacts().createContact()` to add primary contact
+3. Create initial note with AI-generated summary via pipeline_interactions
+4. Call `linkCompany()` to associate inbox item with new company
+5. Show success toast and close modal
 
-Remove the separate `<KeyPeopleCard>` component since it will be integrated into `CompanyContextCard`.
+### Part 4: Update SuggestionCard
 
-### C. HarmonicMatchModal Updates
+**File: `src/components/inbox/SuggestionCard.tsx`**
 
-Add support for linkedin_url-based enrichment when domain is not available:
+Update the button label for `CREATE_PIPELINE_COMPANY`:
+- Current: "Create"
+- New: "Add to Pipeline" (more descriptive)
+
+### Part 5: Update Inbox Page Handler
+
+**File: `src/pages/Inbox.tsx`**
+
+Add state and handler for the new modal:
 
 ```typescript
-const handleSelectCandidate = async (candidate: HarmonicCandidate) => {
-  if (candidate.domain) {
-    await onEnrich('enrich_by_domain', { website_domain: candidate.domain });
-  } else if (candidate.linkedin_url) {
-    await onEnrich('enrich_by_linkedin', { linkedin_url: candidate.linkedin_url });
+// State
+const [pipelineModalItem, setPipelineModalItem] = useState<{
+  item: InboxItem;
+  metadata: CreatePipelineCompanyMetadata;
+} | null>(null);
+
+// In handleApproveSuggestion:
+case "CREATE_PIPELINE_COMPANY": {
+  const metadata = suggestion.metadata as CreatePipelineCompanyMetadata | undefined;
+  if (metadata?.extracted_company_name) {
+    // Open the new modal with pre-filled data
+    setPipelineModalItem({ item, metadata });
   } else {
-    toast.error('Selected company has no domain or LinkedIn URL');
+    // Fallback: Use basic extraction from email
+    setPipelineModalItem({
+      item,
+      metadata: {
+        extracted_company_name: item.senderName || "",
+        extracted_domain: item.senderEmail?.split("@")[1] || null,
+        primary_contact_name: item.senderName || "",
+        primary_contact_email: item.senderEmail || "",
+        description_oneliner: "",
+        notes_summary: item.preview || "",
+        suggested_tags: [],
+        intro_source: "Email",
+      },
+    });
   }
+  break;
+}
+
+// Handler for company created
+const handlePipelineCompanyCreated = (companyId: string, companyName: string) => {
+  if (pipelineModalItem) {
+    linkCompany(pipelineModalItem.item.id, companyId, companyName, 'pipeline');
+    toast.success(`${companyName} added to pipeline and linked to email`);
+  }
+  setPipelineModalItem(null);
 };
 ```
 
-### D. Update HarmonicCandidate Type
+### Part 6: Update InboxActionRail Handler
 
-Add `linkedin_url` field:
+**File: `src/components/inbox/InboxActionRail.tsx`**
 
-```typescript
-export interface HarmonicCandidate {
-  harmonic_id: string;
-  name: string;
-  domain?: string | null;
-  linkedin_url?: string | null;  // Add this
-  logo_url?: string | null;
-  hq?: string | null;
-  employee_range?: string | null;
-  description_short?: string | null;
-  funding_stage?: string | null;
-}
-```
+Ensure `onApproveSuggestion` is called with full suggestion including metadata, so the parent component can extract the prefill data.
 
 ---
 
-## Part 3: State Management Updates
+## Files to Create
 
-### Hook Updates (`usePipelineEnrichment.ts`)
-
-1. **Handle async pending state:**
-
-```typescript
-const [asyncPending, setAsyncPending] = useState(false);
-const [asyncEnrichmentUrn, setAsyncEnrichmentUrn] = useState<string | null>(null);
-
-// In enrichCompany:
-if (data?.asyncPending) {
-  setAsyncPending(true);
-  setAsyncEnrichmentUrn(data.enrichmentUrn);
-  toast.info('Enrichment processing. Data will be available shortly.');
-  return { enrichment: null, notFound: false, pending: true };
-}
-```
-
-2. **Add polling for pending enrichments** (optional, for future):
-
-```typescript
-// Could add a polling mechanism to check async status
-// For MVP, user can manually refresh
-```
-
----
+| File | Purpose |
+|------|---------|
+| `src/components/inbox/CreatePipelineFromInboxModal.tsx` | New modal for AI-assisted pipeline company creation |
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/harmonic-enrich-company/index.ts` | Fix API calls (POST, typeahead), add async polling, update response parsing, add debug info |
-| `src/components/pipeline-detail/overview/CompanyContextCard.tsx` | Merge key people inline, add funding row, add raw JSON viewer, improve skeleton state |
-| `src/components/pipeline-detail/tabs/OverviewTab.tsx` | Remove separate KeyPeopleCard render |
-| `src/components/pipeline-detail/overview/HarmonicMatchModal.tsx` | Support linkedin_url selection fallback |
-| `src/types/enrichment.ts` | Add `linkedin_url` to `HarmonicCandidate` |
-| `src/hooks/usePipelineEnrichment.ts` | Minor cleanup, optional async pending state |
+| `supabase/functions/inbox-suggest-v2/index.ts` | Add metadata extraction for CREATE_PIPELINE_COMPANY |
+| `src/types/inboxSuggestions.ts` | Add CreatePipelineCompanyMetadata interface |
+| `src/components/inbox/SuggestionCard.tsx` | Update button label for pipeline action |
+| `src/pages/Inbox.tsx` | Add modal state and handler for pipeline creation |
 
 ---
 
-## Visual Summary
+## UX Considerations
 
-```text
-Before:
-+-------------------+
-| Company context   |
-| [Empty CTA]       |
-+-------------------+
-| Key People (sep)  |  <-- Separate card
-+-------------------+
+1. **Approval-Oriented Design**: The modal emphasizes that "AI has done the work" but the user is in control. All fields are editable.
 
-After:
-+-------------------------------------------+
-| Company context             [Refresh][Edit]|
-+-------------------------------------------+
-| Description text, 2-3 lines clamped...     |
-| "Read more"                                |
-|                                            |
-| [HQ chip] [Employees chip] [Founded chip]  |
-| [Funding: Series A - $12M]                 |
-|                                            |
-| -- Key People --                           |
-| Jane Doe, CEO                   [LinkedIn] |
-| John Smith, CTO                 [LinkedIn] |
-|                                            |
-| [View raw JSON] (collapsed)                |
-|                                            |
-| Refreshed 2h ago         Confidence: High  |
-+-------------------------------------------+
-```
+2. **Confidence Signal**: Show an "AI" badge near the header to indicate this is auto-extracted data.
+
+3. **No Auto-Creation**: The company is only created when the user explicitly clicks "Create Company".
+
+4. **Seamless Linking**: After creation, the email is automatically linked to the new company, enabling future AI actions (drafting replies, scheduling follow-ups).
+
+5. **Graceful Fallback**: If AI metadata is missing or incomplete, use basic extraction from sender info.
 
 ---
 
-## Testing Steps
+## Technical Considerations
 
-1. Test enrichment with a known company (e.g., stripe.com)
-   - Verify POST request is sent
-   - Verify data is parsed and persisted correctly
-2. Test enrichment with unknown company
-   - Verify async polling (if triggered)
-   - Verify fallback to manual match modal
-3. Test manual search in modal
-   - Verify typeahead endpoint works
-   - Verify selecting a candidate triggers enrichment
-4. Test refresh functionality
-5. Verify all UI states render correctly (loading, empty, enriched)
-6. Verify raw JSON viewer works with copy button
+### Pipeline Company Fields
+
+Based on `usePipeline.createCompany()`, the minimal required fields are:
+- `company_name` (required)
+- `current_round` (required, RoundEnum - default to "Seed")
+
+Optional fields to pre-fill:
+- `website` - constructed from domain if available
+- `next_steps` - can store intro source/context
+- `status` - default to "new"
+
+### Contact Creation
+
+After company creation, use the company ID to create a contact:
+- `name` - from primary_contact_name
+- `email` - from primary_contact_email
+- `is_founder` - default true
+- `is_primary` - default true
+
+### Notes/Interactions
+
+Create an initial pipeline_interaction with type "note" containing the AI-generated summary.
+
+---
+
+## Testing Checklist
+
+1. Forward an intro email to the inbox
+2. Generate AI suggestions - verify CREATE_PIPELINE_COMPANY appears with high priority
+3. Click "Add to Pipeline" - verify modal opens with pre-filled data
+4. Edit fields and click "Create Company"
+5. Verify:
+   - Company appears in Pipeline
+   - Contact is created and linked
+   - Email is linked to the company
+   - Initial note is created with summary
+6. Test fallback when metadata is missing
+7. Test Cancel button closes modal without side effects
 
