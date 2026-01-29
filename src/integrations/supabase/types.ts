@@ -68,6 +68,7 @@ export type Database = {
           match_reason: string | null
           matched_attendee_email: string | null
           matched_domain: string | null
+          microsoft_event_id: string | null
           status: string
         }
         Insert: {
@@ -82,6 +83,7 @@ export type Database = {
           match_reason?: string | null
           matched_attendee_email?: string | null
           matched_domain?: string | null
+          microsoft_event_id?: string | null
           status?: string
         }
         Update: {
@@ -96,6 +98,7 @@ export type Database = {
           match_reason?: string | null
           matched_attendee_email?: string | null
           matched_domain?: string | null
+          microsoft_event_id?: string | null
           status?: string
         }
         Relationships: [
@@ -120,6 +123,7 @@ export type Database = {
           created_by: string
           id: string
           linked_by: string
+          microsoft_event_id: string | null
         }
         Insert: {
           calendar_event_id: string
@@ -132,6 +136,7 @@ export type Database = {
           created_by: string
           id?: string
           linked_by: string
+          microsoft_event_id?: string | null
         }
         Update: {
           calendar_event_id?: string
@@ -144,6 +149,7 @@ export type Database = {
           created_by?: string
           id?: string
           linked_by?: string
+          microsoft_event_id?: string | null
         }
         Relationships: [
           {
