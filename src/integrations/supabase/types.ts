@@ -1751,7 +1751,7 @@ export type Database = {
       company_kind: "portfolio" | "pipeline" | "other"
       company_status: "active" | "watching" | "exited" | "archived"
       interaction_type: "note" | "call" | "meeting" | "email" | "update"
-      note_target_type: "task" | "company" | "project" | "reading_item" | "calendar_event"
+      note_target_type: "task" | "company" | "project" | "reading_item"
       round_enum:
         | "Seed"
         | "Series A"
@@ -1908,7 +1908,7 @@ export const Constants = {
       company_kind: ["portfolio", "pipeline", "other"],
       company_status: ["active", "watching", "exited", "archived"],
       interaction_type: ["note", "call", "meeting", "email", "update"],
-      note_target_type: ["task", "company", "project", "reading_item", "calendar_event"],
+      note_target_type: ["task", "company", "project", "reading_item"],
       round_enum: [
         "Seed",
         "Series A",
