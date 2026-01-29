@@ -113,13 +113,14 @@ export function usePipelineEnrichment(companyId: string | undefined) {
         return { enrichment: null, notFound: false };
       }
 
+      // Check for notFound flag (returned as 200 with notFound: true)
+      if (data?.notFound) {
+        setError(data.error || 'No matching company found');
+        return { enrichment: null, notFound: true };
+      }
+
       if (data?.error) {
         console.error('Enrichment error:', data.error);
-        // Check for specific "not found" error from edge function
-        if (data.error === 'No matching company found in Harmonic') {
-          setError(data.error);
-          return { enrichment: null, notFound: true };
-        }
         toast.error(data.error);
         setError(data.error);
         return { enrichment: null, notFound: false };

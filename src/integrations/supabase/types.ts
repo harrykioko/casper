@@ -1509,6 +1509,7 @@ export type Database = {
       }
       tasks: {
         Row: {
+          archived_at: string | null
           category_id: string | null
           company_id: string | null
           completed: boolean | null
@@ -1529,6 +1530,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           category_id?: string | null
           company_id?: string | null
           completed?: boolean | null
@@ -1549,6 +1551,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           category_id?: string | null
           company_id?: string | null
           completed?: boolean | null
