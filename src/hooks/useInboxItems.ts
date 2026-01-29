@@ -164,6 +164,7 @@ export function useInboxItems(options: UseInboxItemsOptions = {}) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inbox_items"] });
       queryClient.invalidateQueries({ queryKey: ["inbox_items_archived"] });
+      queryClient.invalidateQueries({ queryKey: ["company_linked_communications"] });
       toast.success("Archived");
     },
     onError: (error) => {
@@ -252,6 +253,7 @@ export function useInboxItems(options: UseInboxItemsOptions = {}) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inbox_items"] });
       queryClient.invalidateQueries({ queryKey: ["inbox_items_archived"] });
+      queryClient.invalidateQueries({ queryKey: ["company_linked_communications"] });
       toast.success("Company linked");
     },
     onError: (error) => {
