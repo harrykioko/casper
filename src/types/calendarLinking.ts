@@ -1,6 +1,7 @@
 export interface LinkedCompany {
   id: string;
   calendarEventId: string;
+  microsoftEventId?: string | null;
   companyId: string;
   companyType: 'pipeline' | 'portfolio';
   companyName: string;
@@ -14,6 +15,7 @@ export interface LinkedCompany {
 export interface CompanySuggestion {
   id: string;
   calendarEventId: string;
+  microsoftEventId?: string | null;
   companyId: string;
   companyType: 'pipeline' | 'portfolio';
   companyName: string;

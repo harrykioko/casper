@@ -9,6 +9,7 @@ import type { LinkedCompany, CompanySuggestion, PersonRecord, CompanySearchResul
 
 interface CalendarEvent {
   id: string;
+  microsoftEventId?: string;
   title: string;
   attendees?: Array<{ name: string; email?: string }>;
 }
@@ -20,13 +21,14 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
   const [loading, setLoading] = useState(false);
   const [eventPeople, setEventPeople] = useState<PersonRecord[]>([]);
 
-  // Fetch existing link for this event
+  // Fetch existing link for this event (with fallback to microsoft_event_id)
   const fetchLink = useCallback(async () => {
     if (!event?.id || !user) return;
     setLoading(true);
 
     try {
-      const { data, error } = await supabase
+      // First try lookup by current UUID
+      let { data, error } = await supabase
         .from('calendar_event_links')
         .select('*')
         .eq('calendar_event_id', event.id)
@@ -35,10 +37,32 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
 
       if (error) throw error;
 
+      // If no link found by UUID, try by microsoft_event_id (handles calendar refresh)
+      if (!data && event.microsoftEventId) {
+        const { data: msData, error: msError } = await supabase
+          .from('calendar_event_links')
+          .select('*')
+          .eq('microsoft_event_id', event.microsoftEventId)
+          .eq('created_by', user.id)
+          .maybeSingle();
+
+        if (msError) throw msError;
+
+        if (msData) {
+          // Re-associate link with current UUID for future lookups
+          await supabase
+            .from('calendar_event_links')
+            .update({ calendar_event_id: event.id })
+            .eq('id', msData.id);
+          data = { ...msData, calendar_event_id: event.id };
+        }
+      }
+
       if (data) {
         setLinkedCompany({
           id: data.id,
           calendarEventId: data.calendar_event_id,
+          microsoftEventId: data.microsoft_event_id || null,
           companyId: data.company_id,
           companyType: data.company_type as 'pipeline' | 'portfolio',
           companyName: data.company_name,
@@ -57,7 +81,7 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
     } finally {
       setLoading(false);
     }
-  }, [event?.id, user]);
+  }, [event?.id, event?.microsoftEventId, user]);
 
   // Fetch existing suggestions or compute new ones
   const fetchOrComputeSuggestions = useCallback(async () => {
@@ -107,11 +131,12 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
 
     const newSuggestions: Array<{
       calendar_event_id: string;
+      microsoft_event_id: string | null;
       company_id: string;
       company_type: string;
       company_name: string;
       match_reason: string;
-      matched_domain: string;
+      matched_domain: string | null;
       matched_attendee_email: string | null;
       confidence: number;
       status: string;
@@ -130,6 +155,7 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
           );
           newSuggestions.push({
             calendar_event_id: event.id,
+            microsoft_event_id: event.microsoftEventId || null,
             company_id: company.id,
             company_type: 'pipeline',
             company_name: company.company_name,
@@ -156,6 +182,7 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
           );
           newSuggestions.push({
             calendar_event_id: event.id,
+            microsoft_event_id: event.microsoftEventId || null,
             company_id: company.id,
             company_type: 'portfolio',
             company_name: company.name,
@@ -182,6 +209,7 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
       if (titleWords.some(word => companyNameLower.includes(word) && word.length > 3)) {
         newSuggestions.push({
           calendar_event_id: event.id,
+          microsoft_event_id: event.microsoftEventId || null,
           company_id: company.id,
           company_type: type,
           company_name: name,
@@ -228,6 +256,7 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
         .from('calendar_event_links')
         .upsert({
           calendar_event_id: event.id,
+          microsoft_event_id: event.microsoftEventId || null,
           company_id: company.id,
           company_type: company.type,
           company_name: company.name,
@@ -244,6 +273,7 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
       setLinkedCompany({
         id: data.id,
         calendarEventId: data.calendar_event_id,
+        microsoftEventId: data.microsoft_event_id || null,
         companyId: data.company_id,
         companyType: data.company_type as 'pipeline' | 'portfolio',
         companyName: data.company_name,
@@ -395,6 +425,7 @@ function transformSuggestion(row: any): CompanySuggestion {
   return {
     id: row.id,
     calendarEventId: row.calendar_event_id,
+    microsoftEventId: row.microsoft_event_id || null,
     companyId: row.company_id,
     companyType: row.company_type,
     companyName: row.company_name,

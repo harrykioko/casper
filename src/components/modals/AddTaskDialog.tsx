@@ -85,7 +85,7 @@ export function AddTaskDialog({ open, onOpenChange, onAddTask, prefill }: AddTas
 
       // If we got a task id back and user entered an initial note, persist it
       const noteText = taskDescription.trim();
-      if (result?.id && noteText) {
+      if (result && 'id' in result && noteText) {
         await createNote({
           content: noteText,
           primaryContext: { targetType: 'task', targetId: result.id },
