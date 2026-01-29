@@ -112,25 +112,57 @@ async function callHarmonicAPI(
     },
   });
 
+  // LOG: Status code
+  console.log("Harmonic response status:", response.status);
+
+  // Read raw text to log before parsing
+  const rawText = await response.text();
+  console.log("Harmonic raw response (first 2000 chars):", rawText.slice(0, 2000));
+
+  // Parse JSON safely
+  let data: any = null;
+  try {
+    data = rawText ? JSON.parse(rawText) : null;
+  } catch (e) {
+    console.error("Failed to parse Harmonic response as JSON:", e);
+    return { data: null, error: `Harmonic returned non-JSON: ${response.status}` };
+  }
+
+  // LOG: Data structure info
+  console.log("Harmonic response type:", Array.isArray(data) ? "array" : typeof data);
+  console.log("Harmonic array length:", Array.isArray(data) ? data.length : "N/A");
+  console.log("Harmonic keys:", data && !Array.isArray(data) ? Object.keys(data) : null);
+  console.log("Harmonic first item keys:", Array.isArray(data) && data[0] ? Object.keys(data[0]) : null);
+
+  // Handle error status codes
   if (response.status === 401 || response.status === 403) {
     return { data: null, error: "Harmonic API key invalid or missing" };
   }
 
   if (response.status === 429) {
     // Rate limited - wait and retry once
+    console.log("Rate limited, retrying after 2s...");
     await new Promise((r) => setTimeout(r, 2000));
+
     const retryResponse = await fetch(url.toString(), {
       method: "GET",
-      headers: {
-        apikey: apiKey,
-        "Content-Type": "application/json",
-      },
+      headers: { apikey: apiKey, "Content-Type": "application/json" },
     });
+
+    console.log("Retry response status:", retryResponse.status);
+    const retryRawText = await retryResponse.text();
+    console.log("Retry raw response (first 2000 chars):", retryRawText.slice(0, 2000));
 
     if (!retryResponse.ok) {
       return { data: null, error: `Harmonic API rate limited: ${retryResponse.status}` };
     }
-    return { data: await retryResponse.json() };
+
+    try {
+      const retryData = retryRawText ? JSON.parse(retryRawText) : null;
+      return { data: retryData };
+    } catch (e) {
+      return { data: null, error: `Harmonic retry returned non-JSON: ${retryResponse.status}` };
+    }
   }
 
   if (response.status === 404) {
@@ -138,12 +170,10 @@ async function callHarmonicAPI(
   }
 
   if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Harmonic API error:", response.status, errorText);
+    console.error("Harmonic API error:", response.status, rawText.slice(0, 500));
     return { data: null, error: `Harmonic API error: ${response.status}` };
   }
 
-  const data = await response.json();
   return { data };
 }
 
@@ -289,10 +319,11 @@ serve(async (req) => {
       // Handle array response - Harmonic returns array of companies
       const companyData = Array.isArray(data) ? data[0] : data;
       if (!companyData) {
-        return new Response(JSON.stringify({ error: "No matching company found in Harmonic" }), {
-          status: 404,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        // Return 200 with notFound flag instead of 404 to prevent frontend runtime errors
+        return new Response(
+          JSON.stringify({ success: false, notFound: true, error: "No matching company found in Harmonic" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       const parsed = parseHarmonicResponse(companyData as HarmonicCompany, existing.match_method || "domain");
@@ -350,10 +381,11 @@ serve(async (req) => {
     // Handle array response - Harmonic returns array of companies
     const companyData = Array.isArray(data) ? data[0] : data;
     if (!companyData) {
-      return new Response(JSON.stringify({ error: "No matching company found in Harmonic" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      // Return 200 with notFound flag instead of 404 to prevent frontend runtime errors
+      return new Response(
+        JSON.stringify({ success: false, notFound: true, error: "No matching company found in Harmonic" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const parsed = parseHarmonicResponse(companyData as HarmonicCompany, matchMethod);
