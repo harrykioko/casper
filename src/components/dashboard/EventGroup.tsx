@@ -5,6 +5,7 @@ import { NowIndicator } from "./NowIndicator";
 
 interface CalendarEvent {
   id: string;
+  microsoftEventId?: string;
   title: string;
   startTime: string;
   endTime?: string;
@@ -122,7 +123,7 @@ export function EventGroup({ title, events, isToday = false, showDate = false, o
                     event={event}
                     delay={index * 0.05}
                     onClick={onEventClick}
-                    linkedCompanyName={linkedCompanyMap?.get(event.id)}
+                    linkedCompanyName={linkedCompanyMap?.get(event.id) || (event.microsoftEventId ? linkedCompanyMap?.get(event.microsoftEventId) : undefined)}
                   />
                 ))}
               </div>
@@ -143,7 +144,7 @@ export function EventGroup({ title, events, isToday = false, showDate = false, o
                 isPast={isToday && isPastEvent(event)}
                 isCurrent={isToday && isCurrentEvent(event)}
                 onClick={onEventClick}
-                linkedCompanyName={linkedCompanyMap?.get(event.id)}
+                linkedCompanyName={linkedCompanyMap?.get(event.id) || (event.microsoftEventId ? linkedCompanyMap?.get(event.microsoftEventId) : undefined)}
               />
             </Fragment>
           ))}

@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface CalendarEvent {
   id: string;
+  microsoftEventId?: string;
   title: string;
   startTime: string;
   endTime?: string;
@@ -40,24 +41,39 @@ export function CalendarSidebar({ className, events, nonnegotiables, onSync, isS
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [linkedCompanyMap, setLinkedCompanyMap] = useState<Map<string, string>>(new Map());
 
-  // Fetch all calendar_event_links for displayed events
+  // Fetch all calendar_event_links for displayed events (lookup by both UUID and MS ID)
   const eventIds = useMemo(() => events.map(e => e.id), [events]);
+  const eventMsIds = useMemo(() => 
+    events.map(e => e.microsoftEventId).filter((id): id is string => Boolean(id)), 
+    [events]
+  );
+
   useEffect(() => {
-    if (!user || eventIds.length === 0) return;
+    if (!user || events.length === 0) return;
     const fetchLinks = async () => {
+      // Fetch by both UUID and microsoft_event_id
       const { data } = await supabase
         .from('calendar_event_links')
-        .select('calendar_event_id, company_name')
-        .eq('created_by', user.id)
-        .in('calendar_event_id', eventIds);
+        .select('calendar_event_id, microsoft_event_id, company_name')
+        .eq('created_by', user.id);
+      
       if (data) {
         const map = new Map<string, string>();
-        data.forEach(row => map.set(row.calendar_event_id, row.company_name));
+        // Build lookup map by both IDs
+        data.forEach(row => {
+          // Only include if the event matches our displayed events
+          const matchesUUID = eventIds.includes(row.calendar_event_id);
+          const matchesMsId = row.microsoft_event_id && eventMsIds.includes(row.microsoft_event_id);
+          if (matchesUUID || matchesMsId) {
+            if (row.calendar_event_id) map.set(row.calendar_event_id, row.company_name);
+            if (row.microsoft_event_id) map.set(row.microsoft_event_id, row.company_name);
+          }
+        });
         setLinkedCompanyMap(map);
       }
     };
     fetchLinks();
-  }, [user, eventIds]);
+  }, [user, eventIds, eventMsIds]);
 
   const handleEventClick = (event: CalendarEvent) => {
     setSelectedEvent(event);
