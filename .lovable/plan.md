@@ -1,348 +1,226 @@
 
-# Pipeline Tab UX & Functionality Enhancements
+# Accept and Link Attachments - Implementation Plan
 
-## Overview
+## Problem Analysis
 
-Enhance the Pipeline tab to function as a high-signal command surface for deal flow management. This plan focuses on improving scanability, attention signaling, and flow into deeper deal work while strictly preserving existing structure, stages, and navigation patterns.
+Currently, when a task is created from an inbox item:
+1. The `TaskPrefillOptions` includes `sourceInboxItemId` (line 181 in Inbox.tsx)
+2. But when the task is actually created, only `content` is passed: `createTask({ content })` (line 381)
+3. The `source_inbox_item_id` column exists on the tasks table but is never populated
+4. Inbox attachments are stored in `inbox_attachments` but have no way to be accessed from tasks
 
-## Current State Summary
+Users cannot currently access email attachments from tasks that were created from inbox items, even though the infrastructure partially exists.
 
-- **5 Pipeline Stages**: New, Passed, To Share, Interesting, Pearls (plus Active sidebar)
-- **3 View Modes**: Kanban, List, Grid
-- **Existing Card Info**: Company name, round badge, sector badge, raise amount, close date, next steps preview
-- **Existing Actions**: Top of Mind toggle (star), website link, drag-to-move
-- **Existing Filters**: Search, Round dropdown, Sector dropdown
-- **Summary Tiles**: Total, Active, Passed, To Share, Interesting, Pearls, New (already clickable)
+## Solution Architecture
 
-## Architecture
-
-The implementation enhances existing components without introducing new layout paradigms:
+Implement a two-phase approach:
+1. **Phase 1 - Wiring**: Connect the `source_inbox_item_id` when creating tasks from inbox items
+2. **Phase 2 - Display & Linking**: Show inbox attachments on tasks that originated from inbox items, and allow "accepting" (copying/linking) attachments to tasks
 
 ```text
-+------------------------------------------------------------------------+
-|  Pipeline                    [Search] [Round▼] [Sector▼]               |
-|                              [Needs Attention] [Top of Mind] [Stale]   |
-+------------------------------------------------------------------------+
-|                                                                        |
-|  New (4)                    | Interesting (3)        | Pearls (2)      |
-|  "1 stale, 2 open tasks"    | "1 closing soon"       | "All clear"     |
-|  ─────────────────────────  | ─────────────────────  | ───────────────  |
-|  ┌──────────────────────┐   | ┌────────────────────┐ | ┌──────────────┐ |
-|  │ CompanyName    [★][↗]│   | │ CompanyName   [★][↗]│ | │ CompanyName  │ |
-|  │ [Seed] [Payments]    │   | │ [Series A] [Wealth]│ | │ [Seed] [Fin] │ |
-|  │ $3M • Mar 2026       │   | │ $5M • Apr 2026     │ | │ $2M • May    │ |
-|  │ ─────────────────────│   | │ ────────────────────│ | │ ─────────────│ |
-|  │ ⚠ Stale • 2 tasks    │   | │ 📋 1 task • 3d ago │ | │ ✓ Next step  │ |
-|  └──────────────────────┘   | └────────────────────┘ | └──────────────┘ |
-|                                                                        |
-+------------------------------------------------------------------------+
+┌─────────────────────┐         ┌─────────────────────┐
+│   Inbox Item        │         │      Task           │
+│   ─────────────     │         │   ───────────       │
+│   • subject         │ creates │   • content         │
+│   • attachments[]   │────────▶│   • source_inbox_   │
+│                     │         │     item_id ────────┼───┐
+└─────────────────────┘         └─────────────────────┘   │
+         │                                                │
+         │ has                                   references
+         ▼                                                │
+┌─────────────────────┐                                   │
+│ inbox_attachments   │◀──────────────────────────────────┘
+│   ─────────────     │   (can fetch attachments via FK)
+│   • filename        │
+│   • storage_path    │
+└─────────────────────┘
 ```
 
-## Implementation Steps
+## Phase 1: Wire `source_inbox_item_id` to Task Creation
 
-### Step 1: Enhanced Pipeline Card Component
+### 1.1 Update AddTaskDialog to Pass Full Task Data
 
-**File: `src/components/pipeline/PipelineCard.tsx`**
+**File: `src/components/modals/AddTaskDialog.tsx`**
 
-Standardize card anatomy with new attention row:
-
-```
-Header Row:
-├── Company name (left)
-└── Actions (right): Star toggle, Open full page icon
-
-Metadata Row:
-├── Round badge
-└── Sector badge
-
-Deal Facts Row:
-├── Raise amount
-└── Close date
-
-Attention Row (NEW - conditional):
-├── Open tasks count (if > 0): "2 tasks" with task icon
-├── Last touch indicator: "12d ago" / "3d ago"
-├── Next step exists: small dot/chip if next_steps present
-├── Stale badge: amber "Stale" badge if no activity > 14 days
-└── Overdue indicator: red dot/badge if any linked task overdue
-```
-
-**New Props & Data Requirements:**
-- Add `openTaskCount?: number` and `hasOverdueTasks?: boolean` props
-- Add `lastInteractionAt?: string` for stale/last touch calculation
-- These will be computed at the page level and passed down
-
-**Visual Changes:**
-- Slightly reduce border saturation for stage colors
-- Attention signals (stale, overdue) get stronger color emphasis
-- Increase card padding-bottom slightly for attention row
-- Add "Open full page" icon (ArrowUpRight) always visible next to star
-
-### Step 2: Create Pipeline Attention Helper Functions
-
-**New File: `src/lib/pipeline/pipelineAttentionHelpers.ts`**
-
-Utility functions for computing attention signals:
+Update the `onAddTask` callback to include the full prefill data:
 
 ```typescript
-interface PipelineCardAttention {
-  isStale: boolean;              // No activity > 14 days
-  daysSinceTouch: number | null;
-  hasOverdueTasks: boolean;
-  openTaskCount: number;
-  hasNextSteps: boolean;
-  isClosingSoon: boolean;        // Close date within 14 days
-  needsAttention: boolean;       // Composite: stale OR overdue OR closing soon
-}
-
-function computeCardAttention(
-  company: PipelineCompany,
-  tasks: PipelineTask[]
-): PipelineCardAttention
-
-function computeColumnSummary(
-  companies: PipelineCompany[],
-  allTasks: PipelineTask[]
-): ColumnSummary
-```
-
-### Step 3: Aggregate Pipeline Tasks Hook
-
-**New File: `src/hooks/usePipelineTasksAggregate.ts`**
-
-Fetch all tasks linked to pipeline companies for aggregation:
-
-```typescript
-function usePipelineTasksAggregate(companyIds: string[]) {
-  // Query tasks where pipeline_company_id IN companyIds
-  // Returns map of companyId -> { openCount, hasOverdue, tasks[] }
+interface AddTaskDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAddTask: (taskData: {
+    content: string;
+    description?: string;
+    source_inbox_item_id?: string;
+    company_id?: string;
+    pipeline_company_id?: string;
+  }) => void;
+  prefill?: TaskPrefillOptions;
 }
 ```
 
-This hook efficiently fetches task data for all visible companies in one query rather than per-card queries.
-
-### Step 4: Enhanced Kanban Column Headers
-
-**File: `src/components/pipeline/PipelineKanbanView.tsx`**
-
-Update `KanbanColumn` component:
-
-```
-Current:
-  <h3>New</h3>
-  <p>4 companies</p>
-
-Enhanced:
-  <h3>New</h3>
-  <p>4 companies</p>
-  <p className="text-xs text-muted-foreground">1 stale • 2 open tasks</p>
-```
-
-**Column Summary Logic:**
-- Count stale companies in column
-- Count total open tasks across column
-- Count companies closing soon
-- Show most urgent signal first
-
-**Quick Controls (Column Hover):**
-- "Show needs attention only" toggle
-- Sort dropdown: Last touched, Closing soon, Raise amount
-- Apply only to that column via local state
-
-### Step 5: Enhanced Filter Bar (PipelineToolbar)
-
-**File: `src/components/pipeline/PipelineToolbar.tsx`**
-
-Add toggle-style filter pills after existing filters:
-
-```
-[Search...] [Round▼] [Sector▼]    [Needs Attention] [Top of Mind] [Stale]    [View Toggle]
-```
-
-**New Filter State:**
+Update `handleSubmit` to include the source link:
 ```typescript
-interface PipelineFilters {
-  search: string;
-  rounds: RoundEnum[];
-  sectors: SectorEnum[];
-  // New attention filters (toggle-style)
-  needsAttention?: boolean;
-  topOfMindOnly?: boolean;
-  staleOnly?: boolean;
+const handleSubmit = async (e: React.FormEvent) => {
+  // ...
+  onAddTask({
+    content: taskContent,
+    // Include source_inbox_item_id from prefill
+    source_inbox_item_id: prefill?.sourceInboxItemId,
+  });
+};
+```
+
+### 1.2 Update Inbox.tsx to Handle Full Task Data
+
+**File: `src/pages/Inbox.tsx`**
+
+Change line 381 from:
+```typescript
+onAddTask={(content) => createTask({ content })}
+```
+
+To:
+```typescript
+onAddTask={(taskData) => createTask(taskData)}
+```
+
+## Phase 2: Display Linked Attachments on Tasks
+
+### 2.1 Create Hook to Fetch Attachments for Task
+
+**New File: `src/hooks/useTaskAttachments.ts`**
+
+A hook that fetches attachments linked to a task via its `source_inbox_item_id`:
+
+```typescript
+export function useTaskAttachments(taskId: string | undefined) {
+  // 1. Fetch the task to get source_inbox_item_id
+  // 2. If source_inbox_item_id exists, fetch inbox_attachments
+  // 3. Return attachments with getSignedUrl helper
 }
 ```
 
-**Filter Logic:**
-- `needsAttention`: Show only companies that are stale OR have overdue tasks OR closing soon
-- `topOfMindOnly`: Show only `is_top_of_mind === true`
-- `staleOnly`: Show only companies with no interaction > 14 days
+### 2.2 Add Attachments Section to TaskDetailsDialog
 
-### Step 6: Actionable Summary Tiles
+**File: `src/components/modals/TaskDetailsDialog.tsx`**
 
-**File: `src/components/pipeline/SummaryBox.tsx`**
+Add a collapsible "Attachments" section that:
+- Shows attachments from the source inbox item (if any)
+- Allows previewing/downloading attachments
+- Reuses existing `AttachmentCard` and `AttachmentPreview` patterns
 
-Tiles are already clickable. Enhance with sublabels:
+### 2.3 Create Polymorphic Attachment Links Table (Future Enhancement)
 
-```
-Current:
-  [5] Active
+For full attachment portability across entities (tasks, notes, projects), a polymorphic `attachment_links` table could be added:
 
-Enhanced:
-  [5] Active
-  2 need follow-up
-```
-
-**Sublabel Logic per Tile:**
-- Active: Count with overdue tasks or stale
-- Passed: (no sublabel needed)
-- To Share: Count stale
-- Interesting: Count with tasks
-- Pearls: Count closing soon
-- New: Count needing review (no tasks created yet)
-
-### Step 7: Inline Card Actions Menu
-
-**File: `src/components/pipeline/PipelineCard.tsx`**
-
-Add kebab menu (MoreHorizontal) on hover with quick actions:
-
-```
-[⋮] Menu Items:
-├── Add task
-├── Log note
-├── Move to... (submenu with stages)
-├── ─────────────
-└── Mark as passed
+```sql
+CREATE TABLE attachment_links (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  attachment_source_type TEXT NOT NULL, -- 'inbox' | 'pipeline' | 'project'
+  attachment_source_id uuid NOT NULL,
+  target_type TEXT NOT NULL, -- 'task' | 'note' | 'project' | 'company'
+  target_id uuid NOT NULL,
+  created_by uuid REFERENCES auth.users(id),
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 ```
 
-**Implementation:**
-- Use existing DropdownMenu pattern
-- On "Add task": Open AddTaskDialog with company pre-filled
-- On "Log note": Open quick note composer (reuse from Deal Room)
-- On "Move to": Submenu with all stages except current
-- On "Mark as passed": Direct status update with confirmation
+**Note**: For MVP, we can achieve attachment viewing via the FK relationship (task → inbox_item → inbox_attachments) without needing a new linking table.
 
-### Step 8: Enhanced List View
+## Phase 3: UI for "Accept" Action
 
-**File: `src/components/pipeline/PipelineListView.tsx`**
+### 3.1 Add Attachment Actions in InboxActionRail
 
-Add attention columns to table:
+**File: `src/components/inbox/InboxActionRail.tsx`**
 
-```
-| Company | Round | Status | Sector | Raise | Close | Tasks | Last Touch | Actions |
-```
+Add "Link Attachments" action that:
+- Shows when the inbox item has attachments
+- Opens a picker to select which attachments to link
+- Creates task with selected attachment references
 
-- **Tasks column**: Open task count with overdue indicator
-- **Last Touch column**: Relative timestamp, red if stale
-- **Actions column**: Star, kebab menu, open full page
+### 3.2 Attachment Indicator on Inbox Items
 
-### Step 9: Visual Polish Pass
+**File: `src/components/inbox/InboxItemRow.tsx`**
 
-**Files: Multiple**
+Add a small attachment icon/count indicator when an inbox item has attachments.
 
-- Reduce stage border saturation by 10-15% (e.g., `border-slate-400` → `border-slate-300`)
-- Attention badges use stronger colors (amber-500 for stale, red-500 for overdue)
-- Increase vertical spacing between cards: `space-y-4` → `space-y-5`
-- Reduce internal card padding slightly: `p-4` → `p-3.5`
-- Ensure consistent icon sizes (h-3.5 w-3.5 for inline, h-4 w-4 for buttons)
-
-## File Summary
+## File Changes Summary
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/lib/pipeline/pipelineAttentionHelpers.ts` | Create | Utility functions for computing attention signals |
-| `src/hooks/usePipelineTasksAggregate.ts` | Create | Hook to fetch all pipeline tasks efficiently |
-| `src/components/pipeline/PipelineCard.tsx` | Modify | Add attention row, inline actions menu, open full page icon |
-| `src/components/pipeline/PipelineKanbanView.tsx` | Modify | Enhanced column headers with summaries and quick controls |
-| `src/components/pipeline/PipelineToolbar.tsx` | Modify | Add toggle-style attention filters |
-| `src/components/pipeline/SummaryBox.tsx` | Modify | Add sublabels to tiles |
-| `src/components/pipeline/PipelineListView.tsx` | Modify | Add tasks and last touch columns |
-| `src/components/pipeline/PipelineGridView.tsx` | Modify | Ensure cards show attention signals |
-| `src/types/pipeline.ts` | Modify | Extend PipelineFilters interface |
-| `src/pages/Pipeline.tsx` | Modify | Wire up aggregate hooks and pass attention data |
-
-## Data Flow
-
-```text
-Pipeline.tsx
-├── usePipeline() → companies[]
-├── usePipelineTasksAggregate(companyIds) → tasksMap
-├── Compute attention for each company
-└── Pass to views
-
-PipelineKanbanView
-├── Receive companies with attention data
-├── Compute column summaries
-└── Render enhanced headers + cards
-
-PipelineCard
-├── Receive company + attention props
-├── Render attention row conditionally
-└── Render inline actions menu
-```
-
-## New Type Definitions
-
-```typescript
-// src/types/pipeline.ts additions
-
-interface PipelineCardAttention {
-  isStale: boolean;
-  daysSinceTouch: number | null;
-  hasOverdueTasks: boolean;
-  openTaskCount: number;
-  hasNextSteps: boolean;
-  isClosingSoon: boolean;
-  needsAttention: boolean;
-}
-
-interface EnhancedPipelineCompany extends PipelineCompany {
-  attention: PipelineCardAttention;
-}
-
-interface PipelineFilters {
-  search: string;
-  rounds: RoundEnum[];
-  sectors: SectorEnum[];
-  needsAttention?: boolean;
-  topOfMindOnly?: boolean;
-  staleOnly?: boolean;
-}
-
-interface ColumnSummary {
-  staleCount: number;
-  openTaskCount: number;
-  closingSoonCount: number;
-  summaryText: string; // e.g., "1 stale • 2 tasks"
-}
-```
-
-## Acceptance Criteria
-
-1. **Card Attention Signals**: Cards display stale badge (amber), overdue indicator (red), task count, last touch timestamp, and next steps indicator
-2. **Column Summaries**: Each Kanban column header shows aggregated attention signals (e.g., "2 stale • 5 tasks")
-3. **Column Quick Controls**: Hover reveals "Show needs attention" toggle and sort options
-4. **Filter Bar**: Three new toggle pills (Needs Attention, Top of Mind, Stale) filter the entire view
-5. **Actionable Tiles**: Summary tiles show sublabels and filter on click
-6. **Inline Actions**: Kebab menu on card hover with Add task, Log note, Move to, Mark as passed
-7. **Open Full Page**: Always-visible icon to navigate to Deal Room
-8. **Visual Polish**: Reduced border saturation, stronger attention colors, improved spacing
-9. **List View**: Additional columns for tasks and last touch
-10. **Existing Functionality**: All current features (drag-drop, filters, modal edit) continue working
+| `src/components/modals/AddTaskDialog.tsx` | Modify | Accept full task data including source_inbox_item_id |
+| `src/pages/Inbox.tsx` | Modify | Pass full task data to createTask, not just content |
+| `src/hooks/useTasks.ts` | Verify | Ensure source_inbox_item_id is passed to database |
+| `src/hooks/useTaskAttachments.ts` | Create | Hook to fetch attachments for a task via source inbox item |
+| `src/components/modals/TaskDetailsDialog.tsx` | Modify | Add attachments section showing source attachments |
+| `src/components/inbox/InboxItemRow.tsx` | Modify | Add attachment count indicator |
+| `src/components/inbox/InboxActionRail.tsx` | Modify | Add attachment linking awareness |
 
 ## Implementation Order
 
-1. **Phase 1 - Foundation**: Create attention helpers + aggregate tasks hook
-2. **Phase 2 - Card Enhancements**: Add attention row + inline actions to PipelineCard
-3. **Phase 3 - Column Headers**: Enhanced summaries + quick controls in KanbanView
-4. **Phase 4 - Filter Bar**: Toggle-style attention filters in Toolbar
-5. **Phase 5 - Summary Tiles**: Sublabels in SummaryBox
-6. **Phase 6 - List View**: Additional columns
-7. **Phase 7 - Visual Polish**: Color and spacing adjustments
+1. **Phase 1 - Wiring** (Foundation)
+   - Update AddTaskDialog to pass source_inbox_item_id
+   - Update Inbox.tsx to pass full task data to createTask
+   - Verify useTasks.ts handles source_inbox_item_id
 
-## Performance Considerations
+2. **Phase 2 - Display**
+   - Create useTaskAttachments hook
+   - Add TaskAttachmentsSection component
+   - Integrate into TaskDetailsDialog
 
-- Aggregate tasks hook uses single query with `IN` clause for all company IDs
-- Attention computations are memoized at Pipeline.tsx level
-- Column summaries computed only when companies change
-- No additional API calls per card
+3. **Phase 3 - Polish**
+   - Add attachment indicator to InboxItemRow
+   - Add "includes attachments" awareness to InboxActionRail
+   - Show attachment count in task creation confirmation
+
+## Technical Details
+
+### Database Query for Task Attachments
+
+When viewing a task, fetch attachments via the source inbox item:
+
+```typescript
+// In useTaskAttachments hook
+const { data: task } = await supabase
+  .from('tasks')
+  .select('source_inbox_item_id')
+  .eq('id', taskId)
+  .single();
+
+if (task?.source_inbox_item_id) {
+  const { data: attachments } = await supabase
+    .from('inbox_attachments')
+    .select('*')
+    .eq('inbox_item_id', task.source_inbox_item_id);
+}
+```
+
+### Signed URL Generation
+
+Reuse the existing `getSignedUrl` pattern from `useInboxAttachments`:
+
+```typescript
+const getSignedUrl = async (storagePath: string) => {
+  const { data } = await supabase.storage
+    .from('inbox-attachments')
+    .createSignedUrl(storagePath, 3600);
+  return data?.signedUrl;
+};
+```
+
+### Component Reuse
+
+Reuse existing attachment display components:
+- `AttachmentCard` from InboxAttachmentsSection
+- `AttachmentPreview` for inline preview
+- `formatFileSize`, `getFileIcon`, `canPreviewInline` helpers
+
+## Acceptance Criteria
+
+1. When creating a task from an inbox item, `source_inbox_item_id` is saved to the database
+2. TaskDetailsDialog shows "Source Attachments" section when task has source inbox item
+3. Users can preview and download attachments from the task view
+4. InboxItemRow shows attachment count indicator when attachments exist
+5. InboxActionRail indicates when task will include attachments
+6. Existing inbox attachment functionality continues to work unchanged
