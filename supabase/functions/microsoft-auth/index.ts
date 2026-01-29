@@ -306,14 +306,14 @@ serve(async (req) => {
             }
 
             console.log('Database operation completed successfully');
-          } catch (dbException) {
+        } catch (dbException) {
             console.error('Database exception:', dbException);
             // Clean up on database exception
             usedStates.delete(state);
             usedCodes.delete(code);
             return new Response(JSON.stringify({ 
               error: 'Database operation failed', 
-              details: dbException.message 
+              details: (dbException as Error).message 
             }), {
               status: 500,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },

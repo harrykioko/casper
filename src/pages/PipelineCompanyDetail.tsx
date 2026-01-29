@@ -5,6 +5,7 @@ import { usePipelineInteractions } from '@/hooks/usePipelineInteractions';
 import { usePipelineTimeline } from '@/hooks/usePipelineTimeline';
 import { usePipelineAttachments } from '@/hooks/usePipelineAttachments';
 import { useCompanyLinkedCommunications } from '@/hooks/useCompanyLinkedCommunications';
+import { usePipelineEnrichment } from '@/hooks/usePipelineEnrichment';
 import { DealRoomLayout } from '@/components/pipeline-detail/DealRoomLayout';
 import { DealRoomHero } from '@/components/pipeline-detail/DealRoomHero';
 import { DealRoomTabs } from '@/components/pipeline-detail/DealRoomTabs';
@@ -31,6 +32,7 @@ export default function PipelineCompanyDetail() {
   const { interactions, loading: interactionsLoading, createInteraction } = usePipelineInteractions(companyId);
   const { attachments, loading: attachmentsLoading } = usePipelineAttachments(companyId);
   const { linkedCommunications } = useCompanyLinkedCommunications(company?.primary_domain, companyId);
+  const { enrichment } = usePipelineEnrichment(companyId);
   const timelineEvents = usePipelineTimeline(interactions, tasks, linkedCommunications);
 
   if (!companyId) {
@@ -144,6 +146,7 @@ export default function PipelineCompanyDetail() {
             timelineEvents={timelineEvents}
             attachments={attachments}
             linkedCommunications={linkedCommunications}
+            enrichment={enrichment}
             onViewFullTimeline={() => setActiveTab('timeline')}
           />
         }
