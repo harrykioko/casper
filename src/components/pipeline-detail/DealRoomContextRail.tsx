@@ -1,4 +1,5 @@
 import { PipelineCompanyDetail, PipelineInteraction, PipelineTimelineEvent } from '@/types/pipelineExtended';
+import { PipelineAttachment } from '@/hooks/usePipelineAttachments';
 import { RelationshipSummary } from './shared/RelationshipSummary';
 import { NextActionsCard } from './shared/NextActionsCard';
 import { ActivityFeed } from './shared/ActivityFeed';
@@ -16,19 +17,21 @@ interface DealRoomContextRailProps {
   tasks: Task[];
   interactions: PipelineInteraction[];
   timelineEvents: PipelineTimelineEvent[];
+  attachments: PipelineAttachment[];
 }
 
 export function DealRoomContextRail({ 
   company, 
   tasks, 
   interactions, 
-  timelineEvents 
+  timelineEvents,
+  attachments 
 }: DealRoomContextRailProps) {
   const openTasks = tasks.filter(t => !t.completed);
   const notesCount = interactions.filter(i => 
     ['note', 'call', 'meeting', 'update'].includes(i.interaction_type)
   ).length;
-  const filesCount = 0; // Will be implemented
+  const filesCount = attachments.length;
   const commsCount = 0; // Placeholder
 
   return (
