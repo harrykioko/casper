@@ -1,211 +1,166 @@
 
-# Fix Email-Company Linking Visibility
+# Add "Save to Company" Button for Individual Attachments
 
-## Problem Summary
+## Overview
 
-When a user links an email to a pipeline company (Proxify), the linked email is correctly stored in the database (`related_company_id` is set), but it does not appear in:
+Enhance the inbox attachments section by adding a "Save to Company" button on each individual attachment card, allowing users to quickly save specific documents to a linked company's file workspace.
 
-1. The **Comms tab** on the pipeline company detail page
-2. The **Relationship Summary** (shows "Comms: 0")
-3. The **Activity feed** on the context rail
-4. The **Activity dropdown** in the inbox detail drawer
+## Current State
 
-## Root Cause
+- **InboxAttachmentsSection** displays attachment cards with Preview and Download buttons
+- **SaveAttachmentsModal** exists but is only accessible via the Action Rail's "Save to Company" button
+- The modal requires selecting files first, then a company (multi-step)
+- Individual attachments can't be saved directly
 
-The communication linking uses **domain matching only** - it checks if the sender/recipient email domain matches the company's `primary_domain`. This misses emails that are **manually linked** via `related_company_id`, which is the case here:
+## User Flow After Change
 
-- Sender: `harrison@canapi.com` (domain: canapi.com)
-- Company domain: `proxify.ai`
-- Domain match: **FAIL**
-- But `related_company_id` is correctly set to the Proxify company ID
-
-## Solution
-
-Update the communication fetching to use a **dual approach**:
-
-1. **Domain matching** (existing) - for automatic linking
-2. **Explicit link check** (new) - for manually linked emails via `related_company_id`
-
-Additionally, update the inbox activity section to show tasks created from the email.
-
----
+```text
+User views email with attachments
+          │
+          ▼
+┌─────────────────────────────────────────────────┐
+│  ATTACHMENT CARD                                │
+│  ┌──────┐                                       │
+│  │ PDF  │  Nilus One-Pager Nov25.pdf     👁 ⬇ 💾│
+│  └──────┘  2.7 MB                               │
+└─────────────────────────────────────────────────┘
+          │
+          │ User clicks 💾 (Save to Company)
+          │
+          ├──────────────────────────────────────────┐
+          │                                          │
+     Company Linked?                            No Company?
+          │                                          │
+          ▼                                          ▼
+   Save immediately                      Open company picker modal
+   Show toast success                    Then save on selection
+```
 
 ## File Changes
 
-### 1. Update `src/hooks/useCompanyLinkedCommunications.ts`
+### 1. Update `InboxAttachmentsSection.tsx`
 
-Add a new parameter to accept the company ID and fetch emails that are explicitly linked:
+Add a "Save to Company" button to each `AttachmentCard`:
 
-```text
-Current: useCompanyLinkedCommunications(primaryDomain)
-New:     useCompanyLinkedCommunications(primaryDomain, companyId?)
-```
+**Props changes:**
+- Accept `linkedCompanyId`, `linkedCompanyName` from parent
+- Accept `onSaveAttachment` callback for handling save action
 
-Changes:
-- Accept optional `companyId` parameter
-- Fetch inbox items where `related_company_id = companyId` (explicit links)
-- Also fetch inbox items matching by domain (implicit links)
-- Merge and dedupe the two result sets
-- Return unified list of linked communications
+**AttachmentCard changes:**
+- Add a Save icon button (Building2 icon) next to Download
+- Button shows tooltip: "Save to [Company Name]" or "Save to Company"
+- On click:
+  - If company is linked → call save function directly
+  - If no company → trigger the save modal flow
 
-Query logic:
+**Component signature:**
 ```typescript
-// Fetch explicitly linked emails
-const { data: linkedEmails } = await supabase
-  .from('inbox_items')
-  .select('id, subject, from_email, from_name, to_email, received_at')
-  .eq('related_company_id', companyId)
-  .eq('is_resolved', false)
-  .eq('is_deleted', false);
-
-// Combine with domain-matched emails, dedupe by ID
-```
-
-### 2. Update `src/components/pipeline-detail/tabs/CommsTab.tsx`
-
-Pass the company ID to the hook:
-
-```typescript
-// Before
-const { linkedCommunications, loading } = useCompanyLinkedCommunications(company.primary_domain);
-
-// After
-const { linkedCommunications, loading } = useCompanyLinkedCommunications(
-  company.primary_domain,
-  company.id
-);
-```
-
-### 3. Update `src/hooks/usePipelineTimeline.ts`
-
-Add linked emails as timeline events:
-
-```typescript
-// Accept a new parameter for linked communications
-export function usePipelineTimeline(
-  interactions: PipelineInteraction[],
-  tasks: PipelineTask[],
-  linkedEmails?: LinkedCommunication[]
-): PipelineTimelineEvent[]
-
-// Add email linked events to the timeline
-for (const email of linkedEmails || []) {
-  if (email.type === 'email') {
-    events.push({
-      id: `email-linked-${email.id}`,
-      type: 'email',
-      timestamp: email.timestamp,
-      title: 'Email linked',
-      description: email.title,
-      icon: 'email',
-      metadata: { email },
-    });
-  }
+interface InboxAttachmentsSectionProps {
+  inboxItemId: string;
+  linkedCompanyId?: string;
+  linkedCompanyName?: string;
+  onSaveToCompany?: (attachment: InboxAttachment) => void;
 }
 ```
 
-### 4. Update `src/pages/PipelineCompanyDetail.tsx`
+### 2. Update `InboxContentPane.tsx`
 
-Pass linked communications to the timeline hook:
-
-```typescript
-// Fetch linked communications for the company
-const { linkedCommunications } = useCompanyLinkedCommunications(
-  company?.primary_domain,
-  companyId
-);
-
-// Pass to timeline hook
-const timelineEvents = usePipelineTimeline(
-  interactions, 
-  tasks, 
-  linkedCommunications.filter(c => c.type === 'email')
-);
-```
-
-### 5. Update `src/components/inbox/InboxActionRail.tsx`
-
-Fetch and display tasks created from this email in the Activity section:
+Pass the linked company info and save handler to `InboxAttachmentsSection`:
 
 ```typescript
-// Add hook to fetch related tasks
-import { useTasks } from '@/hooks/useTasks';
-
-// Inside the component:
-const { tasks: allTasks } = useTasks();
-
-// Filter tasks created from this inbox item
-const relatedTasks = useMemo(() => {
-  return allTasks.filter(t => t.sourceInboxItemId === item.id);
-}, [allTasks, item.id]);
-
-// Map to activity items
-const activityItems = useMemo(() => {
-  return relatedTasks.map(task => ({
-    action: `Created task: "${task.content}"`,
-    timestamp: formatDistanceToNow(new Date(task.createdAt), { addSuffix: true }),
-  }));
-}, [relatedTasks]);
+<InboxAttachmentsSection 
+  inboxItemId={item.id}
+  linkedCompanyId={item.relatedCompanyId}
+  linkedCompanyName={item.relatedCompanyName}
+  onSaveToCompany={onSaveAttachmentToCompany}
+/>
 ```
 
-### 6. Update `src/components/pipeline-detail/shared/RelationshipSummary.tsx`
+Add handler that:
+- If company is linked → call `copyInboxAttachmentToPipeline` directly
+- If no company → open modal (passed from parent)
 
-The Comms count should reflect explicitly linked emails. This is already passed from the parent, but ensure it counts linked inbox items:
+### 3. Update `InboxDetailWorkspace.tsx`
 
-The parent component (`DealRoomContextRail`) calculates `commsCount` - update it to use the linked communications count:
+Add new prop to accept single-attachment save handler:
 
 ```typescript
-// In DealRoomContextRail.tsx
-const commsCount = linkedCommunications.length; // Use actual count
+onSaveAttachmentToCompany?: (attachment: InboxAttachment) => void;
 ```
 
-Wait - I need to check what `DealRoomContextRail` currently receives:
+Pass down to `InboxContentPane`.
+
+### 4. Update `InboxDetailDrawer.tsx` (embedded mode)
+
+Pass the single-attachment handler through to `InboxDetailWorkspace`.
+
+### 5. Update `Inbox.tsx` Page
+
+Add state and handler for single attachment saves:
+
+```typescript
+// State for single attachment save
+const [singleAttachmentToSave, setSingleAttachmentToSave] = useState<{
+  attachment: InboxAttachment;
+  inboxItem: InboxItem;
+} | null>(null);
+
+// Handler for single attachment save
+const handleSaveAttachmentToCompany = async (attachment: InboxAttachment, item: InboxItem) => {
+  if (item.relatedCompanyId) {
+    // Company linked - save directly
+    const result = await copyInboxAttachmentToPipeline(
+      attachment,
+      item.relatedCompanyId,
+      user.id
+    );
+    if (result.success) {
+      toast.success(`Saved "${attachment.filename}" to ${item.relatedCompanyName}`);
+    } else {
+      toast.error("Failed to save attachment");
+    }
+  } else {
+    // No company - open modal with single attachment preselected
+    setSingleAttachmentToSave({ attachment, inboxItem: item });
+    setSaveAttachmentsItem(item);
+  }
+};
+```
+
+### 6. Optional: Enhance `SaveAttachmentsModal.tsx`
+
+Add prop to pre-select specific attachments when opened from individual save button:
+
+```typescript
+interface SaveAttachmentsModalProps {
+  // ... existing props
+  preSelectedAttachmentIds?: string[];
+}
+```
+
+When `preSelectedAttachmentIds` is provided:
+- Initialize `selectedIds` state with these IDs
+- Skip file selection step if only one pre-selected
 
 ---
 
-## Additional Investigation Needed
+## UI Design for Attachment Card
 
-Looking at `DealRoomContextRail.tsx`:
-
-```typescript
-const commsCount = 0; // Placeholder
+```text
+┌────────────────────────────────────────────────────────────────┐
+│  ┌──────┐                                                      │
+│  │ icon │  filename.pdf                    [👁] [⬇] [🏢]      │
+│  └──────┘  2.7 MB                                              │
+└────────────────────────────────────────────────────────────────┘
+                                              │    │    │
+                                          Preview  │  Save to
+                                              Download  Company
 ```
 
-This is a hardcoded placeholder! It needs to receive the actual linked communications count.
-
-### 7. Update `src/components/pipeline-detail/DealRoomContextRail.tsx`
-
-Add linked communications to the props and use for count:
-
-```typescript
-interface DealRoomContextRailProps {
-  // ...existing props
-  linkedCommunications: LinkedCommunication[];
-}
-
-// In component
-const commsCount = linkedCommunications.length;
-```
-
-### 8. Update `src/pages/PipelineCompanyDetail.tsx`
-
-Fetch and pass linked communications to the context rail:
-
-```typescript
-const { linkedCommunications, loading: commsLoading } = useCompanyLinkedCommunications(
-  company?.primary_domain,
-  companyId
-);
-
-<DealRoomContextRail
-  company={company}
-  tasks={tasks}
-  interactions={interactions}
-  timelineEvents={timelineEvents}
-  attachments={attachments}
-  linkedCommunications={linkedCommunications}
-/>
-```
+Button states:
+- **If company linked**: Building2 icon with checkmark, tooltip "Save to [CompanyName]"
+- **If no company**: Building2 icon, tooltip "Save to company..."
+- **Saving state**: Loader2 spinner
 
 ---
 
@@ -213,46 +168,39 @@ const { linkedCommunications, loading: commsLoading } = useCompanyLinkedCommunic
 
 | File | Change |
 |------|--------|
-| `src/hooks/useCompanyLinkedCommunications.ts` | Add `companyId` param, fetch explicitly linked emails |
-| `src/components/pipeline-detail/tabs/CommsTab.tsx` | Pass company ID to hook |
-| `src/hooks/usePipelineTimeline.ts` | Include linked emails as timeline events |
-| `src/pages/PipelineCompanyDetail.tsx` | Fetch linked comms, pass to timeline + context rail |
-| `src/components/pipeline-detail/DealRoomContextRail.tsx` | Accept linked comms, compute count |
-| `src/components/inbox/InboxActionRail.tsx` | Show tasks created from email in Activity section |
-| `src/types/inbox.ts` | Add `sourceInboxItemId` to InboxItem if missing |
+| `src/components/inbox/InboxAttachmentsSection.tsx` | Add Save button to each card, accept company props |
+| `src/components/inbox/InboxContentPane.tsx` | Pass company info to attachments section |
+| `src/components/inbox/InboxDetailWorkspace.tsx` | Add single-save handler prop |
+| `src/components/dashboard/InboxDetailDrawer.tsx` | Pass handler through to workspace |
+| `src/pages/Inbox.tsx` | Add handler for single attachment saves |
 
 ---
 
-## Data Flow After Fix
+## Technical Notes
 
-```text
-Email Linked to Company
-        │
-        ▼
-┌────────────────────────────────────┐
-│  inbox_items.related_company_id    │
-│  = pipeline_company.id             │
-└────────────────────────────────────┘
-        │
-        ▼
-┌────────────────────────────────────┐
-│  useCompanyLinkedCommunications()  │
-│  - Fetches by related_company_id   │
-│  - Also matches by domain          │
-│  - Returns merged, deduped list    │
-└────────────────────────────────────┘
-        │
-        ├──────────────────────────────────┐
-        │                                  │
-        ▼                                  ▼
-┌──────────────────────┐     ┌──────────────────────────┐
-│  CommsTab            │     │  DealRoomContextRail     │
-│  Shows linked emails │     │  - RelationshipSummary   │
-│  and meetings        │     │    (shows Comms count)   │
-└──────────────────────┘     │  - ActivityFeed          │
-                             │    (shows email events)  │
-                             └──────────────────────────┘
+### Direct Save (when company linked)
+
+```typescript
+import { copyInboxAttachmentToPipeline } from "@/lib/inbox/copyAttachmentToCompany";
+
+const result = await copyInboxAttachmentToPipeline(
+  attachment,
+  companyId,
+  userId
+);
 ```
+
+### Toast Feedback
+
+- Success: `Saved "filename.pdf" to [Company Name]`
+- Error: `Failed to save attachment`
+- Loading: Spinner on button, disable other actions
+
+### Edge Cases
+
+1. **Portfolio companies**: Show toast "Saving to portfolio coming soon" (already handled in existing modal)
+2. **Linked company deleted**: Show error toast, fallback to company picker
+3. **Storage bucket permission errors**: Show clear error message
 
 ---
 
@@ -260,35 +208,8 @@ Email Linked to Company
 
 After implementation:
 
-1. **Comms tab** - Shows the Neil Agarwal email under "Emails (1)"
-2. **Relationship Summary** - Shows "Comms: 1"
-3. **Activity feed** - Shows "Email linked" event with timestamp
-4. **Inbox Activity dropdown** - Shows "Created task: Follow up with Neil..." entry
-
----
-
-## Technical Notes
-
-### Deduplication
-
-When merging domain-matched and explicitly-linked emails, dedupe by `id` to avoid showing the same email twice:
-
-```typescript
-const allEmails = [...linkedEmails, ...domainMatchedEmails];
-const uniqueEmails = Array.from(
-  new Map(allEmails.map(e => [e.id, e])).values()
-);
-```
-
-### Query Cache Invalidation
-
-After linking a company to an email, invalidate the communications query:
-
-```typescript
-// In useInboxItems.ts linkCompanyMutation onSuccess:
-queryClient.invalidateQueries({ queryKey: ["company_linked_communications"] });
-```
-
-### Build Error Fixes
-
-The plan should also include fixing the existing build errors mentioned (TypeScript issues in edge functions) - these are separate from the linking issue but need to be resolved.
+1. Each attachment card shows a third button (Building2 icon) for "Save to Company"
+2. If email is linked to a company → one-click save with success toast
+3. If email has no linked company → opens company picker modal
+4. Files appear in the company's Files tab immediately
+5. Works consistently in both desktop embedded view and mobile drawer
