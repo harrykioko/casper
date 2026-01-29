@@ -1,6 +1,7 @@
 import { formatDistanceToNow } from "date-fns";
 import { ListTodo, Check, Archive, Paperclip } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import type { InboxItem } from "@/types/inbox";
 
@@ -23,6 +24,12 @@ export function InboxItemRow({
   onMarkComplete,
   onArchive,
 }: InboxItemRowProps) {
+  // Use display fields with fallbacks
+  const displayName = item.displayFromName || item.senderName;
+  const displaySubject = item.displaySubject || item.subject;
+  const displayPreview = item.summary || item.displaySnippet || item.preview;
+  const initial = displayName.charAt(0).toUpperCase();
+
   return (
     <div
       onClick={onClick}
@@ -37,7 +44,7 @@ export function InboxItemRow({
       {/* Avatar */}
       <div className="w-10 h-10 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center flex-shrink-0">
         <span className="text-sm font-semibold text-sky-600 dark:text-sky-400">
-          {item.senderName.charAt(0).toUpperCase()}
+          {initial}
         </span>
       </div>
 
@@ -52,8 +59,13 @@ export function InboxItemRow({
                 : "font-medium text-muted-foreground"
             )}
           >
-            {item.senderName}
+            {displayName}
           </span>
+          {item.isForwarded && (
+            <Badge variant="outline" className="text-[9px] h-4 px-1.5 font-medium text-muted-foreground border-muted-foreground/30">
+              Fwd
+            </Badge>
+          )}
           {!item.isRead && (
             <div className="w-2 h-2 rounded-full bg-sky-500 flex-shrink-0" />
           )}
@@ -73,11 +85,11 @@ export function InboxItemRow({
           "text-sm truncate",
           !item.isRead ? "text-foreground" : "text-muted-foreground"
         )}>
-          {item.subject}
+          {displaySubject}
         </p>
-        {item.preview && (
+        {displayPreview && (
           <p className="text-xs text-muted-foreground truncate mt-0.5">
-            {item.preview}
+            {displayPreview}
           </p>
         )}
       </div>

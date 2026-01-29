@@ -571,6 +571,7 @@ export type Database = {
           display_from_name: string | null
           display_snippet: string | null
           display_subject: string | null
+          forwarded_by_email: string | null
           from_email: string
           from_name: string | null
           has_calendar: boolean
@@ -591,6 +592,9 @@ export type Database = {
           snippet: string | null
           snoozed_until: string | null
           subject: string
+          summary: string | null
+          summary_source: string | null
+          summary_updated_at: string | null
           text_body: string | null
           to_email: string | null
           updated_at: string
@@ -603,6 +607,7 @@ export type Database = {
           display_from_name?: string | null
           display_snippet?: string | null
           display_subject?: string | null
+          forwarded_by_email?: string | null
           from_email: string
           from_name?: string | null
           has_calendar?: boolean
@@ -623,6 +628,9 @@ export type Database = {
           snippet?: string | null
           snoozed_until?: string | null
           subject: string
+          summary?: string | null
+          summary_source?: string | null
+          summary_updated_at?: string | null
           text_body?: string | null
           to_email?: string | null
           updated_at?: string
@@ -635,6 +643,7 @@ export type Database = {
           display_from_name?: string | null
           display_snippet?: string | null
           display_subject?: string | null
+          forwarded_by_email?: string | null
           from_email?: string
           from_name?: string | null
           has_calendar?: boolean
@@ -655,6 +664,9 @@ export type Database = {
           snippet?: string | null
           snoozed_until?: string | null
           subject?: string
+          summary?: string | null
+          summary_source?: string | null
+          summary_updated_at?: string | null
           text_body?: string | null
           to_email?: string | null
           updated_at?: string

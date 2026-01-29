@@ -26,12 +26,18 @@ interface InboxItemRow {
   created_at: string;
   updated_at: string;
   is_top_priority?: boolean;
-  // New cleaned fields
+  // Cleaned fields
   cleaned_text?: string | null;
   display_snippet?: string | null;
   display_subject?: string | null;
   display_from_email?: string | null;
   display_from_name?: string | null;
+  // Summary fields
+  forwarded_by_email?: string | null;
+  summary?: string | null;
+  summary_source?: string | null;
+  summary_updated_at?: string | null;
+  // Signal flags
   is_forwarded?: boolean;
   has_thread?: boolean;
   has_disclaimer?: boolean;
@@ -65,6 +71,11 @@ function transformRow(row: InboxItemRow): InboxItem {
     displaySubject: row.display_subject,
     displayFromEmail: row.display_from_email,
     displayFromName: row.display_from_name,
+    // Summary fields
+    forwardedByEmail: row.forwarded_by_email,
+    summary: row.summary,
+    summarySource: row.summary_source as 'heuristic' | 'ai' | null,
+    summaryUpdatedAt: row.summary_updated_at,
     // Processing signals
     isForwarded: row.is_forwarded || false,
     hasThread: row.has_thread || false,

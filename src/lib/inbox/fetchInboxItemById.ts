@@ -38,11 +38,18 @@ export async function fetchInboxItemById(emailId: string): Promise<InboxItem | n
     relatedCompanyLogoUrl: data.related_company_logo_url || undefined,
     createdBy: data.created_by,
     isTopPriority: data.is_top_priority || false,
+    // Cleaned content
     cleanedText: data.cleaned_text,
     displaySnippet: data.display_snippet,
     displaySubject: data.display_subject,
     displayFromEmail: data.display_from_email,
     displayFromName: data.display_from_name,
+    // Summary fields
+    forwardedByEmail: data.forwarded_by_email,
+    summary: data.summary,
+    summarySource: data.summary_source as 'heuristic' | 'ai' | null,
+    summaryUpdatedAt: data.summary_updated_at,
+    // Signals
     isForwarded: data.is_forwarded || false,
     hasThread: data.has_thread || false,
     hasDisclaimer: data.has_disclaimer || false,

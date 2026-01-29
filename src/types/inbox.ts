@@ -26,6 +26,12 @@ export interface InboxItem {
   displayFromEmail?: string | null;
   displayFromName?: string | null;
   
+  // Summary (one-sentence preview)
+  forwardedByEmail?: string | null;
+  summary?: string | null;
+  summarySource?: 'heuristic' | 'ai' | null;
+  summaryUpdatedAt?: string | null;
+  
   // Processing signals
   isForwarded?: boolean;
   hasThread?: boolean;
