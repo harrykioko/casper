@@ -49,8 +49,8 @@ const App = () => {
                 <GlobalInboxDrawerProvider>
                   <BrowserRouter>
                     <AppContent />
+                    <GlobalInboxDrawerOverlay />
                   </BrowserRouter>
-                  <GlobalInboxDrawerOverlay />
                 </GlobalInboxDrawerProvider>
               </FloatingNoteProvider>
             </SidebarStateProvider>

@@ -55,6 +55,103 @@ export type Database = {
           },
         ]
       }
+      calendar_event_link_suggestions: {
+        Row: {
+          calendar_event_id: string
+          company_id: string
+          company_name: string
+          company_type: string
+          confidence: number | null
+          created_at: string
+          created_by: string
+          id: string
+          match_reason: string | null
+          matched_attendee_email: string | null
+          matched_domain: string | null
+          status: string
+        }
+        Insert: {
+          calendar_event_id: string
+          company_id: string
+          company_name: string
+          company_type: string
+          confidence?: number | null
+          created_at?: string
+          created_by: string
+          id?: string
+          match_reason?: string | null
+          matched_attendee_email?: string | null
+          matched_domain?: string | null
+          status?: string
+        }
+        Update: {
+          calendar_event_id?: string
+          company_id?: string
+          company_name?: string
+          company_type?: string
+          confidence?: number | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          match_reason?: string | null
+          matched_attendee_email?: string | null
+          matched_domain?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_link_suggestions_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_event_links: {
+        Row: {
+          calendar_event_id: string
+          company_id: string
+          company_name: string
+          company_type: string
+          confidence: number | null
+          created_at: string
+          created_by: string
+          id: string
+          linked_by: string
+        }
+        Insert: {
+          calendar_event_id: string
+          company_id: string
+          company_name: string
+          company_type: string
+          confidence?: number | null
+          created_at?: string
+          created_by: string
+          id?: string
+          linked_by: string
+        }
+        Update: {
+          calendar_event_id?: string
+          company_id?: string
+          company_name?: string
+          company_type?: string
+          confidence?: number | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          linked_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_links_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           attendees: Json | null
