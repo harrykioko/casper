@@ -2,12 +2,13 @@
 import { useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { 
-  LayoutDashboard, 
+  LayoutDashboard,
   AlertTriangle,
+  Crosshair,
   Inbox,
   List,
-  FolderKanban, 
-  MessageSquareText, 
+  FolderKanban,
+  MessageSquareText,
   Sparkles,
   BookOpen,
   TrendingUp,
@@ -34,17 +35,23 @@ export function NavSidebar() {
       label: "Dashboard",
       active: location.pathname === "/dashboard" 
     },
-    { 
-      icon: AlertTriangle, 
-      path: "/priority", 
+    {
+      icon: AlertTriangle,
+      path: "/priority",
       label: "Priority",
-      active: location.pathname.startsWith("/priority") 
+      active: location.pathname.startsWith("/priority")
     },
-    { 
-      icon: Inbox, 
-      path: "/inbox", 
+    {
+      icon: Crosshair,
+      path: "/focus",
+      label: "Focus",
+      active: location.pathname.startsWith("/focus")
+    },
+    {
+      icon: Inbox,
+      path: "/inbox",
       label: "Inbox",
-      active: location.pathname.startsWith("/inbox") 
+      active: location.pathname.startsWith("/inbox")
     },
     { 
       icon: List, 

@@ -31,6 +31,7 @@ import Priority from "./pages/Priority";
 import Inbox from "./pages/Inbox";
 import Settings from "./pages/Settings";
 import Notes from "./pages/Notes";
+import FocusQueue from "./pages/FocusQueue";
 import NotFound from "./pages/NotFound";
 import OAuthCallback from "./pages/OAuthCallback";
 
@@ -121,6 +122,7 @@ const MainContent = () => {
           <Route path="/portfolio/:companyId" element={<PortfolioCompanyDetail />} />
           <Route path="/priority" element={<Priority />} />
           <Route path="/inbox" element={<Inbox />} />
+          <Route path="/focus" element={<FocusQueue />} />
           <Route path="/notes" element={<Notes />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />
