@@ -45,6 +45,7 @@ const targetTypeLabels: Record<NoteTargetType, string> = {
   company: 'Company',
   project: 'Project',
   reading_item: 'Reading',
+  calendar_event: 'Event',
 };
 
 const targetTypeColors: Record<NoteTargetType, string> = {
@@ -52,6 +53,7 @@ const targetTypeColors: Record<NoteTargetType, string> = {
   company: 'bg-blue-500/20 text-blue-600 dark:text-blue-400',
   project: 'bg-violet-500/20 text-violet-600 dark:text-violet-400',
   reading_item: 'bg-rose-500/20 text-rose-600 dark:text-rose-400',
+  calendar_event: 'bg-orange-500/20 text-orange-600 dark:text-orange-400',
 };
 
 function NoteCard({

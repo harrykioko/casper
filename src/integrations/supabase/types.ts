@@ -112,6 +112,7 @@ export type Database = {
         Row: {
           calendar_event_id: string
           company_id: string
+          company_logo_url: string | null
           company_name: string
           company_type: string
           confidence: number | null
@@ -123,6 +124,7 @@ export type Database = {
         Insert: {
           calendar_event_id: string
           company_id: string
+          company_logo_url?: string | null
           company_name: string
           company_type: string
           confidence?: number | null
@@ -134,6 +136,7 @@ export type Database = {
         Update: {
           calendar_event_id?: string
           company_id?: string
+          company_logo_url?: string | null
           company_name?: string
           company_type?: string
           confidence?: number | null
