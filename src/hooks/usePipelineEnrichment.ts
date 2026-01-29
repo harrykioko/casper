@@ -83,10 +83,10 @@ export function usePipelineEnrichment(companyId: string | undefined) {
   const enrichCompany = async (
     mode: EnrichmentMode,
     options?: EnrichOptions
-  ): Promise<HarmonicEnrichment | null> => {
+  ): Promise<{ enrichment: HarmonicEnrichment | null; notFound: boolean }> => {
     if (!companyId) {
       toast.error('No company ID provided');
-      return null;
+      return { enrichment: null, notFound: false };
     }
 
     try {
@@ -103,16 +103,26 @@ export function usePipelineEnrichment(companyId: string | undefined) {
 
       if (invokeError) {
         console.error('Error enriching company:', invokeError);
+        // Check for 404/not found in error
+        if (invokeError.message?.includes('404')) {
+          setError('No matching company found');
+          return { enrichment: null, notFound: true };
+        }
         toast.error(invokeError.message || 'Failed to enrich company');
         setError(invokeError.message);
-        return null;
+        return { enrichment: null, notFound: false };
       }
 
       if (data?.error) {
         console.error('Enrichment error:', data.error);
+        // Check for specific "not found" error from edge function
+        if (data.error === 'No matching company found in Harmonic') {
+          setError(data.error);
+          return { enrichment: null, notFound: true };
+        }
         toast.error(data.error);
         setError(data.error);
-        return null;
+        return { enrichment: null, notFound: false };
       }
 
       if (data?.enrichment) {
@@ -122,16 +132,16 @@ export function usePipelineEnrichment(companyId: string | undefined) {
         };
         setEnrichment(typedEnrichment);
         toast.success('Company enriched successfully');
-        return typedEnrichment;
+        return { enrichment: typedEnrichment, notFound: false };
       }
 
-      return null;
+      return { enrichment: null, notFound: false };
     } catch (err) {
       console.error('Error enriching company:', err);
       const message = (err as Error).message || 'Failed to enrich company';
       toast.error(message);
       setError(message);
-      return null;
+      return { enrichment: null, notFound: false };
     } finally {
       setEnriching(false);
     }
@@ -167,7 +177,7 @@ export function usePipelineEnrichment(companyId: string | undefined) {
     }
   };
 
-  const refreshEnrichment = async (): Promise<HarmonicEnrichment | null> => {
+  const refreshEnrichment = async (): Promise<{ enrichment: HarmonicEnrichment | null; notFound: boolean }> => {
     return enrichCompany('refresh');
   };
 

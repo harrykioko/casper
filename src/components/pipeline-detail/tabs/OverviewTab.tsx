@@ -9,6 +9,7 @@ import { KeyPeopleCard } from '../overview/KeyPeopleCard';
 import { HarmonicMatchModal } from '../overview/HarmonicMatchModal';
 import { DealRoomTab } from '@/pages/PipelineCompanyDetail';
 import { HarmonicEnrichment, HarmonicCandidate, EnrichmentMode } from '@/types/enrichment';
+import { toast } from 'sonner';
 
 interface EnrichOptions {
   website_domain?: string;
@@ -34,9 +35,9 @@ interface OverviewTabProps {
   enrichment: HarmonicEnrichment | null;
   enrichmentLoading: boolean;
   enriching: boolean;
-  onEnrich: (mode: EnrichmentMode, options?: EnrichOptions) => Promise<HarmonicEnrichment | null>;
+  onEnrich: (mode: EnrichmentMode, options?: EnrichOptions) => Promise<{ enrichment: HarmonicEnrichment | null; notFound: boolean }>;
   onSearchCandidates: (queryName: string) => Promise<HarmonicCandidate[]>;
-  onRefreshEnrichment: () => Promise<HarmonicEnrichment | null>;
+  onRefreshEnrichment: () => Promise<{ enrichment: HarmonicEnrichment | null; notFound: boolean }>;
   onRefetch: () => void;
   onCreateTask: (content: string, options?: { scheduled_for?: string; priority?: string }) => Promise<any>;
   onViewAllTasks: () => void;
@@ -85,10 +86,15 @@ export function OverviewTab({
       return bTime - aTime;
     })[0] || null;
 
-  const handleEnrich = () => {
+  const handleEnrich = async () => {
     const domain = company.primary_domain || (company.website ? new URL(company.website.startsWith('http') ? company.website : `https://${company.website}`).hostname.replace('www.', '') : null);
     if (domain) {
-      onEnrich('enrich_by_domain', { website_domain: domain });
+      const result = await onEnrich('enrich_by_domain', { website_domain: domain });
+      // If no match found by domain, auto-open manual match modal
+      if (result.notFound) {
+        toast.info('No automatic match found. Search for the company manually.');
+        setMatchModalOpen(true);
+      }
     } else {
       setMatchModalOpen(true);
     }
