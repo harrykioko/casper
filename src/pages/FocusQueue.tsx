@@ -11,11 +11,15 @@ import { FocusFiltersPanel } from "@/components/focus/FocusFiltersPanel";
 import { WorkQueueList } from "@/components/focus/WorkQueueList";
 import { WorkItemReviewCard } from "@/components/focus/WorkItemReviewCard";
 import { WorkItemContextRail } from "@/components/focus/WorkItemContextRail";
+import { useBackfillWorkItems } from "@/hooks/useBackfillWorkItems";
 import { cn } from "@/lib/utils";
 
 export default function FocusQueue() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
+
+  // Backfill work_items from existing source records on first load
+  useBackfillWorkItems();
 
   // Filter state
   const [statusFilter, setStatusFilter] = useState<WorkItemStatus | 'all'>('all');

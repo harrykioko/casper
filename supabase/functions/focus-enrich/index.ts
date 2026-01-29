@@ -253,13 +253,13 @@ async function fetchSourceContent(
     case "calendar_event": {
       const { data } = await supabase
         .from("calendar_events")
-        .select("subject, body_preview, attendees, start_time, end_time, location")
+        .select("title, description, attendees, start_time, end_time, location")
         .eq("id", sourceId)
         .single();
       if (!data) return null;
       return {
-        title: data.subject || "",
-        body: data.body_preview || "",
+        title: data.title || "",
+        body: data.description || "",
         metadata: {
           attendees: data.attendees,
           start_time: data.start_time,
