@@ -6,6 +6,7 @@
 export interface CleanedEmailResult {
   cleanedText: string;
   snippet: string;
+  summary: string; // ~120 char one-sentence summary
   displaySubject: string;
   displayFromEmail: string | null;
   displayFromName: string | null;
@@ -28,6 +29,7 @@ interface ForwardedMeta {
 // ============ Constants ============
 
 const SNIPPET_LENGTH = 280;
+const SUMMARY_LENGTH = 120;
 const MAX_CLEANED_LENGTH = 4000;
 
 // Calendar block indicators - cut from first occurrence
@@ -175,9 +177,13 @@ export function extractBrief(
   // Step 11: Generate snippet
   const snippet = text.substring(0, SNIPPET_LENGTH).trim();
 
+  // Step 12: Generate summary (~120 char one-sentence)
+  const summary = generateSummary(text);
+
   return {
     cleanedText: text,
     snippet,
+    summary,
     displaySubject,
     displayFromEmail: forwardedMeta.fromEmail || (signals.isForwarded ? null : fromEmail),
     displayFromName: forwardedMeta.fromName || (signals.isForwarded ? null : fromName),
@@ -512,4 +518,61 @@ function capLength(text: string, maxLength: number): string {
   }
 
   return text.substring(0, maxLength).trim();
+}
+
+/**
+ * Generate a ~120 character one-sentence summary
+ * Strips greetings, takes first meaningful sentence
+ */
+function generateSummary(text: string): string {
+  if (!text || text.trim().length === 0) {
+    return "";
+  }
+
+  let content = text.trim();
+
+  // Strip common greetings at the start
+  const greetingPatterns = [
+    /^(hi|hey|hello|dear|good\s+(morning|afternoon|evening)),?\s*[a-z]*,?\s*/i,
+    /^(hope\s+(this|you).{0,50}\.?\s*)/i,
+    /^(thanks?\s+for.{0,50}\.?\s*)/i,
+  ];
+
+  for (const pattern of greetingPatterns) {
+    content = content.replace(pattern, "").trim();
+  }
+
+  // Split into sentences (handle common sentence endings)
+  const sentences = content.split(/(?<=[.!?])\s+/);
+  
+  // Find first meaningful sentence (at least 20 chars, not just a name)
+  let summary = "";
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim();
+    if (trimmed.length >= 20 && !/^[A-Z][a-z]+(\s+[A-Z][a-z]+)?$/.test(trimmed)) {
+      summary = trimmed;
+      break;
+    }
+  }
+
+  // Fallback: use first chunk of content
+  if (!summary && content.length > 0) {
+    summary = content;
+  }
+
+  // Truncate to ~120 chars at word boundary
+  if (summary.length > SUMMARY_LENGTH) {
+    const lastSpace = summary.lastIndexOf(" ", SUMMARY_LENGTH);
+    if (lastSpace > SUMMARY_LENGTH * 0.7) {
+      summary = summary.substring(0, lastSpace).trim();
+    } else {
+      summary = summary.substring(0, SUMMARY_LENGTH).trim();
+    }
+    // Add ellipsis if truncated mid-sentence
+    if (!summary.endsWith(".") && !summary.endsWith("!") && !summary.endsWith("?")) {
+      summary = summary + "…";
+    }
+  }
+
+  return summary;
 }

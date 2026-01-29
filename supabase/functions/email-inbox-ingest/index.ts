@@ -117,11 +117,17 @@ serve(async (req) => {
       display_from_email: cleanedResult.displayFromEmail,
       display_from_name: cleanedResult.displayFromName,
       
+      // Summary
+      summary: cleanedResult.summary,
+      summary_source: 'heuristic',
+      summary_updated_at: new Date().toISOString(),
+      
       // Legacy snippet (uses cleaned content now)
       snippet: cleanedResult.snippet,
       
       // Signals
       is_forwarded: cleanedResult.signals.isForwarded,
+      forwarded_by_email: cleanedResult.signals.isForwarded ? senderEmail : null,
       has_thread: cleanedResult.signals.hasThread,
       has_disclaimer: cleanedResult.signals.hasDisclaimer,
       has_calendar: cleanedResult.signals.hasCalendar,
