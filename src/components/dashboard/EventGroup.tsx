@@ -24,6 +24,7 @@ interface EventGroupProps {
   isToday?: boolean;
   showDate?: boolean;
   onEventClick?: (event: CalendarEvent) => void;
+  linkedCompanyMap?: Map<string, string>;
 }
 
 // Helper: Check if an event has already ended
@@ -65,7 +66,7 @@ const getNowIndicatorPosition = (events: CalendarEvent[]): number => {
   return events.length;
 };
 
-export function EventGroup({ title, events, isToday = false, showDate = false, onEventClick }: EventGroupProps) {
+export function EventGroup({ title, events, isToday = false, showDate = false, onEventClick, linkedCompanyMap }: EventGroupProps) {
   // Sort events by start time
   const sortedEvents = [...events].sort((a, b) => 
     new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
@@ -116,11 +117,12 @@ export function EventGroup({ title, events, isToday = false, showDate = false, o
               </p>
               <div className="space-y-2">
                 {dateEvents.map((event, index) => (
-                  <EventCard 
-                    key={event.id} 
-                    event={event} 
+                  <EventCard
+                    key={event.id}
+                    event={event}
                     delay={index * 0.05}
                     onClick={onEventClick}
+                    linkedCompanyName={linkedCompanyMap?.get(event.id)}
                   />
                 ))}
               </div>
@@ -134,13 +136,14 @@ export function EventGroup({ title, events, isToday = false, showDate = false, o
             <Fragment key={event.id}>
               {/* Insert Now indicator at the correct position */}
               {isToday && nowPosition === index && <NowIndicator />}
-              <EventCard 
-                event={event} 
+              <EventCard
+                event={event}
                 delay={index * 0.05}
                 isToday={isToday}
                 isPast={isToday && isPastEvent(event)}
                 isCurrent={isToday && isCurrentEvent(event)}
                 onClick={onEventClick}
+                linkedCompanyName={linkedCompanyMap?.get(event.id)}
               />
             </Fragment>
           ))}

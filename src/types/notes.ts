@@ -1,5 +1,5 @@
 // Polymorphic note target types
-export type NoteTargetType = 'task' | 'company' | 'project' | 'reading_item';
+export type NoteTargetType = 'task' | 'company' | 'project' | 'reading_item' | 'calendar_event';
 
 // Note context for creating/linking notes
 export interface NoteContext {

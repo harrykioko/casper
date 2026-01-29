@@ -55,6 +55,103 @@ export type Database = {
           },
         ]
       }
+      calendar_event_links: {
+        Row: {
+          id: string
+          calendar_event_id: string
+          company_id: string
+          company_type: string
+          company_name: string
+          linked_by: string
+          confidence: number | null
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          calendar_event_id: string
+          company_id: string
+          company_type: string
+          company_name: string
+          linked_by: string
+          confidence?: number | null
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          calendar_event_id?: string
+          company_id?: string
+          company_type?: string
+          company_name?: string
+          linked_by?: string
+          confidence?: number | null
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_links_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_event_link_suggestions: {
+        Row: {
+          id: string
+          calendar_event_id: string
+          company_id: string
+          company_type: string
+          company_name: string
+          match_reason: string | null
+          matched_domain: string | null
+          matched_attendee_email: string | null
+          confidence: number | null
+          status: string
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          calendar_event_id: string
+          company_id: string
+          company_type: string
+          company_name: string
+          match_reason?: string | null
+          matched_domain?: string | null
+          matched_attendee_email?: string | null
+          confidence?: number | null
+          status?: string
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          calendar_event_id?: string
+          company_id?: string
+          company_type?: string
+          company_name?: string
+          match_reason?: string | null
+          matched_domain?: string | null
+          matched_attendee_email?: string | null
+          confidence?: number | null
+          status?: string
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_event_link_suggestions_calendar_event_id_fkey"
+            columns: ["calendar_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       calendar_events: {
         Row: {
           attendees: Json | null
@@ -1648,7 +1745,7 @@ export type Database = {
       company_kind: "portfolio" | "pipeline" | "other"
       company_status: "active" | "watching" | "exited" | "archived"
       interaction_type: "note" | "call" | "meeting" | "email" | "update"
-      note_target_type: "task" | "company" | "project" | "reading_item"
+      note_target_type: "task" | "company" | "project" | "reading_item" | "calendar_event"
       round_enum:
         | "Seed"
         | "Series A"
@@ -1805,7 +1902,7 @@ export const Constants = {
       company_kind: ["portfolio", "pipeline", "other"],
       company_status: ["active", "watching", "exited", "archived"],
       interaction_type: ["note", "call", "meeting", "email", "update"],
-      note_target_type: ["task", "company", "project", "reading_item"],
+      note_target_type: ["task", "company", "project", "reading_item", "calendar_event"],
       round_enum: [
         "Seed",
         "Series A",

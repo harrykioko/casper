@@ -6,8 +6,10 @@ import { Nonnegotiables, Nonnegotiable } from "./Nonnegotiables";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface CalendarEvent {
   id: string;
@@ -33,8 +35,29 @@ interface CalendarSidebarProps {
 }
 
 export function CalendarSidebar({ className, events, nonnegotiables, onSync, isSyncing }: CalendarSidebarProps) {
+  const { user } = useAuth();
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [linkedCompanyMap, setLinkedCompanyMap] = useState<Map<string, string>>(new Map());
+
+  // Fetch all calendar_event_links for displayed events
+  const eventIds = useMemo(() => events.map(e => e.id), [events]);
+  useEffect(() => {
+    if (!user || eventIds.length === 0) return;
+    const fetchLinks = async () => {
+      const { data } = await supabase
+        .from('calendar_event_links')
+        .select('calendar_event_id, company_name')
+        .eq('created_by', user.id)
+        .in('calendar_event_id', eventIds);
+      if (data) {
+        const map = new Map<string, string>();
+        data.forEach(row => map.set(row.calendar_event_id, row.company_name));
+        setLinkedCompanyMap(map);
+      }
+    };
+    fetchLinks();
+  }, [user, eventIds]);
 
   const handleEventClick = (event: CalendarEvent) => {
     setSelectedEvent(event);
@@ -136,40 +159,44 @@ export function CalendarSidebar({ className, events, nonnegotiables, onSync, isS
             <div className="space-y-6 pb-4">
               {/* Today Events - only show if there are events */}
               {todayEvents.length > 0 && (
-                <EventGroup 
-                  title="📅 Today" 
-                  events={todayEvents} 
+                <EventGroup
+                  title="📅 Today"
+                  events={todayEvents}
                   isToday={true}
                   onEventClick={handleEventClick}
+                  linkedCompanyMap={linkedCompanyMap}
                 />
               )}
-              
+
               {/* Tomorrow Events */}
               {tomorrowEvents.length > 0 && (
-                <EventGroup 
-                  title="🔜 Tomorrow" 
+                <EventGroup
+                  title="🔜 Tomorrow"
                   events={tomorrowEvents}
-                  onEventClick={handleEventClick} 
+                  onEventClick={handleEventClick}
+                  linkedCompanyMap={linkedCompanyMap}
                 />
               )}
-              
+
               {/* Later This Week Events */}
               {laterThisWeekEvents.length > 0 && (
-                <EventGroup 
-                  title="📆 This Week" 
-                  events={laterThisWeekEvents} 
+                <EventGroup
+                  title="📆 This Week"
+                  events={laterThisWeekEvents}
                   showDate={true}
                   onEventClick={handleEventClick}
+                  linkedCompanyMap={linkedCompanyMap}
                 />
               )}
-              
+
               {/* Later Events */}
               {laterEvents.length > 0 && (
-                <EventGroup 
-                  title="🗓️ Later" 
-                  events={laterEvents} 
+                <EventGroup
+                  title="🗓️ Later"
+                  events={laterEvents}
                   showDate={true}
                   onEventClick={handleEventClick}
+                  linkedCompanyMap={linkedCompanyMap}
                 />
               )}
 

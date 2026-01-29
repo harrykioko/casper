@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { MapPin, Video } from "lucide-react";
+import { MapPin, Video, Building2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 interface CalendarEvent {
@@ -24,9 +25,10 @@ interface EventCardProps {
   isPast?: boolean;
   isCurrent?: boolean;
   onClick?: (event: CalendarEvent) => void;
+  linkedCompanyName?: string;
 }
 
-export function EventCard({ event, delay = 0, isToday = false, isPast = false, isCurrent = false, onClick }: EventCardProps) {
+export function EventCard({ event, delay = 0, isToday = false, isPast = false, isCurrent = false, onClick, linkedCompanyName }: EventCardProps) {
   // Format time to display in a readable format
   const formatTime = (timeString: string) => {
     const date = new Date(timeString);
@@ -113,10 +115,18 @@ export function EventCard({ event, delay = 0, isToday = false, isPast = false, i
         </p>
         
         {/* Title */}
-        <h4 className="font-semibold text-sm leading-tight mb-2 truncate">
+        <h4 className="font-semibold text-sm leading-tight mb-1.5 truncate">
           {event.title}
         </h4>
-        
+
+        {/* Linked Company Pill */}
+        {linkedCompanyName && (
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 mb-1.5 inline-flex items-center gap-1">
+            <Building2 className="h-2.5 w-2.5" />
+            {linkedCompanyName}
+          </Badge>
+        )}
+
         {/* Location or Video Link */}
         {event.location && (
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
