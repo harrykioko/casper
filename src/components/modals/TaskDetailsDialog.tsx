@@ -38,6 +38,8 @@ export function TaskDetailsDialog({
     setPriority,
     category,
     setCategory,
+    companyLink,
+    setCompanyLink,
     createUpdatedTask
   } = useTaskDetails({ task });
 
@@ -126,6 +128,8 @@ export function TaskDetailsDialog({
               setPriority={setPriority}
               category={category}
               setCategory={setCategory}
+              companyLink={companyLink}
+              setCompanyLink={setCompanyLink}
             />
 
             {/* Notes section */}

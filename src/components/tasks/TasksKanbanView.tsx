@@ -63,8 +63,8 @@ export function TasksKanbanView({ tasks, inboxTasks, onTaskComplete, onTaskDelet
         // DB trigger will set inbox = false automatically
         
         toast({
-          title: "Task triaged",
-          description: "Task moved out of inbox.",
+          title: "Task promoted",
+          description: "Task moved out of triage.",
         });
       }
       // Moving between workflow columns
@@ -86,8 +86,8 @@ export function TasksKanbanView({ tasks, inboxTasks, onTaskComplete, onTaskDelet
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
       <div className="grid grid-cols-4 gap-6 min-h-[500px]">
-        {/* Inbox Column */}
-        <InboxColumn 
+        {/* Triage Column */}
+        <InboxColumn
           tasks={inboxTasks}
           onTaskComplete={onTaskComplete}
           onTaskClick={onTaskClick}

@@ -7,6 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { TaskPrefillOptions } from "@/types/inbox";
+import { createNote } from "@/hooks/useNotes";
+import { CompanySelector } from "./task-details/CompanySelector";
+import { setTaskCompanyLink, type TaskCompanyLink } from "@/lib/taskCompanyLink";
 
 export interface TaskCreateData {
   content: string;
@@ -19,13 +22,14 @@ export interface TaskCreateData {
 interface AddTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddTask: (taskData: TaskCreateData) => void;
+  onAddTask: (taskData: TaskCreateData) => Promise<{ id: string }> | void;
   prefill?: TaskPrefillOptions;
 }
 
 export function AddTaskDialog({ open, onOpenChange, onAddTask, prefill }: AddTaskDialogProps) {
   const [taskContent, setTaskContent] = useState("");
   const [taskDescription, setTaskDescription] = useState("");
+  const [companyLink, setCompanyLink] = useState<TaskCompanyLink | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Apply prefill values when dialog opens
@@ -33,43 +37,61 @@ export function AddTaskDialog({ open, onOpenChange, onAddTask, prefill }: AddTas
     if (open && prefill) {
       setTaskContent(prefill.content || "");
       setTaskDescription(prefill.description || "");
+      // Seed company selector from prefill
+      if (prefill.companyId) {
+        setCompanyLink({
+          type: prefill.companyType === 'pipeline' ? 'pipeline' : 'portfolio',
+          id: prefill.companyId,
+          name: prefill.companyName,
+        });
+      } else {
+        setCompanyLink(null);
+      }
     }
   }, [open, prefill]);
 
   const resetForm = () => {
     setTaskContent("");
     setTaskDescription("");
+    setCompanyLink(null);
     setIsLoading(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!taskContent.trim()) return;
 
     try {
       setIsLoading(true);
-      
+
       // Build full task data object including source_inbox_item_id and company links
       const taskData: TaskCreateData = {
         content: taskContent,
       };
-      
+
       // Include source inbox item ID if this task originated from an email
       if (prefill?.sourceInboxItemId) {
         taskData.source_inbox_item_id = prefill.sourceInboxItemId;
       }
-      
-      // Include company links if provided
-      if (prefill?.companyId) {
-        if (prefill.companyType === 'pipeline') {
-          taskData.pipeline_company_id = prefill.companyId;
-        } else {
-          taskData.company_id = prefill.companyId;
-        }
+
+      // Include company links from selector
+      const companyFields = setTaskCompanyLink(companyLink);
+      if (companyFields.company_id) taskData.company_id = companyFields.company_id;
+      if (companyFields.pipeline_company_id) taskData.pipeline_company_id = companyFields.pipeline_company_id;
+
+      // Create the task — onAddTask may return the created task with its id
+      const result = await onAddTask(taskData);
+
+      // If we got a task id back and user entered an initial note, persist it
+      const noteText = taskDescription.trim();
+      if (result?.id && noteText) {
+        await createNote({
+          content: noteText,
+          primaryContext: { targetType: 'task', targetId: result.id },
+        });
       }
-      
-      onAddTask(taskData);
+
       toast.success("Task added successfully");
       onOpenChange(false);
       resetForm();
@@ -118,28 +140,20 @@ export function AddTaskDialog({ open, onOpenChange, onAddTask, prefill }: AddTas
             </div>
           </div>
 
-          {/* Show description field if there's prefill content or user starts typing */}
-          {(prefill?.description || taskDescription) && (
-            <div className="space-y-2">
-              <Label htmlFor="task-description">Notes</Label>
-              <Textarea
-                id="task-description"
-                placeholder="Add additional context..."
-                value={taskDescription}
-                onChange={(e) => setTaskDescription(e.target.value)}
-                className="min-h-[80px] focus-visible:ring-0 focus-visible:ring-offset-0 border-muted/30 focus-visible:border-muted/50 hover:border-muted/50 transition-colors resize-none"
-                disabled={isLoading}
-              />
-            </div>
-          )}
+          <div className="space-y-2">
+            <Label htmlFor="task-description">Initial note <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <Textarea
+              id="task-description"
+              placeholder="Add context, details, or background for this task..."
+              value={taskDescription}
+              onChange={(e) => setTaskDescription(e.target.value)}
+              className="min-h-[80px] focus-visible:ring-0 focus-visible:ring-offset-0 border-muted/30 focus-visible:border-muted/50 hover:border-muted/50 transition-colors resize-none"
+              disabled={isLoading}
+            />
+          </div>
 
-          {/* Show related company info if available */}
-          {prefill?.companyName && (
-            <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
-              <p className="text-xs text-muted-foreground mb-1">Related to</p>
-              <p className="text-sm font-medium text-foreground">{prefill.companyName}</p>
-            </div>
-          )}
+          {/* Company selector */}
+          <CompanySelector companyLink={companyLink} onCompanyChange={setCompanyLink} />
           
           <GlassModalFooter>
             <Button

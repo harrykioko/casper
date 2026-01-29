@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Check, Calendar, FolderOpen, AlertCircle, MoreHorizontal } from "lucide-react";
+import { Check, Calendar, FolderOpen, AlertCircle, MoreHorizontal, ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -18,14 +18,16 @@ interface InboxSectionProps {
   onBulkAction?: (ids: string[], action: string, value?: string | boolean) => void;
   onTaskComplete: (id: string) => void;
   onTaskClick: (task: Task) => void;
+  onPromoteTask?: (id: string) => void;
 }
 
-export function InboxSection({ 
-  tasks, 
-  onInlineUpdate, 
+export function InboxSection({
+  tasks,
+  onInlineUpdate,
   onBulkAction,
   onTaskComplete,
-  onTaskClick 
+  onTaskClick,
+  onPromoteTask
 }: InboxSectionProps) {
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [focusedTaskId, setFocusedTaskId] = useState<string | null>(null);
@@ -171,13 +173,13 @@ export function InboxSection({
       <Card className="glassmorphic border-muted/30">
         <CardHeader>
           <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            📥 Inbox
+            Triage
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center py-16 text-muted-foreground">
             <div className="text-2xl mb-2">🎯</div>
-            <p className="text-sm">Zero inbox. Add your next task above.</p>
+            <p className="text-sm">All clear. Add your next task above.</p>
           </div>
         </CardContent>
       </Card>
@@ -189,7 +191,7 @@ export function InboxSection({
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            📥 Inbox
+            Triage
             <span className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded-full">
               {tasks.length}
             </span>
@@ -262,6 +264,16 @@ export function InboxSection({
               <Button size="sm" variant="outline" onClick={handleBulkComplete}>
                 Complete
               </Button>
+              {onPromoteTask && (
+                <Button size="sm" variant="outline" onClick={() => {
+                  if (selectedTasks.size > 0) {
+                    Array.from(selectedTasks).forEach(id => onPromoteTask(id));
+                    setSelectedTasks(new Set());
+                  }
+                }}>
+                  Promote
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -467,6 +479,23 @@ export function InboxSection({
                   </ToggleGroup>
                 </PopoverContent>
               </Popover>
+
+              {/* Promote out of triage */}
+              {onPromoteTask && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 opacity-0 group-hover:opacity-100"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPromoteTask(task.id);
+                  }}
+                  title="Promote to main task list"
+                >
+                  <ArrowUpRight className="h-3 w-3 mr-1" />
+                  Promote
+                </Button>
+              )}
 
               {/* More Options */}
               <Button

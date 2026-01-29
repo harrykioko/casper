@@ -1,6 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { Task } from "@/hooks/useTasks";
+import { getTaskCompanyLink, setTaskCompanyLink, type TaskCompanyLink } from "@/lib/taskCompanyLink";
 
 interface UseTaskDetailsProps {
   task: Task | null;
@@ -19,6 +20,8 @@ interface UseTaskDetailsReturn {
   setPriority: (priority: "low" | "medium" | "high" | undefined) => void;
   category: string | undefined;
   setCategory: (category: string | undefined) => void;
+  companyLink: TaskCompanyLink | null;
+  setCompanyLink: (link: TaskCompanyLink | null) => void;
   resetForm: () => void;
   createUpdatedTask: () => Task | null;
 }
@@ -30,7 +33,8 @@ export function useTaskDetails({ task }: UseTaskDetailsProps): UseTaskDetailsRet
   const [selectedProject, setSelectedProject] = useState<Task["project"] | undefined>(undefined);
   const [priority, setPriority] = useState<"low" | "medium" | "high" | undefined>(undefined);
   const [category, setCategory] = useState<string | undefined>(undefined);
-  
+  const [companyLink, setCompanyLink] = useState<TaskCompanyLink | null>(null);
+
   // Initialize form when task changes
   useEffect(() => {
     if (task) {
@@ -39,12 +43,13 @@ export function useTaskDetails({ task }: UseTaskDetailsProps): UseTaskDetailsRet
       setSelectedProject(task.project);
       setPriority(task.priority);
       setCategory(task.category);
-      
+      setCompanyLink(getTaskCompanyLink(task));
+
       // Handle date parsing
       if (task.scheduledFor) {
         try {
           const date = new Date(task.scheduledFor);
-          
+
           if (!isNaN(date.getTime())) {
             setScheduledFor(date);
           } else {
@@ -62,7 +67,7 @@ export function useTaskDetails({ task }: UseTaskDetailsProps): UseTaskDetailsRet
       resetForm();
     }
   }, [task]);
-  
+
   // Reset form to initial state
   const resetForm = () => {
     setContent("");
@@ -71,12 +76,15 @@ export function useTaskDetails({ task }: UseTaskDetailsProps): UseTaskDetailsRet
     setSelectedProject(undefined);
     setPriority(undefined);
     setCategory(undefined);
+    setCompanyLink(null);
   };
-  
+
   // Create an updated task object based on current form state
   const createUpdatedTask = (): Task | null => {
     if (!task) return null;
-    
+
+    const companyFields = setTaskCompanyLink(companyLink);
+
     return {
       ...task,
       content,
@@ -85,10 +93,12 @@ export function useTaskDetails({ task }: UseTaskDetailsProps): UseTaskDetailsRet
       project: selectedProject,
       priority,
       category,
-      scheduledFor: scheduledFor ? scheduledFor.toISOString() : undefined
+      scheduledFor: scheduledFor ? scheduledFor.toISOString() : undefined,
+      company_id: companyFields.company_id || undefined,
+      pipeline_company_id: companyFields.pipeline_company_id || undefined,
     };
   };
-  
+
   return {
     content,
     setContent,
@@ -102,6 +112,8 @@ export function useTaskDetails({ task }: UseTaskDetailsProps): UseTaskDetailsRet
     setPriority,
     category,
     setCategory,
+    companyLink,
+    setCompanyLink,
     resetForm,
     createUpdatedTask
   };

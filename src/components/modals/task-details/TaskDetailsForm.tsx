@@ -6,6 +6,8 @@ import { CategorySelector } from "./CategorySelector";
 import { DateSelector } from "./DateSelector";
 import { PrioritySelector } from "./PrioritySelector";
 import { StatusSelector } from "./StatusSelector";
+import { CompanySelector } from "./CompanySelector";
+import type { TaskCompanyLink } from "@/lib/taskCompanyLink";
 
 interface TaskDetailsFormProps {
   content: string;
@@ -20,6 +22,8 @@ interface TaskDetailsFormProps {
   setPriority: (priority?: "low" | "medium" | "high") => void;
   category?: string;
   setCategory: (category?: string) => void;
+  companyLink?: TaskCompanyLink | null;
+  setCompanyLink?: (link: TaskCompanyLink | null) => void;
 }
 
 export function TaskDetailsForm({
@@ -34,7 +38,9 @@ export function TaskDetailsForm({
   priority,
   setPriority,
   category,
-  setCategory
+  setCategory,
+  companyLink,
+  setCompanyLink,
 }: TaskDetailsFormProps) {
   return (
     <div className="space-y-4">
@@ -43,6 +49,11 @@ export function TaskDetailsForm({
 
       {/* Project Selection */}
       <ProjectSelector selectedProject={selectedProject} setSelectedProject={setSelectedProject} />
+
+      {/* Company Selection */}
+      {setCompanyLink && (
+        <CompanySelector companyLink={companyLink ?? null} onCompanyChange={setCompanyLink} />
+      )}
 
       {/* Category Selection */}
       <CategorySelector selectedCategory={category} setSelectedCategory={setCategory} />

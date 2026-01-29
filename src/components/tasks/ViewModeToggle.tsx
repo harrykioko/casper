@@ -1,5 +1,5 @@
 
-import { List, LayoutGrid, Inbox } from "lucide-react";
+import { List, LayoutGrid, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -55,8 +55,8 @@ export function ViewModeToggle({
       {onShowInboxChange && (
         <div className="flex items-center gap-2">
           <Label htmlFor="inbox-toggle" className="flex items-center gap-2 cursor-pointer">
-            <Inbox className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Show Inbox</span>
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Show Triage</span>
           </Label>
           <Switch
             id="inbox-toggle"

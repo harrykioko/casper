@@ -23,7 +23,7 @@ export default function Tasks() {
   const [sortBy, setSortBy] = useState("date");
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
-  const [showInbox, setShowInbox] = useState(true); // Show inbox by default
+  const [showInbox, setShowInbox] = useState(false); // Triage section collapsed by default
 
   const {
     tasks,
@@ -32,6 +32,7 @@ export default function Tasks() {
     handleAddTask,
     handleCompleteTask,
     handleDeleteTask,
+    handlePromoteTask,
     handleUpdateTaskStatus,
     handleUpdateTask,
     quickInlineUpdate,
@@ -120,7 +121,7 @@ export default function Tasks() {
           {/* Main Content Layout */}
           {viewMode === "list" ? (
             <div className="space-y-6">
-              {/* Inbox Section - Show when inbox preset is active */}
+              {/* Triage Section - Show when triage toggle is active */}
               {showInbox && (
                 <InboxSection
                   tasks={inboxTasks}
@@ -128,6 +129,7 @@ export default function Tasks() {
                   onBulkAction={handleBulkAction}
                   onTaskComplete={handleCompleteTask}
                   onTaskClick={handleTaskClick}
+                  onPromoteTask={handlePromoteTask}
                 />
               )}
 
@@ -143,7 +145,7 @@ export default function Tasks() {
             </div>
           ) : (
             <div className="w-full">
-              {/* Kanban Board with Inbox Column */}
+              {/* Kanban Board with Triage Column */}
               <TasksKanbanView
                 tasks={filteredTasks}
                 inboxTasks={showInbox ? inboxTasks : []}

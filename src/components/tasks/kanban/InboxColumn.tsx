@@ -26,7 +26,7 @@ export function InboxColumn({ tasks, onTaskComplete, onTaskClick }: InboxColumnP
           style={{ minHeight: 400 }}
         >
           <h3 className="font-medium text-foreground flex items-center gap-2 pb-2 border-b border-muted/20">
-            📥 Inbox
+            Triage
             <span className="text-xs text-muted-foreground bg-muted/30 px-2 py-1 rounded-full">
               {tasks.length}
             </span>
@@ -104,7 +104,7 @@ export function InboxColumn({ tasks, onTaskComplete, onTaskClick }: InboxColumnP
                   <div className="text-xl">🎯</div>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Zero inbox! All tasks triaged.
+                  All clear! No tasks to triage.
                 </p>
               </div>
             )}

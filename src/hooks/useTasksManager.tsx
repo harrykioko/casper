@@ -25,8 +25,13 @@ export function useTasksManager() {
     deleteTask(id);
   };
 
+  const handlePromoteTask = (id: string) => {
+    // Explicitly move a task out of triage into the main list
+    updateTask(id, { is_quick_task: false });
+  };
+
   const handleUpdateTaskStatus = (id: string, status: "todo" | "inprogress" | "done") => {
-    updateTask(id, { 
+    updateTask(id, {
       status,
       completed: status === 'done'
       // DB trigger will set inbox = false when status !== 'todo'
@@ -36,7 +41,7 @@ export function useTasksManager() {
   const handleUpdateTask = (updatedTask: any) => {
     // Get category_id from category name if category exists
     const categoryId = updatedTask.category ? getCategoryIdByName(updatedTask.category) : null;
-    
+
     // Transform the frontend task object to database format
     const dbTaskData = transformTaskForDatabase({
       content: updatedTask.content,
@@ -45,13 +50,15 @@ export function useTasksManager() {
       priority: updatedTask.priority,
       scheduledFor: updatedTask.scheduledFor,
       project_id: updatedTask.project?.id || null,
-      category_id: categoryId
+      category_id: categoryId,
+      company_id: updatedTask.company_id || null,
+      pipeline_company_id: updatedTask.pipeline_company_id || null,
       // DB trigger will handle inbox = false when scheduled_for or project_id is set
     });
 
     // Remove the id from the update data since it's used in the WHERE clause
     const { id, ...updateData } = dbTaskData;
-    
+
     updateTask(updatedTask.id, updateData);
   };
 
@@ -74,6 +81,7 @@ export function useTasksManager() {
     handleAddTask,
     handleCompleteTask,
     handleDeleteTask,
+    handlePromoteTask,
     handleUpdateTaskStatus,
     handleUpdateTask,
     quickInlineUpdate,

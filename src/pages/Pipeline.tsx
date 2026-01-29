@@ -198,7 +198,7 @@ export default function Pipeline() {
         onOpenChange={setTaskDialogOpen}
         onAddTask={async (taskData) => {
           if (taskDialogCompany) {
-            await createTask({
+            return await createTask({
               content: taskData.content,
               pipeline_company_id: taskData.pipeline_company_id || taskDialogCompany.id,
             });
