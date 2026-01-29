@@ -26,7 +26,10 @@ import { SaveAttachmentsModal } from "@/components/inbox/SaveAttachmentsModal";
 import { isActionRequired, isWaitingOn } from "@/components/inbox/inboxHelpers";
 import type { InboxItem, TaskPrefillOptions, InboxViewFilter } from "@/types/inbox";
 import type { StructuredSuggestion } from "@/types/inboxSuggestions";
+import type { InboxAttachment } from "@/hooks/useInboxAttachments";
 import { usePipeline } from "@/hooks/usePipeline";
+import { useAuth } from "@/contexts/AuthContext";
+import { copyInboxAttachmentToPipeline } from "@/lib/inbox/copyAttachmentToCompany";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +45,7 @@ export default function Inbox() {
   const { inboxItems: archivedItems, isLoading: isLoadingArchived } = useInboxItems({ onlyArchived: true });
   const { createTask } = useTasks();
   const { createCompany: createPipelineCompany } = usePipeline();
+  const { user } = useAuth();
 
   // Snooze handler
   const handleSnooze = (id: string, until: Date) => {
@@ -182,6 +186,7 @@ export default function Inbox() {
         onLinkCompany: handleLinkCompany,
         onSaveAttachments: handleSaveAttachments,
         onApproveSuggestion: handleApproveSuggestion,
+        onSaveAttachmentToCompany: handleSaveAttachmentToCompany,
       });
     }
   };
@@ -220,6 +225,31 @@ export default function Inbox() {
 
   const handleSaveAttachments = (item: InboxItem) => {
     setSaveAttachmentsItem(item);
+  };
+
+  // Handler for saving a single attachment to a linked company
+  const handleSaveAttachmentToCompany = async (item: InboxItem, attachment: InboxAttachment) => {
+    if (!user) {
+      toast.error("You must be logged in");
+      return;
+    }
+
+    if (item.relatedCompanyId) {
+      // Company is linked - save directly
+      const result = await copyInboxAttachmentToPipeline(
+        attachment,
+        item.relatedCompanyId,
+        user.id
+      );
+      if (result.success) {
+        toast.success(`Saved "${attachment.filename}" to ${item.relatedCompanyName || "company"}`);
+      } else {
+        toast.error(result.error || "Failed to save attachment");
+      }
+    } else {
+      // No company linked - open the save attachments modal
+      setSaveAttachmentsItem(item);
+    }
   };
 
   const handleApproveSuggestion = async (item: InboxItem, suggestion: StructuredSuggestion) => {
@@ -485,6 +515,7 @@ export default function Inbox() {
                 onLinkCompany={handleLinkCompany}
                 onSaveAttachments={handleSaveAttachments}
                 onApproveSuggestion={handleApproveSuggestion}
+                onSaveAttachmentToCompany={handleSaveAttachmentToCompany}
                 attachmentCount={selectedItemAttachments.length}
               />
             </div>

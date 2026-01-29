@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
 import type { InboxItem } from "@/types/inbox";
 import type { StructuredSuggestion } from "@/types/inboxSuggestions";
+import type { InboxAttachment } from "@/hooks/useInboxAttachments";
 
 export interface InboxDrawerHandlers {
   onCreateTask: (item: InboxItem, suggestionTitle?: string) => void;
@@ -11,6 +12,7 @@ export interface InboxDrawerHandlers {
   onLinkCompany?: (item: InboxItem) => void;
   onSaveAttachments?: (item: InboxItem) => void;
   onApproveSuggestion?: (item: InboxItem, suggestion: StructuredSuggestion) => void;
+  onSaveAttachmentToCompany?: (item: InboxItem, attachment: InboxAttachment) => void;
 }
 
 interface GlobalInboxDrawerContextValue {
