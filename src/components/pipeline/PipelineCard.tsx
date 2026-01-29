@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { PipelineCompany, PipelineStatus } from '@/types/pipeline';
 import { PipelineCardAttention } from '@/lib/pipeline/pipelineAttentionHelpers';
 import { formatTaskDate } from '@/utils/dateUtils';
@@ -127,7 +128,7 @@ export function PipelineCard({
     >
       {/* Header Row */}
       <div className="flex items-start justify-between mb-2.5">
-        <div className="flex items-start gap-2 flex-1 min-w-0">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
           {/* Drag Handle */}
           {dragHandleProps && (
             <div 
@@ -138,6 +139,14 @@ export function PipelineCard({
               <GripVertical className="h-4 w-4 text-muted-foreground" />
             </div>
           )}
+          
+          {/* Company Logo */}
+          <Avatar className="h-8 w-8 shrink-0">
+            <AvatarImage src={company.logo_url || undefined} alt={company.company_name} />
+            <AvatarFallback className="bg-white/10 text-xs font-medium">
+              {company.company_name.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
           
           <h3 className="font-semibold text-base truncate flex-1">{company.company_name}</h3>
         </div>
