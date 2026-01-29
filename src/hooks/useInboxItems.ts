@@ -208,6 +208,37 @@ export function useInboxItems(options: UseInboxItemsOptions = {}) {
     },
   });
 
+  const linkCompanyMutation = useMutation({
+    mutationFn: async ({ 
+      id, 
+      companyId, 
+      companyName 
+    }: { 
+      id: string; 
+      companyId: string | null; 
+      companyName: string | null;
+    }) => {
+      const { error } = await supabase
+        .from("inbox_items")
+        .update({ 
+          related_company_id: companyId,
+          related_company_name: companyName 
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inbox_items"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox_items_archived"] });
+      toast.success("Company linked");
+    },
+    onError: (error) => {
+      console.error("Error linking company:", error);
+      toast.error("Failed to link company");
+    },
+  });
+
   return {
     inboxItems,
     isLoading,
@@ -218,5 +249,7 @@ export function useInboxItems(options: UseInboxItemsOptions = {}) {
     unarchive: (id: string) => unarchiveMutation.mutate(id),
     snooze: (id: string, until: Date) => snoozeMutation.mutate({ id, until }),
     markTopPriority: (id: string, isTop: boolean) => markTopPriorityMutation.mutate({ id, isTop }),
+    linkCompany: (id: string, companyId: string | null, companyName: string | null) => 
+      linkCompanyMutation.mutate({ id, companyId, companyName }),
   };
 }

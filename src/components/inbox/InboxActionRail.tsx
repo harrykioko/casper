@@ -12,6 +12,8 @@ import {
   ChevronDown,
   Loader2,
   Wand2,
+  Download,
+  Paperclip,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +38,9 @@ interface InboxActionRailProps {
   onArchive: (id: string) => void;
   onSnooze?: (id: string, until: Date) => void;
   onAddNote?: (item: InboxItem) => void;
+  onLinkCompany?: (item: InboxItem) => void;
+  onSaveAttachments?: (item: InboxItem) => void;
+  attachmentCount?: number;
 }
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
@@ -90,6 +95,9 @@ export function InboxActionRail({
   onArchive,
   onSnooze,
   onAddNote,
+  onLinkCompany,
+  onSaveAttachments,
+  attachmentCount = 0,
 }: InboxActionRailProps) {
   const [isActivityOpen, setIsActivityOpen] = useState(false);
 
@@ -155,10 +163,31 @@ export function InboxActionRail({
           />
           <ActionButton
             icon={Building2}
-            label="Link Company"
-            onClick={() => {}}
-            disabled
+            label={item.relatedCompanyName ? "Change Company" : "Link Company"}
+            onClick={() => onLinkCompany?.(item)}
+            disabled={!onLinkCompany}
           />
+          {item.relatedCompanyName && (
+            <p className="text-[10px] text-muted-foreground ml-7 -mt-0.5 mb-1 truncate">
+              → {item.relatedCompanyName}
+            </p>
+          )}
+          
+          {/* Save Attachments - only show if there are attachments */}
+          {attachmentCount > 0 && (
+            <>
+              <ActionButton
+                icon={Download}
+                label="Save to Company"
+                onClick={() => onSaveAttachments?.(item)}
+                disabled={!onSaveAttachments}
+              />
+              <p className="text-[10px] text-muted-foreground italic ml-7 -mt-0.5 mb-1">
+                {attachmentCount} attachment{attachmentCount !== 1 ? 's' : ''} available
+              </p>
+            </>
+          )}
+          
           <ActionButton
             icon={Tag}
             label="Set Category"

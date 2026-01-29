@@ -7,6 +7,8 @@ export interface InboxDrawerHandlers {
   onArchive: (id: string) => void;
   onSnooze?: (id: string, until: Date) => void;
   onAddNote?: (item: InboxItem) => void;
+  onLinkCompany?: (item: InboxItem) => void;
+  onSaveAttachments?: (item: InboxItem) => void;
 }
 
 interface GlobalInboxDrawerContextValue {
