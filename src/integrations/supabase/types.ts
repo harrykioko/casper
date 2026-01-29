@@ -1066,6 +1066,92 @@ export type Database = {
         }
         Relationships: []
       }
+      pipeline_company_enrichments: {
+        Row: {
+          confidence: string | null
+          created_at: string
+          created_by: string
+          description_long: string | null
+          description_short: string | null
+          employee_range: string | null
+          enriched_at: string
+          founding_year: number | null
+          funding_stage: string | null
+          harmonic_company_id: string | null
+          hq_city: string | null
+          hq_country: string | null
+          hq_region: string | null
+          id: string
+          key_people: Json | null
+          last_funding_date: string | null
+          last_refreshed_at: string
+          linkedin_url: string | null
+          match_method: string | null
+          pipeline_company_id: string
+          source_payload: Json | null
+          total_funding_usd: number | null
+          twitter_url: string | null
+        }
+        Insert: {
+          confidence?: string | null
+          created_at?: string
+          created_by: string
+          description_long?: string | null
+          description_short?: string | null
+          employee_range?: string | null
+          enriched_at?: string
+          founding_year?: number | null
+          funding_stage?: string | null
+          harmonic_company_id?: string | null
+          hq_city?: string | null
+          hq_country?: string | null
+          hq_region?: string | null
+          id?: string
+          key_people?: Json | null
+          last_funding_date?: string | null
+          last_refreshed_at?: string
+          linkedin_url?: string | null
+          match_method?: string | null
+          pipeline_company_id: string
+          source_payload?: Json | null
+          total_funding_usd?: number | null
+          twitter_url?: string | null
+        }
+        Update: {
+          confidence?: string | null
+          created_at?: string
+          created_by?: string
+          description_long?: string | null
+          description_short?: string | null
+          employee_range?: string | null
+          enriched_at?: string
+          founding_year?: number | null
+          funding_stage?: string | null
+          harmonic_company_id?: string | null
+          hq_city?: string | null
+          hq_country?: string | null
+          hq_region?: string | null
+          id?: string
+          key_people?: Json | null
+          last_funding_date?: string | null
+          last_refreshed_at?: string
+          linkedin_url?: string | null
+          match_method?: string | null
+          pipeline_company_id?: string
+          source_payload?: Json | null
+          total_funding_usd?: number | null
+          twitter_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_company_enrichments_pipeline_company_id_fkey"
+            columns: ["pipeline_company_id"]
+            isOneToOne: true
+            referencedRelation: "pipeline_companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pipeline_contacts: {
         Row: {
           created_at: string | null

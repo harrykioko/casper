@@ -60,7 +60,7 @@ serve(async (req) => {
         );
       }
     } catch (error) {
-      console.log(`Logo.dev fetch failed for ${domain}:`, error.message);
+      console.log(`Logo.dev fetch failed for ${domain}:`, (error as Error).message);
     }
 
     // Fallback to Google Favicon (always works)
@@ -75,7 +75,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in fetch-company-logo:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

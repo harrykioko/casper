@@ -1,250 +1,354 @@
 
-# Pipeline Detail Overview Redesign
 
-## Current State Analysis
+# Harmonic Enrichment Integration - Implementation Plan
 
-The existing Overview tab consists of 5 stacked GlassPanel cards:
-1. **Next Steps** - Large textarea for freeform notes
-2. **Open Tasks Preview** - Quick add input + up to 5 tasks in subcards
-3. **Recent Notes Preview** - Up to 3 notes in subcards
-4. **Recent Files Preview** - Up to 3 files or large empty state with illustration
-5. **Communications Preview** - Always shows "Connect emails..." placeholder
+## Summary
 
-**Right rail** duplicates some content with 3 more cards:
-- RelationshipSummary (counts + last activity)
-- NextActionsCard (tasks + next steps fallback)
-- ActivityFeed (timeline preview)
-
-**Problems identified:**
-- 8 total cards between main content and rail = visual overwhelm
-- Empty states announce absence loudly ("No notes yet", file illustration)
-- Redundancy between main content and rail (tasks appear twice, next steps shown twice)
-- Fixed card heights waste space when empty
-- Feels like a form, not a workspace
+This plan fixes the Edge Function to correctly use the Harmonic API (POST for enrichment, typeahead for search), handles async enrichment polling, and enhances the existing Company Context Card to become an information-dense workspace panel after enrichment.
 
 ---
 
-## New Architecture
+## Part 1: Edge Function Fixes
 
-### Zone 1: Deal Snapshot (Top - replaces current implicit hero metadata)
+### Current Issues Identified
 
-Currently, the hero (`DealRoomHero.tsx`) shows company info but in a generic "back + name + actions" pattern. We'll enhance the hero when viewing Overview to include a **Deal Snapshot** section that appears just below the existing header row.
+1. **Enrichment uses GET instead of POST** - Harmonic's `/companies` enrichment endpoint requires POST
+2. **Search uses wrong endpoint** - Currently uses `GET /search/companies` which returns 405. Should use `GET /search/typeahead?query=...&search_type=COMPANY`
+3. **No async enrichment handling** - Harmonic returns 404 with an enrichment ID when data needs fetching; current code treats this as "not found"
+4. **Response parsing mismatch** - The `HarmonicCompany` interface doesn't match Harmonic's actual response structure
 
-**Data displayed (only if present - no placeholders):**
-- Status pill (already in hero)
-- Stage/Round (already in hero)
-- Sector (already in hero)
-- Raise amount (already in hero)
-- Close date (already in hero)
-- Website (already in hero)
-- **NEW: Editable one-line thesis** - inline text input, autosaves on blur
-- **Last touched** relative timestamp (already in hero)
+### Changes to `supabase/functions/harmonic-enrich-company/index.ts`
 
-**Implementation:** Add a `thesis` or `working_summary` field display below the existing metadata row in the hero, shown only on Overview tab. This requires passing `activeTab` to DealRoomHero or creating a conditional "snapshot" slot.
+**A. Update `HarmonicCompany` interface to match actual API response:**
 
-### Zone 2: Momentum Panel (Primary focus - single card)
-
-Replaces: Next Steps, Open Tasks Preview, NextActionsCard (from rail)
-
-**Component:** `MomentumPanel.tsx` (new)
-
-**Structure:**
 ```text
-┌────────────────────────────────────────────────────┐
-│ Momentum                                           │
-│ What's next for this deal?                         │
-│                                                    │
-│ ┌────────────────────────────────────────────────┐ │
-│ │ ⊕  Capture your next step or takeaway...      │ │
-│ └────────────────────────────────────────────────┘ │
-│                                                    │
-│ ○ Follow up on term sheet questions        Due Fri│
-│ ○ Schedule partner meeting                Tomorrow │
-│                                                    │
-│ [View all tasks →]                                │
-└────────────────────────────────────────────────────┘
+Based on API docs, structure is:
+- id: number (not string)
+- name: string
+- description: string
+- short_description: string
+- website: { url: string, domain: string }
+- location: { city, region, country, ... }
+- socials: { linkedin: { url }, twitter: { url } }
+- founding_date: { date: string }
+- headcount: number (not string)
+- stage: string (e.g., "SEED", "SERIES_A")
+- funding: { total_raised_usd, last_funding_round_date, ... }
+- people: array of employee objects with full_name, title, socials.linkedin.url
 ```
 
-**Behavior:**
-- Input field always visible at top (supports task creation on Enter)
-- Shows max 2-3 open tasks with due dates (sorted by urgency)
-- Falls back to `next_steps` freeform text if no tasks exist
-- "View all tasks" link navigates to Tasks tab
-- No nested cards inside - flat list with dividers
-
-### Zone 3: Deal Signals (Compressed evidence)
-
-Replaces: Recent Notes Preview, Recent Files Preview, Communications Preview
-
-**Component:** `DealSignals.tsx` (new)
-
-**Conditions:** Only renders if any signal exists. If empty, entire section is omitted.
-
-**Structure:**
-```text
-Signals
-──────────────────────────────────────────────────────
-📝 "Call with Alex - discussed timeline..."    2 days ago  → Notes
-📎 pitch_deck_v3.pdf                           Yesterday   → Files  
-✉️ "Re: Partnership discussion"                3 days ago  → Comms
-✓  Sent follow-up email                        4 days ago  → Tasks
-──────────────────────────────────────────────────────
-```
-
-**Data sources:**
-- Most recent note (from `interactions` where type is note/call/meeting)
-- Most recent file (from `attachments`)
-- Most recent comms item (from `linkedCommunications`)
-- Last completed task (from `tasks` where completed=true)
-
-**Behavior:**
-- Max 5 rows total
-- Each row is a single line with icon, title (truncated), timestamp, and click-to-navigate
-- No empty state - if no signals, section doesn't render
-- Flat list with hairline dividers, no card wrapping per item
-
----
-
-## Right Rail Refinement
-
-### Replace current 3 cards with 2 lightweight sections
-
-**A. Status Snapshot** (compact metrics)
-```text
-┌────────────────────────────────────┐
-│ ○ 3 open tasks                     │
-│ ○ 5 notes                          │
-│ ○ 2 files                          │
-│ ○ 4 days since last activity       │
-└────────────────────────────────────┘
-```
-- Icon + label + value on single line each
-- Borderless or very subtle container
-- Replaces RelationshipSummary card
-
-**B. Recent Activity** (timeline preview)
-```text
-┌────────────────────────────────────┐
-│ Activity                           │
-│ ─────────────────────────────────  │
-│ Today                              │
-│   📝 Added note about pricing      │
-│   ✓ Completed: Send deck           │
-│ Yesterday                          │
-│   📞 Call with founder             │
-│                                    │
-│ [View full timeline →]             │
-└────────────────────────────────────┘
-```
-- Max 5 items
-- Groups by date (Today/Yesterday/Earlier)
-- Link to Timeline tab
-- Replaces ActivityFeed and NextActionsCard
-
----
-
-## Files Changed
-
-| File | Change Type | Description |
-|------|-------------|-------------|
-| `src/components/pipeline-detail/tabs/OverviewTab.tsx` | **Major rewrite** | Replace 5 GlassPanels with MomentumPanel + DealSignals |
-| `src/components/pipeline-detail/overview/MomentumPanel.tsx` | **New file** | Primary focus component with task input + preview |
-| `src/components/pipeline-detail/overview/DealSignals.tsx` | **New file** | Compressed signals row list |
-| `src/components/pipeline-detail/overview/StatusSnapshot.tsx` | **New file** | Compact rail metrics |
-| `src/components/pipeline-detail/shared/RelationshipSummary.tsx` | Delete or deprecate | Replaced by StatusSnapshot |
-| `src/components/pipeline-detail/shared/NextActionsCard.tsx` | Delete or deprecate | Functionality merged into MomentumPanel |
-| `src/components/pipeline-detail/shared/ActivityFeed.tsx` | **Update** | Simplify for rail-only use, add "View full timeline" link |
-| `src/components/pipeline-detail/DealRoomContextRail.tsx` | **Update** | Use StatusSnapshot + simplified ActivityFeed |
-| `src/components/pipeline-detail/DealRoomHero.tsx` | **Update** | Add optional thesis/summary inline field for Overview |
-| `src/pages/PipelineCompanyDetail.tsx` | **Minor update** | Pass `activeTab` to hero if needed for conditional thesis field |
-
----
-
-## Component Specifications
-
-### MomentumPanel.tsx
+**B. Fix enrichment to use POST:**
 
 ```typescript
-interface MomentumPanelProps {
-  tasks: PipelineTask[];
-  nextSteps?: string | null;
-  onCreateTask: (content: string) => Promise<any>;
-  onViewAllTasks: () => void;
+// Change from GET to POST
+const response = await fetch(url.toString(), {
+  method: "POST",  // <-- Was "GET"
+  headers: {
+    apikey: apiKey,
+    "Content-Type": "application/json",
+  },
+});
+```
+
+**C. Handle async enrichment (201/404 with enrichment_id):**
+
+```typescript
+// If 201 or 404 with enrichment URN, poll for completion
+if (response.status === 201 || (response.status === 404 && data?.entity_urn?.includes('enrichment'))) {
+  const enrichmentUrn = data.entity_urn || data.urn;
+  console.log(`Async enrichment triggered: ${enrichmentUrn}`);
+  
+  // Poll up to 10 times at 1s intervals
+  for (let attempt = 0; attempt < 10; attempt++) {
+    await new Promise(r => setTimeout(r, 1000));
+    
+    const statusResponse = await fetch(
+      `https://api.harmonic.ai/enrichment_status?urns=${enrichmentUrn}`,
+      { headers: { apikey } }
+    );
+    const statusData = await statusResponse.json();
+    
+    if (statusData[0]?.status === 'COMPLETE') {
+      // Fetch enriched company
+      const companyUrn = statusData[0].enriched_entity_urn;
+      const companyResponse = await fetch(
+        `https://api.harmonic.ai/companies/${companyUrn}`,
+        { method: 'GET', headers: { apikey } }
+      );
+      return { data: await companyResponse.json() };
+    }
+    
+    if (statusData[0]?.status === 'FAILED' || statusData[0]?.status === 'NOT_FOUND') {
+      return { data: null, error: 'Enrichment failed or company not found', asyncFailed: true };
+    }
+  }
+  
+  // Timeout - return pending state
+  return { data: null, error: 'Enrichment still processing', asyncPending: true, enrichmentUrn };
 }
 ```
 
-**Styling:**
-- Single GlassPanel container (reduced padding: `padding="md"`)
-- Header: "Momentum" with subtle subtext
-- Input: inline text field with Plus icon, no button until typing
-- Task rows: flex layout, checkbox-style icon, content truncated, due badge right-aligned
-- Max 3 visible items
-- "View all" link at bottom if more exist
-
-### DealSignals.tsx
+**D. Fix search to use typeahead endpoint:**
 
 ```typescript
-interface DealSignalsProps {
-  recentNote?: PipelineInteraction | null;
-  recentFile?: PipelineAttachment | null;
-  recentComm?: LinkedCommunication | null;
-  lastCompletedTask?: PipelineTask | null;
-  onNavigate: (tab: DealRoomTab) => void;
+// For search mode, use typeahead endpoint (GET, not POST)
+if (params.query) {
+  const typeaheadUrl = new URL("https://api.harmonic.ai/search/typeahead");
+  typeaheadUrl.searchParams.set("query", params.query);
+  typeaheadUrl.searchParams.set("search_type", "COMPANY");
+  
+  const response = await fetch(typeaheadUrl.toString(), {
+    method: "GET",
+    headers: { apikey: apiKey },
+  });
+  
+  // Response contains results with entity_urn, text (company name), alt_text
+  // Then fetch full company details for top N results
 }
 ```
 
-**Styling:**
-- Light container (no GlassPanel, just subtle border-top or divider)
-- Header: "Signals" in small caps
-- Rows: icon (16px) + title (truncated) + relative time + → indicator
-- Clickable rows navigate to respective tabs
-
-### StatusSnapshot.tsx
+**E. Update `parseHarmonicResponse` to match actual response:**
 
 ```typescript
-interface StatusSnapshotProps {
-  openTasksCount: number;
-  notesCount: number;
-  filesCount: number;
-  daysSinceLastActivity: number | null;
+function parseHarmonicResponse(data: HarmonicApiCompany, matchMethod: string) {
+  // Extract key people from people array (filter for founders/executives)
+  const keyPeople = (data.people || [])
+    .filter(p => p.is_current && (
+      p.highlights?.some(h => h.category === 'FOUNDER') ||
+      /ceo|founder|chief|co-founder|president/i.test(p.title || '')
+    ))
+    .slice(0, 5)
+    .map(p => ({
+      name: p.full_name || 'Unknown',
+      title: p.title || '',
+      linkedin_url: p.socials?.linkedin?.url || null,
+    }));
+
+  return {
+    harmonic_company_id: String(data.id),
+    match_method: matchMethod,
+    confidence: 'high' as const,
+    description_short: data.short_description || data.description?.slice(0, 300) || null,
+    description_long: data.description || null,
+    hq_city: data.location?.city || null,
+    hq_region: data.location?.region || data.location?.state || null,
+    hq_country: data.location?.country || null,
+    employee_range: data.headcount ? formatHeadcount(data.headcount) : null,
+    founding_year: data.founding_date?.date ? new Date(data.founding_date.date).getFullYear() : null,
+    funding_stage: data.stage || null,
+    total_funding_usd: data.funding?.total_raised_usd || null,
+    last_funding_date: data.funding?.last_funding_round_date || null,
+    linkedin_url: data.socials?.linkedin?.url || null,
+    twitter_url: data.socials?.twitter?.url || null,
+    key_people: keyPeople,
+    source_payload: data,
+  };
+}
+
+function formatHeadcount(count: number): string {
+  if (count < 10) return '1-10';
+  if (count < 50) return '11-50';
+  if (count < 200) return '51-200';
+  if (count < 500) return '201-500';
+  if (count < 1000) return '501-1000';
+  return '1000+';
 }
 ```
 
-**Styling:**
-- Minimal card (variant="subtle" or borderless)
-- 4 rows max, icon + label + count
-- No "Relationship Summary" header - implicit context
+**F. Add comprehensive debug response:**
+
+```typescript
+// Success response
+return new Response(JSON.stringify({ 
+  success: true, 
+  enrichment,
+  harmonic_debug: {
+    triggered_async: wasAsync,
+    enrichment_id: enrichmentUrn || null,
+    response_status: responseStatus,
+    match_method: matchMethod,
+  }
+}), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+// Error response
+return new Response(JSON.stringify({ 
+  error: message,
+  harmonic_debug: {
+    status: response.status,
+    body_snippet: rawText.slice(0, 500),
+  }
+}), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+```
 
 ---
 
-## Visual Guidelines Applied
+## Part 2: Frontend Component Updates
 
-| Guideline | Implementation |
-|-----------|----------------|
-| Reduce card usage by ~40% | 2 cards in main (Momentum + Signals) vs current 5 |
-| Prefer dividers over borders | Signals uses hairline dividers, not subcards |
-| Reduce padding by 15-20% | MomentumPanel uses `padding="md"`, Signals uses minimal wrapper |
-| Typography creates hierarchy | Section headers in small caps, content in regular text |
-| Empty states collapse space | DealSignals not rendered if empty, MomentumPanel adapts |
-| No tables, no pagination | Flat lists with hard caps (3 tasks, 5 signals) |
+### A. Enhanced CompanyContextCard
+
+The existing card already has empty, loading, and enriched states. Updates:
+
+**Enriching state (skeleton):**
+- Show 2-3 skeleton text lines
+- Show skeleton chips for HQ, Employees, Founded
+
+**Enriched state (dense layout within same card):**
+
+```text
++--------------------------------------------------+
+| [Sparkles] Company context          [Refresh][Edit] |
++--------------------------------------------------+
+| [Description 2-3 lines, clamped]                    |
+| "Read more" inline toggle                           |
+|                                                     |
+| [HQ: City, Region] [Employees: 51-200] [Founded: 2019] |
+| [Funding: Series A - $12M - 2023-05]                |
+|                                                     |
+| ---- Key People ----                                |
+| [Avatar] Jane Doe          CEO           [LinkedIn] |
+| [Avatar] John Smith        CTO           [LinkedIn] |
+| [Avatar] Alice Chen        CFO           [LinkedIn] |
+| (If empty: "No key people available from Harmonic") |
+|                                                     |
+| [View raw JSON] (collapsed toggle)                  |
+|                                                     |
+| Footer: "Refreshed 2h ago"     [Confidence: High]   |
++--------------------------------------------------+
+```
+
+**Key changes to CompanyContextCard.tsx:**
+
+1. **Merge KeyPeopleCard into this card** - Move key people rendering inline (not a separate card)
+2. **Add funding info row** - Show formatted `total_funding_usd` + `last_funding_date`
+3. **Add "View raw" collapsible** - JSON viewer for `source_payload` with copy button
+4. **Better enriching state** - Show skeleton with chips layout
+
+### B. Update OverviewTab
+
+Remove the separate `<KeyPeopleCard>` component since it will be integrated into `CompanyContextCard`.
+
+### C. HarmonicMatchModal Updates
+
+Add support for linkedin_url-based enrichment when domain is not available:
+
+```typescript
+const handleSelectCandidate = async (candidate: HarmonicCandidate) => {
+  if (candidate.domain) {
+    await onEnrich('enrich_by_domain', { website_domain: candidate.domain });
+  } else if (candidate.linkedin_url) {
+    await onEnrich('enrich_by_linkedin', { linkedin_url: candidate.linkedin_url });
+  } else {
+    toast.error('Selected company has no domain or LinkedIn URL');
+  }
+};
+```
+
+### D. Update HarmonicCandidate Type
+
+Add `linkedin_url` field:
+
+```typescript
+export interface HarmonicCandidate {
+  harmonic_id: string;
+  name: string;
+  domain?: string | null;
+  linkedin_url?: string | null;  // Add this
+  logo_url?: string | null;
+  hq?: string | null;
+  employee_range?: string | null;
+  description_short?: string | null;
+  funding_stage?: string | null;
+}
+```
 
 ---
 
-## Success Metrics (Qualitative)
+## Part 3: State Management Updates
 
-1. Overview renders shorter when empty (no "No X yet" messages)
-2. Clear visual distinction from Tasks/Notes tabs (no item grids)
-3. Momentum panel immediately answers "what's next?"
-4. Signals provide evidence without requiring tab navigation
-5. Rail feels informational, not action-heavy
+### Hook Updates (`usePipelineEnrichment.ts`)
+
+1. **Handle async pending state:**
+
+```typescript
+const [asyncPending, setAsyncPending] = useState(false);
+const [asyncEnrichmentUrn, setAsyncEnrichmentUrn] = useState<string | null>(null);
+
+// In enrichCompany:
+if (data?.asyncPending) {
+  setAsyncPending(true);
+  setAsyncEnrichmentUrn(data.enrichmentUrn);
+  toast.info('Enrichment processing. Data will be available shortly.');
+  return { enrichment: null, notFound: false, pending: true };
+}
+```
+
+2. **Add polling for pending enrichments** (optional, for future):
+
+```typescript
+// Could add a polling mechanism to check async status
+// For MVP, user can manually refresh
+```
 
 ---
 
-## Technical Notes
+## Files to Modify
 
-- No database changes required
-- No new routes
-- No changes to left tab navigation (`DealRoomTabs.tsx` untouched)
-- All data already available via existing hooks
-- Existing actions (Add Task, Add Note, Upload File) preserved in hero
-- Inline thesis field uses same autosave pattern as existing next_steps
+| File | Change |
+|------|--------|
+| `supabase/functions/harmonic-enrich-company/index.ts` | Fix API calls (POST, typeahead), add async polling, update response parsing, add debug info |
+| `src/components/pipeline-detail/overview/CompanyContextCard.tsx` | Merge key people inline, add funding row, add raw JSON viewer, improve skeleton state |
+| `src/components/pipeline-detail/tabs/OverviewTab.tsx` | Remove separate KeyPeopleCard render |
+| `src/components/pipeline-detail/overview/HarmonicMatchModal.tsx` | Support linkedin_url selection fallback |
+| `src/types/enrichment.ts` | Add `linkedin_url` to `HarmonicCandidate` |
+| `src/hooks/usePipelineEnrichment.ts` | Minor cleanup, optional async pending state |
+
+---
+
+## Visual Summary
+
+```text
+Before:
++-------------------+
+| Company context   |
+| [Empty CTA]       |
++-------------------+
+| Key People (sep)  |  <-- Separate card
++-------------------+
+
+After:
++-------------------------------------------+
+| Company context             [Refresh][Edit]|
++-------------------------------------------+
+| Description text, 2-3 lines clamped...     |
+| "Read more"                                |
+|                                            |
+| [HQ chip] [Employees chip] [Founded chip]  |
+| [Funding: Series A - $12M]                 |
+|                                            |
+| -- Key People --                           |
+| Jane Doe, CEO                   [LinkedIn] |
+| John Smith, CTO                 [LinkedIn] |
+|                                            |
+| [View raw JSON] (collapsed)                |
+|                                            |
+| Refreshed 2h ago         Confidence: High  |
++-------------------------------------------+
+```
+
+---
+
+## Testing Steps
+
+1. Test enrichment with a known company (e.g., stripe.com)
+   - Verify POST request is sent
+   - Verify data is parsed and persisted correctly
+2. Test enrichment with unknown company
+   - Verify async polling (if triggered)
+   - Verify fallback to manual match modal
+3. Test manual search in modal
+   - Verify typeahead endpoint works
+   - Verify selecting a candidate triggers enrichment
+4. Test refresh functionality
+5. Verify all UI states render correctly (loading, empty, enriched)
+6. Verify raw JSON viewer works with copy button
+

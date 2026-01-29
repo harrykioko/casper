@@ -4,6 +4,7 @@ import { LinkedCommunication } from '@/hooks/useCompanyLinkedCommunications';
 import { StatusSnapshot } from './overview/StatusSnapshot';
 import { ActivityFeed } from './shared/ActivityFeed';
 import { differenceInDays } from 'date-fns';
+import { HarmonicEnrichment } from '@/types/enrichment';
 
 interface Task {
   id: string;
@@ -20,6 +21,7 @@ interface DealRoomContextRailProps {
   timelineEvents: PipelineTimelineEvent[];
   attachments: PipelineAttachment[];
   linkedCommunications: LinkedCommunication[];
+  enrichment?: HarmonicEnrichment | null;
   onViewFullTimeline?: () => void;
 }
 
@@ -29,6 +31,7 @@ export function DealRoomContextRail({
   interactions, 
   timelineEvents,
   attachments,
+  enrichment,
   onViewFullTimeline,
 }: DealRoomContextRailProps) {
   const openTasks = tasks.filter(t => !t.completed);
@@ -49,6 +52,7 @@ export function DealRoomContextRail({
         notesCount={notesCount}
         filesCount={filesCount}
         daysSinceLastActivity={daysSinceLastActivity}
+        enrichment={enrichment}
       />
 
       <ActivityFeed
