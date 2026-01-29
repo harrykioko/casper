@@ -24,6 +24,16 @@ interface InboxItemRow {
   created_at: string;
   updated_at: string;
   is_top_priority?: boolean;
+  // New cleaned fields
+  cleaned_text?: string | null;
+  display_snippet?: string | null;
+  display_subject?: string | null;
+  display_from_email?: string | null;
+  display_from_name?: string | null;
+  is_forwarded?: boolean;
+  has_thread?: boolean;
+  has_disclaimer?: boolean;
+  has_calendar?: boolean;
 }
 
 function transformRow(row: InboxItemRow): InboxItem {
@@ -45,6 +55,17 @@ function transformRow(row: InboxItemRow): InboxItem {
     relatedCompanyName: row.related_company_name || undefined,
     createdBy: row.created_by,
     isTopPriority: row.is_top_priority || false,
+    // Cleaned content (server-side processed)
+    cleanedText: row.cleaned_text,
+    displaySnippet: row.display_snippet,
+    displaySubject: row.display_subject,
+    displayFromEmail: row.display_from_email,
+    displayFromName: row.display_from_name,
+    // Processing signals
+    isForwarded: row.is_forwarded || false,
+    hasThread: row.has_thread || false,
+    hasDisclaimer: row.has_disclaimer || false,
+    hasCalendar: row.has_calendar || false,
   };
 }
 

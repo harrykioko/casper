@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { format, formatDistanceToNow } from "date-fns";
-import { ChevronDown, Building2, X } from "lucide-react";
+import { ChevronDown, Building2, X, Forward, MessageSquareQuote, FileWarning, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -18,22 +18,37 @@ interface InboxContentPaneProps {
 export function InboxContentPane({ item, onClose, hideCloseButton = false }: InboxContentPaneProps) {
   const [isRawOpen, setIsRawOpen] = useState(false);
   
-  const bodyContent = item.body || item.preview || "";
-  const hasHtmlBody = !!item.htmlBody;
+  // Prefer server-cleaned content, fallback to client-side cleaning for old items
+  const hasServerCleanedContent = !!item.cleanedText;
   
-  // Use the new email cleaner with sender name for better signature detection
-  const cleanedEmail = useMemo(() => {
+  const bodyContent = item.body || item.preview || "";
+  
+  // Client-side cleaning fallback (for items ingested before server-side cleaning)
+  const clientCleanedEmail = useMemo(() => {
+    if (hasServerCleanedContent) return null;
     return cleanEmailContent(bodyContent, item.htmlBody, item.senderName);
-  }, [bodyContent, item.htmlBody, item.senderName]);
+  }, [bodyContent, item.htmlBody, item.senderName, hasServerCleanedContent]);
+  
+  // Display content: prefer server-cleaned, fallback to client-cleaned
+  const displayBody = hasServerCleanedContent 
+    ? item.cleanedText! 
+    : (clientCleanedEmail?.cleanedText || bodyContent);
+  
+  // Display subject: prefer canonicalized, fallback to raw
+  const displaySubject = item.displaySubject || item.subject;
+  
+  // Original sender (for forwards): prefer display fields, fallback to sender fields
+  const displayFromEmail = item.displayFromEmail || item.senderEmail;
+  const displayFromName = item.displayFromName || item.senderName;
 
   const relativeTime = formatDistanceToNow(new Date(item.receivedAt), { addSuffix: true });
   const absoluteTime = format(new Date(item.receivedAt), "MMM d, yyyy 'at' h:mm a");
-  const initial = item.senderName.charAt(0).toUpperCase();
+  const initial = displayFromName.charAt(0).toUpperCase();
 
-  // Determine if we should show original sender info (for forwarded emails)
-  const showOriginalSender = cleanedEmail.wasForwarded && 
-    cleanedEmail.originalSender?.email && 
-    cleanedEmail.originalSender.email !== item.senderEmail;
+  // Determine if we should show forwarding info
+  const showForwardingInfo = item.isForwarded && 
+    item.displayFromEmail && 
+    item.displayFromEmail !== item.senderEmail;
 
   const getStatusBadge = () => {
     if (item.isDeleted) {
@@ -48,9 +63,16 @@ export function InboxContentPane({ item, onClose, hideCloseButton = false }: Inb
     return <Badge variant="outline" className="text-[10px] h-5">Open</Badge>;
   };
 
+  // Signal badges for what was stripped
+  const signalBadges = [];
+  if (item.isForwarded) signalBadges.push({ icon: Forward, label: "Forwarded" });
+  if (item.hasThread) signalBadges.push({ icon: MessageSquareQuote, label: "Thread stripped" });
+  if (item.hasDisclaimer) signalBadges.push({ icon: FileWarning, label: "Disclaimer stripped" });
+  if (item.hasCalendar) signalBadges.push({ icon: Calendar, label: "Calendar stripped" });
+
   // Check if any cleaning was applied (for showing "View original" toggle)
-  const hasCleanedContent = cleanedEmail.cleaningApplied.length > 0 && 
-    !cleanedEmail.cleaningApplied.includes("fallback_too_aggressive");
+  const hasCleanedContent = hasServerCleanedContent || 
+    (clientCleanedEmail?.cleaningApplied?.length || 0) > 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -70,7 +92,7 @@ export function InboxContentPane({ item, onClose, hideCloseButton = false }: Inb
           </div>
         )}
 
-        {/* Sender info row */}
+        {/* Sender info row - use display fields for original sender */}
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center flex-shrink-0">
             <span className="text-sm font-semibold text-sky-600 dark:text-sky-400">
@@ -80,12 +102,12 @@ export function InboxContentPane({ item, onClose, hideCloseButton = false }: Inb
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <span className="font-medium text-sm text-foreground">
-                {item.senderName}
+                {displayFromName}
               </span>
               {getStatusBadge()}
             </div>
             <span className="text-xs text-muted-foreground truncate block">
-              {item.senderEmail}
+              {displayFromEmail}
             </span>
           </div>
           <Tooltip>
@@ -100,76 +122,57 @@ export function InboxContentPane({ item, onClose, hideCloseButton = false }: Inb
           </Tooltip>
         </div>
 
-        {/* Original sender info (for forwarded emails) */}
-        {showOriginalSender && (
+        {/* Forwarding info (shows who forwarded it) */}
+        {showForwardingInfo && (
           <div className="mb-4 p-2.5 rounded-lg bg-muted/30 border border-border">
             <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">
-              Originally from
+              Forwarded by
             </p>
             <p className="text-xs font-medium text-foreground">
-              {cleanedEmail.originalSender?.name || cleanedEmail.originalSender?.email}
+              {item.senderName}
             </p>
-            {cleanedEmail.originalSender?.name && (
-              <p className="text-[10px] text-muted-foreground">
-                {cleanedEmail.originalSender.email}
-              </p>
-            )}
-            {cleanedEmail.originalSubject && cleanedEmail.originalSubject !== item.subject && (
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Subject: {cleanedEmail.originalSubject}
-              </p>
-            )}
+            <p className="text-[10px] text-muted-foreground">
+              {item.senderEmail}
+            </p>
           </div>
         )}
 
         {/* Subject */}
         <h1 className="text-lg font-semibold text-foreground leading-tight mb-3">
-          {item.subject}
+          {displaySubject}
         </h1>
 
-        {/* Linked entities chips */}
-        {item.relatedCompanyName && (
-          <div className="flex flex-wrap gap-2">
+        {/* Signal badges and linked entities */}
+        <div className="flex flex-wrap gap-2">
+          {/* Processing signal badges */}
+          {signalBadges.map(({ icon: Icon, label }) => (
+            <Tooltip key={label}>
+              <TooltipTrigger asChild>
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/50 border border-border text-[10px] text-muted-foreground">
+                  <Icon className="h-3 w-3" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{label}</p>
+              </TooltipContent>
+            </Tooltip>
+          ))}
+          
+          {/* Linked company */}
+          {item.relatedCompanyName && (
             <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 border border-border text-xs">
               <Building2 className="h-3 w-3 text-muted-foreground" />
               <span className="text-foreground">{item.relatedCompanyName}</span>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Scrollable Body */}
       <div className="flex-1 overflow-y-auto p-5">
-        {/* Email body content - prefer cleaned text when significant cleaning occurred */}
+        {/* Email body content - use cleaned text */}
         <div className="max-w-prose text-[13px] leading-relaxed text-foreground">
-          {(() => {
-            // If we applied 2+ cleaning operations, prefer cleaned text over HTML
-            // This handles cases where HTML still has styled versions of stripped content
-            const significantCleaning = cleanedEmail.cleaningApplied.filter(
-              c => !["html_sanitized"].includes(c)
-            ).length >= 2;
-            
-            const hasCalendarCleaning = cleanedEmail.cleaningApplied.includes("calendar_content");
-            const hasForwardedCleaning = cleanedEmail.cleaningApplied.includes("forwarded_wrapper");
-            
-            // Prefer text when we did significant cleaning
-            if (significantCleaning || hasCalendarCleaning || hasForwardedCleaning) {
-              return <p className="whitespace-pre-wrap">{cleanedEmail.cleanedText}</p>;
-            }
-            
-            // Otherwise use HTML if available and cleaned
-            if (hasHtmlBody && cleanedEmail.cleanedHtml) {
-              return (
-                <div 
-                  className="prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-headings:my-3"
-                  dangerouslySetInnerHTML={{ __html: cleanedEmail.cleanedHtml }}
-                />
-              );
-            }
-            
-            // Fallback to cleaned text
-            return <p className="whitespace-pre-wrap">{cleanedEmail.cleanedText}</p>;
-          })()}
+          <p className="whitespace-pre-wrap">{displayBody}</p>
         </div>
 
         {/* Attachments Section */}
@@ -178,7 +181,7 @@ export function InboxContentPane({ item, onClose, hideCloseButton = false }: Inb
         </div>
 
         {/* Collapsible raw/original section */}
-        {(hasCleanedContent || hasHtmlBody) && (
+        {hasCleanedContent && (
           <Collapsible 
             open={isRawOpen} 
             onOpenChange={setIsRawOpen}
@@ -186,10 +189,10 @@ export function InboxContentPane({ item, onClose, hideCloseButton = false }: Inb
           >
             <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
               <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isRawOpen ? 'rotate-180' : ''}`} />
-              {hasCleanedContent ? "View original email (cleaned)" : "View original email"}
-              {cleanedEmail.cleaningApplied.length > 0 && hasCleanedContent && (
+              View original email
+              {signalBadges.length > 0 && (
                 <span className="text-[10px] text-muted-foreground/60 ml-1">
-                  • {cleanedEmail.cleaningApplied.filter(c => c !== "html_sanitized").join(", ")}
+                  • {signalBadges.map(b => b.label.replace(" stripped", "")).join(", ")}
                 </span>
               )}
             </CollapsibleTrigger>

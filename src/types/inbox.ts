@@ -16,6 +16,19 @@ export interface InboxItem {
   relatedCompanyName?: string;
   createdBy: string;
   isTopPriority?: boolean;
+  
+  // Cleaned content (server-side processed)
+  cleanedText?: string | null;
+  displaySnippet?: string | null;
+  displaySubject?: string | null;
+  displayFromEmail?: string | null;
+  displayFromName?: string | null;
+  
+  // Processing signals
+  isForwarded?: boolean;
+  hasThread?: boolean;
+  hasDisclaimer?: boolean;
+  hasCalendar?: boolean;
 }
 
 export interface InboxAttachment {
