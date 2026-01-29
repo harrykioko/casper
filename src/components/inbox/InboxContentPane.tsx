@@ -140,22 +140,36 @@ export function InboxContentPane({ item, onClose, hideCloseButton = false }: Inb
 
       {/* Scrollable Body */}
       <div className="flex-1 overflow-y-auto p-5">
-        {/* Email body content - cleaned by default */}
-        {/* Prefer cleaned text if HTML still contains disclaimers */}
+        {/* Email body content - prefer cleaned text when significant cleaning occurred */}
         <div className="max-w-prose text-[13px] leading-relaxed text-foreground">
-          {hasHtmlBody && cleanedEmail.cleanedHtml && !cleanedEmail.cleaningApplied.includes("html_disclaimers") && !cleanedEmail.cleaningApplied.includes("disclaimers") ? (
-            <div 
-              className="prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-headings:my-3"
-              dangerouslySetInnerHTML={{ __html: cleanedEmail.cleanedHtml }}
-            />
-          ) : cleanedEmail.cleanedHtml && cleanedEmail.cleaningApplied.includes("html_disclaimers") ? (
-            <div 
-              className="prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-headings:my-3"
-              dangerouslySetInnerHTML={{ __html: cleanedEmail.cleanedHtml }}
-            />
-          ) : (
-            <p className="whitespace-pre-wrap">{cleanedEmail.cleanedText}</p>
-          )}
+          {(() => {
+            // If we applied 2+ cleaning operations, prefer cleaned text over HTML
+            // This handles cases where HTML still has styled versions of stripped content
+            const significantCleaning = cleanedEmail.cleaningApplied.filter(
+              c => !["html_sanitized"].includes(c)
+            ).length >= 2;
+            
+            const hasCalendarCleaning = cleanedEmail.cleaningApplied.includes("calendar_content");
+            const hasForwardedCleaning = cleanedEmail.cleaningApplied.includes("forwarded_wrapper");
+            
+            // Prefer text when we did significant cleaning
+            if (significantCleaning || hasCalendarCleaning || hasForwardedCleaning) {
+              return <p className="whitespace-pre-wrap">{cleanedEmail.cleanedText}</p>;
+            }
+            
+            // Otherwise use HTML if available and cleaned
+            if (hasHtmlBody && cleanedEmail.cleanedHtml) {
+              return (
+                <div 
+                  className="prose prose-sm dark:prose-invert max-w-none prose-p:my-2 prose-headings:my-3"
+                  dangerouslySetInnerHTML={{ __html: cleanedEmail.cleanedHtml }}
+                />
+              );
+            }
+            
+            // Fallback to cleaned text
+            return <p className="whitespace-pre-wrap">{cleanedEmail.cleanedText}</p>;
+          })()}
         </div>
 
         {/* Attachments Section */}

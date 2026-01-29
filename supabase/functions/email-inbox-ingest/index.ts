@@ -8,59 +8,53 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars");
 }
 
-// Size limits (tune as needed)
+// Size limits
 const MAX_COMBINED_BODY_BYTES = 1 * 1024 * 1024; // ~1 MB of text+html
 const MAX_TEXT_BODY = 60 * 1024; // 60 KB stored text
 const MAX_HTML_BODY = 120 * 1024; // 120 KB stored html
 const MAX_HTML_FOR_PROCESSING = 120 * 1024; // 120 KB html -> text
-const SNIPPET_LENGTH = 280; // characters
+const SNIPPET_LENGTH = 280;
+const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10 MB per attachment
 
 serve(async (req) => {
   const { supabaseClient } = createSupabase();
 
   try {
-    // Parse JSON once
     const payload = await req.json();
 
-    // Extract raw bodies early
+    // Extract raw bodies
     const rawTextBody: string = payload.text || "";
     const rawHtmlBody: string = payload.html || "";
 
-    // Approximate payload size from body lengths (cheaper than JSON.stringify)
     const textLen = rawTextBody.length;
     const htmlLen = rawHtmlBody.length;
     const approxBodySize = textLen + htmlLen;
 
-    console.log("Inbox email body sizes", {
+    console.log("Inbox email received", {
       textLen,
       htmlLen,
       approxBodySize,
+      hasAttachments: !!(payload.attachments?.length),
+      attachmentCount: payload.attachments?.length || 0,
     });
 
     if (approxBodySize > MAX_COMBINED_BODY_BYTES) {
-      console.error("Email body too large, rejecting", {
-        textLen,
-        htmlLen,
-        approxBodySize,
-      });
+      console.error("Email body too large, rejecting", { textLen, htmlLen, approxBodySize });
       return new Response(JSON.stringify({ error: "Email too large to process" }), {
         status: 413,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    // Truncate bodies before any heavy processing
+    // Truncate bodies
     let textBody = rawTextBody.slice(0, MAX_TEXT_BODY);
     let htmlBody = rawHtmlBody.slice(0, MAX_HTML_BODY);
 
-    // Raw sender (you) – used ONLY for user lookup
+    // Parse sender (you) – used for user lookup
     const senderEmail: string | null =
       payload.from?.value?.[0]?.address || payload.from?.address || payload.from || null;
-
     const senderName: string | null = payload.from?.value?.[0]?.name || payload.from?.name || null;
-
     const toEmail: string | null = payload.to?.value?.[0]?.address || payload.to?.address || payload.to || null;
-
     const smtpSubject: string = payload.subject || "(no subject)";
 
     if (!senderEmail) {
@@ -74,7 +68,7 @@ serve(async (req) => {
       });
     }
 
-    // 1) Lookup user by your email
+    // Lookup user by email
     const { data: user, error: userError } = await supabaseClient
       .from("users")
       .select("id")
@@ -82,43 +76,34 @@ serve(async (req) => {
       .single();
 
     if (userError || !user) {
-      console.error("User not found for sender", {
-        senderEmail,
-        userError,
-      });
+      console.error("User not found for sender", { senderEmail, userError });
       return new Response(JSON.stringify({ error: "Sender not recognized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    // 2) Derive a plain-text version (text preferred; else HTML->text)
+    // Derive plain-text version
     const plainBody = textBody || htmlToPlainText(htmlBody) || "";
 
-    // After we derive plainBody, we can drop htmlBody from memory if we
-    // do not absolutely need to store it. If you want HTML in the UI,
-    // keep the truncated htmlBody; otherwise set it to "" here.
-    // htmlBody = ""; // uncomment if you do not need HTML stored
-
-    // 3) Parse original forwarded sender + subject from plain body
+    // Parse forwarded sender + subject
     const forwardedMeta = parseForwardedMetadata(plainBody);
-
     const displayFromEmail = forwardedMeta.fromEmail || senderEmail;
     const displayFromName = forwardedMeta.fromName || senderName;
     const displaySubject = forwardedMeta.subject || stripFwdPrefix(smtpSubject);
 
-    // 4) Build snippet from the "real" body (below forwarded header if present)
+    // Build snippet
     const snippetSource = forwardedMeta.bodyWithoutHeader || plainBody;
     const snippet = snippetSource.substring(0, SNIPPET_LENGTH);
 
-    const inboxItem = {
+    const inboxItemData = {
       subject: displaySubject,
       from_name: displayFromName,
       from_email: displayFromEmail,
       to_email: toEmail,
       snippet,
-      text_body: plainBody || null, // store canonical text body
-      html_body: htmlBody || null, // already truncated; or null if dropped
+      text_body: plainBody || null,
+      html_body: htmlBody || null,
       received_at: new Date().toISOString(),
       is_read: false,
       is_resolved: false,
@@ -127,9 +112,14 @@ serve(async (req) => {
       created_by: user.id,
     };
 
-    const { error: insertError } = await supabaseClient.from("inbox_items").insert(inboxItem);
+    // Insert inbox item and get ID back
+    const { data: inboxItem, error: insertError } = await supabaseClient
+      .from("inbox_items")
+      .insert(inboxItemData)
+      .select("id")
+      .single();
 
-    if (insertError) {
+    if (insertError || !inboxItem) {
       console.error("Insert into inbox_items failed", insertError);
       return new Response(JSON.stringify({ error: "Insert failed" }), {
         status: 500,
@@ -137,15 +127,144 @@ serve(async (req) => {
       });
     }
 
+    const inboxItemId = inboxItem.id;
     console.log("Inserted inbox item", {
+      id: inboxItemId,
       subject: displaySubject,
       from: displayFromEmail,
     });
 
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
+    // Process attachments
+    const attachments = payload.attachments || [];
+    let attachmentsProcessed = 0;
+    let attachmentsFailed = 0;
+
+    for (const att of attachments) {
+      try {
+        const filename = att.filename || att.name || "unnamed";
+        const contentType = att.contentType || att.type || att.mimeType || "application/octet-stream";
+        const size = att.size || 0;
+
+        // Skip oversized attachments
+        if (size > MAX_ATTACHMENT_SIZE) {
+          console.warn("Skipping large attachment", { filename, size });
+          attachmentsFailed++;
+          continue;
+        }
+
+        let fileBuffer: Uint8Array | null = null;
+
+        // Option A: Base64 content
+        if (att.content) {
+          try {
+            fileBuffer = base64ToUint8Array(att.content);
+          } catch (decodeErr) {
+            console.error("Failed to decode base64 attachment", { filename, error: decodeErr });
+            attachmentsFailed++;
+            continue;
+          }
+        }
+        // Option B: URL reference
+        else if (att.url) {
+          try {
+            const response = await fetch(att.url);
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+            }
+            fileBuffer = new Uint8Array(await response.arrayBuffer());
+          } catch (fetchErr) {
+            console.error("Failed to fetch attachment from URL", { filename, url: att.url, error: fetchErr });
+            attachmentsFailed++;
+            continue;
+          }
+        }
+        // Option C: Buffer data (nodemailer format)
+        else if (att.data) {
+          try {
+            if (typeof att.data === "string") {
+              fileBuffer = base64ToUint8Array(att.data);
+            } else if (att.data instanceof Uint8Array) {
+              fileBuffer = att.data;
+            } else if (Array.isArray(att.data)) {
+              fileBuffer = new Uint8Array(att.data);
+            }
+          } catch (dataErr) {
+            console.error("Failed to process attachment data", { filename, error: dataErr });
+            attachmentsFailed++;
+            continue;
+          }
+        }
+
+        if (!fileBuffer || fileBuffer.length === 0) {
+          console.warn("No content found for attachment", { filename });
+          attachmentsFailed++;
+          continue;
+        }
+
+        // Generate storage path
+        const ext = filename.includes(".") ? filename.split(".").pop() : "";
+        const storagePath = `${user.id}/${inboxItemId}/${crypto.randomUUID()}${ext ? `.${ext}` : ""}`;
+
+        // Upload to Supabase Storage
+        const { error: uploadError } = await supabaseClient.storage
+          .from("inbox-attachments")
+          .upload(storagePath, fileBuffer, {
+            contentType: contentType,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          console.error("Attachment upload failed", { filename, storagePath, error: uploadError });
+          attachmentsFailed++;
+          continue;
+        }
+
+        // Create database record
+        const { error: attachmentInsertError } = await supabaseClient
+          .from("inbox_attachments")
+          .insert({
+            inbox_item_id: inboxItemId,
+            filename: filename,
+            mime_type: contentType,
+            size_bytes: fileBuffer.length,
+            storage_path: storagePath,
+            created_by: user.id,
+          });
+
+        if (attachmentInsertError) {
+          console.error("Attachment record insert failed", { filename, error: attachmentInsertError });
+          // Try to clean up uploaded file
+          await supabaseClient.storage.from("inbox-attachments").remove([storagePath]);
+          attachmentsFailed++;
+          continue;
+        }
+
+        console.log("Attachment saved", { filename, storagePath, size: fileBuffer.length });
+        attachmentsProcessed++;
+      } catch (attErr) {
+        console.error("Unexpected error processing attachment", attErr);
+        attachmentsFailed++;
+      }
+    }
+
+    console.log("Email ingestion complete", {
+      inboxItemId,
+      attachmentsProcessed,
+      attachmentsFailed,
     });
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        inboxItemId,
+        attachmentsProcessed,
+        attachmentsFailed,
+      }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   } catch (err) {
     console.error("Unexpected error in email-inbox-ingest", err);
     return new Response(JSON.stringify({ error: "Unexpected error" }), {
@@ -155,7 +274,7 @@ serve(async (req) => {
   }
 });
 
-// Helpers
+// ============ Helpers ============
 
 function createSupabase() {
   const supabaseClient = createSupabaseClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
@@ -166,6 +285,24 @@ function createSupabase() {
     },
   });
   return { supabaseClient };
+}
+
+// Base64 to Uint8Array
+function base64ToUint8Array(base64: string): Uint8Array {
+  // Handle data URIs
+  let cleanBase64 = base64;
+  if (base64.includes(",")) {
+    cleanBase64 = base64.split(",")[1];
+  }
+  // Remove whitespace
+  cleanBase64 = cleanBase64.replace(/\s/g, "");
+  
+  const binaryString = atob(cleanBase64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
 }
 
 // HTML → plain text with capped input

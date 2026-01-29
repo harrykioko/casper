@@ -1,5 +1,5 @@
 // Email content cleaning utilities for stripping forwarded wrappers, 
-// disclaimers, signatures, and sanitizing HTML
+// disclaimers, signatures, calendar content, and sanitizing HTML
 
 export interface ForwardedMeta {
   fromName: string | null;
@@ -72,6 +72,41 @@ const SIGNATURE_MARKERS = [
   "\nSent from Mail for",
 ];
 
+// Google Calendar patterns (for complete removal)
+const CALENDAR_PATTERNS = [
+  "Invitation from Google Calendar",
+  "You are receiving this email because you are an attendee",
+  "Forwarding this invitation could allow any recipient",
+  "Join with Google Meet",
+  "View all guest info",
+  "More options<https://calendar.google.com",
+  "RSVP to view up-to-date information",
+  "Going?",
+  "more details »",
+  "Calendar<https://calendar.google.com",
+  "This event has been updated",
+  "This event has been changed",
+];
+
+// Calendar RSVP line patterns
+const CALENDAR_RSVP_PATTERNS = [
+  /^Yes<https:\/\/calendar\.google\.com/im,
+  /^No<https:\/\/calendar\.google\.com/im,
+  /^Maybe<https:\/\/calendar\.google\.com/im,
+  /^Yes\s*-\s*No\s*-\s*Maybe/im,
+  /^Going\?\s*Yes\s*-?\s*No\s*-?\s*Maybe/im,
+];
+
+// Calendar metadata patterns (When:/Where:/Guests:)
+const CALENDAR_METADATA_PATTERNS = [
+  /^When:\s*.+$/im,
+  /^Where:\s*.+$/im,
+  /^Guests:\s*.+$/im,
+  /^Calendar:\s*.+$/im,
+  /^Who:\s*.+$/im,
+  /^Video call:\s*.+$/im,
+];
+
 // Phone patterns that often appear in signatures
 const PHONE_PATTERN = /(?:Tel|Phone|Mobile|Cell|Fax|Direct Line|Direct|Office|Work|Main):\s*[\d\s\-\+\(\)\.]+/i;
 
@@ -81,6 +116,9 @@ const INLINE_QUOTE_PATTERNS = [
   /On .{10,60}, .{3,40} <.+@.+> wrote:/im,
   /On .{10,60} at .{5,20}, .+? wrote:/im,
   /\d{1,2}\/\d{1,2}\/\d{2,4}.{1,40}<.+@.+>.{0,10}wrote:/im,
+  // More patterns for various formats
+  /On \w{3}, \w{3} \d{1,2}, \d{4} at \d{1,2}:\d{2}\s*(?:AM|PM)?,?\s*.+?(?:<.+?>)?\s*wrote:/im,
+  /On \w{3,9}, \w{3,9} \d{1,2}, \d{4},?\s*.+?(?:<.+?>)?\s*wrote:/im,
 ];
 
 /**
@@ -108,7 +146,7 @@ export function cleanEmailContent(
 
   const originalLength = cleanedText.length;
 
-  // Step 1: Extract and strip forwarded wrapper
+  // Step 1: Extract and strip forwarded wrapper (also strips forwarder's signature before marker)
   const forwardResult = stripForwardedWrapper(cleanedText);
   if (forwardResult.meta) {
     wasForwarded = true;
@@ -122,34 +160,41 @@ export function cleanEmailContent(
     cleaningApplied.push("forwarded_wrapper");
   }
 
-  // Step 2: Strip inline quoted replies
+  // Step 2: Strip calendar event content
+  const calendarResult = stripCalendarContent(cleanedText);
+  if (calendarResult !== cleanedText) {
+    cleanedText = calendarResult;
+    cleaningApplied.push("calendar_content");
+  }
+
+  // Step 3: Strip inline quoted replies
   const quoteResult = stripInlineQuotes(cleanedText);
   if (quoteResult !== cleanedText) {
     cleanedText = quoteResult;
     cleaningApplied.push("inline_quotes");
   }
 
-  // Step 3: Strip disclaimers
+  // Step 4: Strip disclaimers (more aggressively)
   const disclaimerResult = stripDisclaimers(cleanedText);
   if (disclaimerResult !== cleanedText) {
     cleanedText = disclaimerResult;
     cleaningApplied.push("disclaimers");
   }
 
-  // Step 4: Strip signatures (pass sender name for better detection)
+  // Step 5: Strip signatures (pass sender name for better detection)
   const signatureResult = stripSignatures(cleanedText, senderName);
-  if (signatureResult !== cleanedText && signatureResult.length > cleanedText.length * 0.2) {
+  if (signatureResult !== cleanedText && signatureResult.length > cleanedText.length * 0.15) {
     cleanedText = signatureResult;
     cleaningApplied.push("signatures");
   }
 
-  // Step 5: Clean HTML if present
+  // Step 6: Clean HTML if present
   if (cleanedHtml) {
     // First sanitize HTML
     cleanedHtml = sanitizeHtml(cleanedHtml);
     cleaningApplied.push("html_sanitized");
     
-    // Then try to clean disclaimers from HTML
+    // Then try to clean disclaimers and calendar content from HTML
     const htmlCleanResult = cleanHtmlContent(cleanedHtml, cleanedText);
     if (htmlCleanResult.wasModified) {
       cleanedHtml = htmlCleanResult.html;
@@ -159,14 +204,17 @@ export function cleanEmailContent(
     }
   }
 
-  // Safety check: if we removed more than 80% of content, fall back to original
-  if (cleanedText.length < originalLength * 0.2 && originalLength > 100) {
+  // Safety check: if we removed more than 85% of content, fall back to original
+  if (cleanedText.length < originalLength * 0.15 && originalLength > 100) {
     cleanedText = textBody || "";
     cleaningApplied.push("fallback_too_aggressive");
   }
 
-  // Final trim
+  // Final trim and cleanup
   cleanedText = cleanedText.trim();
+  
+  // Remove any trailing horizontal lines
+  cleanedText = cleanedText.replace(/\n_{10,}$/g, "").trim();
 
   return {
     cleanedText,
@@ -177,6 +225,95 @@ export function cleanEmailContent(
     wasForwarded,
     cleaningApplied,
   };
+}
+
+/**
+ * Strip Google Calendar event content blocks
+ */
+export function stripCalendarContent(text: string): string {
+  let result = text;
+  
+  // Check for calendar-related content
+  let hasCalendarContent = false;
+  for (const pattern of CALENDAR_PATTERNS) {
+    if (result.toLowerCase().includes(pattern.toLowerCase())) {
+      hasCalendarContent = true;
+      break;
+    }
+  }
+  
+  if (!hasCalendarContent) {
+    // Check RSVP patterns
+    for (const pattern of CALENDAR_RSVP_PATTERNS) {
+      if (pattern.test(result)) {
+        hasCalendarContent = true;
+        break;
+      }
+    }
+  }
+  
+  if (!hasCalendarContent) {
+    return result;
+  }
+  
+  const lines = result.split(/\r?\n/);
+  const cleanedLines: string[] = [];
+  let inCalendarBlock = false;
+  let skipNextBlankLines = 0;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineLower = line.toLowerCase();
+    const lineTrimmed = line.trim();
+    
+    // Check for calendar block start
+    const isCalendarLine = CALENDAR_PATTERNS.some(p => lineLower.includes(p.toLowerCase())) ||
+      CALENDAR_RSVP_PATTERNS.some(p => p.test(lineTrimmed)) ||
+      CALENDAR_METADATA_PATTERNS.some(p => p.test(lineTrimmed)) ||
+      /^https:\/\/calendar\.google\.com/i.test(lineTrimmed) ||
+      /^https:\/\/meet\.google\.com/i.test(lineTrimmed) ||
+      /^https:\/\/www\.google\.com\/calendar/i.test(lineTrimmed) ||
+      /^more details\s*[»›>]/i.test(lineTrimmed) ||
+      /^\s*Yes\s*<\s*https:/i.test(lineTrimmed) ||
+      /^\s*No\s*<\s*https:/i.test(lineTrimmed) ||
+      /^\s*Maybe\s*<\s*https:/i.test(lineTrimmed);
+    
+    if (isCalendarLine) {
+      inCalendarBlock = true;
+      skipNextBlankLines = 2;
+      continue;
+    }
+    
+    // Skip blank lines after calendar content
+    if (skipNextBlankLines > 0 && lineTrimmed === "") {
+      skipNextBlankLines--;
+      continue;
+    }
+    
+    // Exit calendar block on substantive content
+    if (inCalendarBlock && lineTrimmed !== "" && lineTrimmed.length > 20) {
+      // Check if this looks like body content vs more calendar junk
+      const isBodyContent = !isCalendarLine && 
+        !/^(when|where|who|guests|calendar|video call):/i.test(lineTrimmed) &&
+        !/^https?:\/\//i.test(lineTrimmed);
+      
+      if (isBodyContent) {
+        inCalendarBlock = false;
+      }
+    }
+    
+    if (!inCalendarBlock && !isCalendarLine) {
+      cleanedLines.push(line);
+    }
+  }
+  
+  result = cleanedLines.join("\n").trim();
+  
+  // Also strip any remaining calendar fragments
+  result = result.replace(/\n*Going\?\s*Yes\s*[-–]?\s*No\s*[-–]?\s*Maybe\s*\n*/gi, "\n");
+  result = result.replace(/\n*more details\s*[»›>]\s*\n*/gi, "\n");
+  
+  return result.trim();
 }
 
 /**
@@ -233,8 +370,9 @@ export function stripForwardedWrapper(text: string): {
     return { body, meta };
   }
 
-  // IMPORTANT: Strip content BEFORE the marker (forwarder's signature)
+  // IMPORTANT: Content BEFORE the marker is the forwarder's additions
   // Only keep content AFTER the forwarded marker
+  // The content before is typically the forwarder's signature or short note
 
   // Extract lines after the marker
   const afterMarker = text.substring(markerIndex + markerLength);
@@ -245,7 +383,7 @@ export function stripForwardedWrapper(text: string): {
   let subjectLine = "";
   let dateLine = "";
 
-  for (let i = 0; i < Math.min(10, lines.length); i++) {
+  for (let i = 0; i < Math.min(12, lines.length); i++) {
     const line = lines[i].trim();
     
     if (/^From:\s*.+$/i.test(line)) {
@@ -328,12 +466,33 @@ function parseHeaderLines(
 export function stripInlineQuotes(text: string): string {
   let result = text;
   
+  // First, strip horizontal rule dividers followed by reply headers
+  const horizontalRulePattern = /\n_{20,}\n+(?:From:|Sent:|To:|Subject:)/im;
+  const ruleMatch = result.match(horizontalRulePattern);
+  if (ruleMatch && ruleMatch.index !== undefined) {
+    const beforeRule = result.substring(0, ruleMatch.index);
+    if (beforeRule.length > 50) {
+      result = beforeRule.trim();
+    }
+  }
+  
+  // Check for reply header blocks (From:/Sent:/To:/Subject:)
+  const replyHeaderPattern = /\n\s*From:\s*.+\n\s*Sent:\s*.+\n\s*To:/im;
+  const replyMatch = result.match(replyHeaderPattern);
+  if (replyMatch && replyMatch.index !== undefined) {
+    const beforeReply = result.substring(0, replyMatch.index);
+    if (beforeReply.length > 50) {
+      result = beforeReply.trim();
+    }
+  }
+  
+  // Then check "On X wrote:" patterns
   for (const pattern of INLINE_QUOTE_PATTERNS) {
     const match = result.match(pattern);
     if (match && match.index !== undefined) {
-      // Only strip if we're not removing too much content (at least 20% should remain)
+      // Only strip if we're not removing too much content (at least 15% should remain)
       const beforeQuote = result.substring(0, match.index);
-      if (beforeQuote.length > result.length * 0.2) {
+      if (beforeQuote.length > 30 && beforeQuote.length > result.length * 0.15) {
         result = beforeQuote.trim();
         break;
       }
@@ -344,17 +503,28 @@ export function stripInlineQuotes(text: string): string {
 }
 
 /**
- * Strip legal disclaimers from content
+ * Strip legal disclaimers from content - more aggressively finds ALL instances
  */
 export function stripDisclaimers(text: string): string {
   let result = text;
   let earliestIndex = result.length;
 
+  // Find the EARLIEST disclaimer that appears after reasonable content
   for (const pattern of DISCLAIMER_PATTERNS) {
-    const index = result.toLowerCase().indexOf(pattern.toLowerCase());
-    // Only strip if pattern appears after some reasonable content (at least 50 chars)
-    if (index !== -1 && index > 50 && index < earliestIndex) {
-      earliestIndex = index;
+    const patternLower = pattern.toLowerCase();
+    const textLower = result.toLowerCase();
+    
+    // Find ALL occurrences of this pattern
+    let searchIndex = 0;
+    while (searchIndex < textLower.length) {
+      const index = textLower.indexOf(patternLower, searchIndex);
+      if (index === -1) break;
+      
+      // Only strip if pattern appears after some reasonable content (at least 30 chars)
+      if (index > 30 && index < earliestIndex) {
+        earliestIndex = index;
+      }
+      searchIndex = index + 1;
     }
   }
 
@@ -376,7 +546,7 @@ export function stripSignatures(text: string, senderName?: string): string {
   for (const marker of SIGNATURE_MARKERS) {
     const index = result.indexOf(marker);
     // For short emails, be more aggressive (don't require marker to be past 30%)
-    const threshold = isShortEmail ? 0.15 : 0.3;
+    const threshold = isShortEmail ? 0.1 : 0.25;
     if (index !== -1 && index > result.length * threshold) {
       result = result.substring(0, index).trim();
       break;
@@ -392,15 +562,15 @@ export function stripSignatures(text: string, senderName?: string): string {
     const nameMatch = result.match(namePattern);
     if (nameMatch && nameMatch.index !== undefined) {
       // Found sender's name with pipe - this is signature start
-      // Only strip if we have some content before it (at least 20 chars)
-      if (nameMatch.index > 20) {
+      // Only strip if we have some content before it (at least 15 chars)
+      if (nameMatch.index > 15) {
         result = result.substring(0, nameMatch.index).trim();
         return result;
       }
     }
   }
 
-  // 3. NEW: Check for C:/M: phone pattern (common Outlook cell format)
+  // 3. Check for C:/M: phone pattern (common Outlook cell format)
   const cellPattern = /^[CM][:.]\s*\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}/m;
   const cellMatch = result.match(cellPattern);
   if (cellMatch && cellMatch.index !== undefined) {
@@ -408,13 +578,13 @@ export function stripSignatures(text: string, senderName?: string): string {
     const beforeCell = result.substring(0, cellMatch.index);
     const lines = beforeCell.split(/\r?\n/);
     
-    // Check last 3 lines for name-like pattern
-    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 3); i--) {
+    // Check last 4 lines for name-like pattern
+    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 4); i--) {
       const line = lines[i].trim();
       // Name | Title pattern
       if (/^[A-Z][a-z]+\s+[A-Z][a-z]+\s*[|]/.test(line)) {
         const cutIndex = result.indexOf(line);
-        if (cutIndex > 20) {
+        if (cutIndex > 15) {
           result = result.substring(0, cutIndex).trim();
           return result;
         }
@@ -422,18 +592,18 @@ export function stripSignatures(text: string, senderName?: string): string {
     }
     
     // If no name found, cut at cell line if we have enough content
-    if (cellMatch.index > 30) {
+    if (cellMatch.index > 25) {
       result = result.substring(0, cellMatch.index).trim();
       return result;
     }
   }
 
-  // 4. NEW: Check for "Name | Title" pattern anywhere (even without sender name)
+  // 4. Check for "Name | Title" pattern anywhere (even without sender name)
   const nameTitlePattern = /^[A-Z][a-z]+\s+[A-Z][a-z]+\s*\|\s*[A-Z]/m;
   const nameTitleMatch = result.match(nameTitlePattern);
   if (nameTitleMatch && nameTitleMatch.index !== undefined) {
     // Found a "Name | Title" line
-    const threshold = isShortEmail ? 20 : 50;
+    const threshold = isShortEmail ? 15 : 40;
     if (nameTitleMatch.index > threshold) {
       result = result.substring(0, nameTitleMatch.index).trim();
       return result;
@@ -449,11 +619,11 @@ export function stripSignatures(text: string, senderName?: string): string {
     const lines = beforeMailto.split(/\r?\n/);
     
     // Find where signature likely starts (look for name patterns)
-    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 5); i--) {
+    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 6); i--) {
       const line = lines[i].trim();
       if (/^[A-Z][a-z]+\s+[A-Z][a-z]+/.test(line) && line.length < 60) {
         const cutIndex = result.indexOf(line);
-        if (cutIndex > 20) {
+        if (cutIndex > 15) {
           result = result.substring(0, cutIndex).trim();
           return result;
         }
@@ -469,14 +639,14 @@ export function stripSignatures(text: string, senderName?: string): string {
     const beforeTagline = result.substring(0, taglineMatch.index);
     const lines = beforeTagline.split(/\r?\n/);
     
-    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 6); i--) {
+    for (let i = lines.length - 1; i >= Math.max(0, lines.length - 7); i--) {
       const line = lines[i].trim();
       // Look for name or phone patterns
       if (/^[A-Z][a-z]+\s+[A-Z][a-z]+/.test(line) || 
           /^[CM][:.]\s*\(?\d{3}/.test(line) ||
           /^[A-Z][a-z]+\s*\|/.test(line)) {
         const cutIndex = result.indexOf(line);
-        if (cutIndex > 20) {
+        if (cutIndex > 15) {
           result = result.substring(0, cutIndex).trim();
           return result;
         }
@@ -489,7 +659,7 @@ export function stripSignatures(text: string, senderName?: string): string {
   let signatureStartLine = -1;
   
   // For short emails, look through more lines
-  const linesToCheck = isShortEmail ? Math.min(15, lines.length) : 10;
+  const linesToCheck = isShortEmail ? Math.min(18, lines.length) : 12;
   
   for (let i = lines.length - 1; i >= Math.max(0, lines.length - linesToCheck); i--) {
     const line = lines[i].trim();
@@ -501,11 +671,11 @@ export function stripSignatures(text: string, senderName?: string): string {
 
   // If we found a phone line, check if preceding lines look like a signature
   // Lower threshold for short emails
-  const lineThreshold = isShortEmail ? 0.2 : 0.5;
+  const lineThreshold = isShortEmail ? 0.15 : 0.4;
   if (signatureStartLine !== -1 && signatureStartLine > lines.length * lineThreshold) {
     // Look back for short lines that might be name/title
     let cutLine = signatureStartLine;
-    for (let i = signatureStartLine - 1; i >= Math.max(0, signatureStartLine - 5); i--) {
+    for (let i = signatureStartLine - 1; i >= Math.max(0, signatureStartLine - 6); i--) {
       const line = lines[i].trim();
       if (line.length === 0 || line.length < 60) {
         cutLine = i;
@@ -520,7 +690,7 @@ export function stripSignatures(text: string, senderName?: string): string {
 }
 
 /**
- * Clean HTML content by trying to remove disclaimers and signatures
+ * Clean HTML content by trying to remove disclaimers, signatures, and calendar content
  */
 export function cleanHtmlContent(html: string, cleanedText: string): {
   html: string;
@@ -529,16 +699,35 @@ export function cleanHtmlContent(html: string, cleanedText: string): {
   let result = html;
   let wasModified = false;
 
+  // Remove calendar-related content from HTML
+  for (const pattern of CALENDAR_PATTERNS) {
+    const patternLower = pattern.toLowerCase();
+    const htmlLower = result.toLowerCase();
+    if (htmlLower.includes(patternLower)) {
+      // Try to remove the containing element
+      const index = htmlLower.indexOf(patternLower);
+      if (index !== -1) {
+        // Find containing table/div
+        const beforePattern = result.substring(0, index);
+        const tableStart = beforePattern.lastIndexOf("<table");
+        const divStart = beforePattern.lastIndexOf("<div");
+        
+        const cutPoint = Math.max(tableStart, divStart);
+        if (cutPoint > result.length * 0.1) {
+          result = result.substring(0, cutPoint).trim();
+          wasModified = true;
+        }
+      }
+    }
+  }
+
   // Try to find and remove disclaimer blocks in HTML
-  // Common patterns: divs/tables at the end with disclaimer keywords
-  
-  // Look for disclaimer text in HTML and try to truncate
   for (const pattern of DISCLAIMER_PATTERNS) {
     const patternLower = pattern.toLowerCase();
     const htmlLower = result.toLowerCase();
     const index = htmlLower.indexOf(patternLower);
     
-    if (index !== -1 && index > result.length * 0.3) {
+    if (index !== -1 && index > result.length * 0.2) {
       // Find the nearest opening tag before the disclaimer
       const beforeDisclaimer = result.substring(0, index);
       
@@ -552,8 +741,8 @@ export function cleanHtmlContent(html: string, cleanedText: string): {
       const cutPoints = [divMatch, pMatch, tableMatch, tdMatch].filter(x => x > 0);
       if (cutPoints.length > 0) {
         const cutPoint = Math.max(...cutPoints);
-        // Only cut if we're keeping at least 30% of content
-        if (cutPoint > result.length * 0.3) {
+        // Only cut if we're keeping at least 20% of content
+        if (cutPoint > result.length * 0.2) {
           result = result.substring(0, cutPoint).trim();
           wasModified = true;
           break;
@@ -612,7 +801,8 @@ export function splitContentAtDisclaimer(content: string): {
   
   if (cleaned.cleaningApplied.includes("disclaimers") || 
       cleaned.cleaningApplied.includes("forwarded_wrapper") ||
-      cleaned.cleaningApplied.includes("signatures")) {
+      cleaned.cleaningApplied.includes("signatures") ||
+      cleaned.cleaningApplied.includes("calendar_content")) {
     return {
       main: cleaned.cleanedText,
       disclaimer: content.length > cleaned.cleanedText.length 
