@@ -138,3 +138,17 @@ export function usePipelineAttachments(companyId: string | undefined) {
     refetch: fetchAttachments,
   };
 }
+
+// Helper to check if attachment can be previewed inline
+export function canPreviewInline(fileType: string | null): boolean {
+  if (!fileType) return false;
+  const previewable = [
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/gif",
+    "image/webp",
+    "application/pdf",
+  ];
+  return previewable.includes(fileType);
+}
