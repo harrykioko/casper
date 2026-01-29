@@ -527,6 +527,42 @@ export type Database = {
         }
         Relationships: []
       }
+      entity_links: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          created_by: string
+          id: string
+          link_reason: string | null
+          source_id: string
+          source_type: string
+          target_id: string
+          target_type: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          created_by: string
+          id?: string
+          link_reason?: string | null
+          source_id: string
+          source_type: string
+          target_id: string
+          target_type: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          link_reason?: string | null
+          source_id?: string
+          source_type?: string
+          target_id?: string
+          target_type?: string
+        }
+        Relationships: []
+      }
       inbox_attachments: {
         Row: {
           created_at: string
@@ -725,6 +761,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      item_extracts: {
+        Row: {
+          content: Json
+          created_at: string
+          created_by: string
+          extract_type: string
+          id: string
+          source_id: string
+          source_type: string
+          updated_at: string
+        }
+        Insert: {
+          content?: Json
+          created_at?: string
+          created_by: string
+          extract_type: string
+          id?: string
+          source_id: string
+          source_type: string
+          updated_at?: string
+        }
+        Update: {
+          content?: Json
+          created_at?: string
+          created_by?: string
+          extract_type?: string
+          id?: string
+          source_id?: string
+          source_type?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       nonnegotiables: {
         Row: {
@@ -1639,6 +1708,54 @@ export type Database = {
           email?: string
           full_name?: string | null
           id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      work_items: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          last_touched_at: string | null
+          priority: number
+          reason_codes: string[]
+          reviewed_at: string | null
+          snooze_until: string | null
+          source_id: string
+          source_type: string
+          status: string
+          trusted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          last_touched_at?: string | null
+          priority?: number
+          reason_codes?: string[]
+          reviewed_at?: string | null
+          snooze_until?: string | null
+          source_id: string
+          source_type: string
+          status?: string
+          trusted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          last_touched_at?: string | null
+          priority?: number
+          reason_codes?: string[]
+          reviewed_at?: string | null
+          snooze_until?: string | null
+          source_id?: string
+          source_type?: string
+          status?: string
+          trusted_at?: string | null
           updated_at?: string
         }
         Relationships: []
