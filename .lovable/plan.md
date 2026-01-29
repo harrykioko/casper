@@ -1,304 +1,235 @@
 
 
-# AI-Driven Pipeline Company Creation from Inbox
+# Add File Preview Capability to Pipeline Details Page
 
 ## Overview
 
-This feature enhances the Inbox AI Suggested Actions system to support first-class creation of new Pipeline Companies directly from introduction emails. When the AI detects an intro email for an unrecognized company, it suggests a `CREATE_PIPELINE_COMPANY` action. Clicking this opens a pre-populated modal where the user reviews and approves the AI-extracted data before creation.
+Add inline preview functionality for files (images and PDFs) in the Pipeline Company Detail Files tab, matching the existing preview capability in the Inbox attachments system.
 
 ---
 
-## Architecture
+## Current State
 
-```text
-+---------------------------+
-|   inbox-suggest-v2        |
-|   (Edge Function)         |
-|   - Detects intro emails  |
-|   - Returns structured    |
-|     metadata for company  |
-|     creation in metadata  |
-+-------------+-------------+
-              |
-              v
-+---------------------------+
-|   SuggestionCard          |
-|   - Displays "Add to      |
-|     Pipeline" action      |
-|   - onClick -> opens      |
-|     CreatePipelineModal   |
-+-------------+-------------+
-              |
-              v
-+---------------------------+
-|   CreatePipelineModal     |
-|   (New Component)         |
-|   - Pre-filled fields     |
-|   - User reviews/edits    |
-|   - "Create" / "Cancel"   |
-+-------------+-------------+
-              |
-              v
-+---------------------------+
-|   usePipeline.createCompany|
-|   + linkCompany (inbox)   |
-|   + createContact         |
-+---------------------------+
+The FilesTab component currently allows:
+- File upload (with drag and drop)
+- File download (opens in new tab)
+- File deletion
+
+Missing: **No inline preview capability for images or PDFs**
+
+---
+
+## Implementation
+
+### Part 1: Add Helper Functions to Pipeline Attachments Hook
+
+**File: `src/hooks/usePipelineAttachments.ts`**
+
+Add the same helper functions used by Inbox attachments:
+
+```typescript
+// Helper to check if attachment can be previewed inline
+export function canPreviewInline(fileType: string | null): boolean {
+  if (!fileType) return false;
+  const previewable = [
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/gif",
+    "image/webp",
+    "application/pdf",
+  ];
+  return previewable.includes(fileType);
+}
 ```
 
 ---
 
-## Implementation Details
+### Part 2: Update FilesTab Component
 
-### Part 1: Edge Function Enhancement (`inbox-suggest-v2`)
+**File: `src/components/pipeline-detail/tabs/FilesTab.tsx`**
 
-Update the AI system prompt and tool schema to return rich metadata when suggesting `CREATE_PIPELINE_COMPANY`.
-
-**Changes to `supabase/functions/inbox-suggest-v2/index.ts`:**
-
-1. **Update system prompt** to instruct the AI to extract company details for intro emails:
-   - Company name (from signature, subject, or body)
-   - Domain (extracted from sender email or mentioned URLs)
-   - Sender name and email as primary contact
-   - One-liner description (AI-generated)
-   - Notes summary (intro context, traction mentions, founder background, any links)
-   - Suggested tags (e.g., "fintech", "AI", "Series A")
-
-2. **Update tool schema** to include `metadata` structure for `CREATE_PIPELINE_COMPANY`:
+#### A. Add preview state and handlers
 
 ```typescript
-metadata: {
-  extracted_company_name: string;
-  extracted_domain: string | null;
-  primary_contact_name: string;
-  primary_contact_email: string;
-  description_oneliner: string;
-  notes_summary: string;
-  suggested_tags: string[];
-  intro_source: string; // e.g., "Warm Intro from Harrison Kioko"
-}
-```
+const [previewAttachmentId, setPreviewAttachmentId] = useState<string | null>(null);
+const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-3. **Prioritize `CREATE_PIPELINE_COMPANY`** when:
-   - Intent is `intro_first_touch`
-   - No candidate companies match (empty `candidate_companies` or low scores)
-   - Subject contains intro signals ("Intro", "Introduction", "Meet", "Connecting you")
-
-### Part 2: New Types
-
-**File: `src/types/inboxSuggestions.ts`**
-
-Add interface for pipeline company creation metadata:
-
-```typescript
-export interface CreatePipelineCompanyMetadata {
-  extracted_company_name: string;
-  extracted_domain: string | null;
-  primary_contact_name: string;
-  primary_contact_email: string;
-  description_oneliner: string;
-  notes_summary: string;
-  suggested_tags: string[];
-  intro_source: string;
-}
-```
-
-### Part 3: New Modal Component
-
-**File: `src/components/inbox/CreatePipelineFromInboxModal.tsx`**
-
-A lightweight, approval-oriented modal with AI-extracted data pre-populated:
-
-**Layout:**
-```text
-+--------------------------------------------------+
-| [Building2] Add to Pipeline                   [X] |
-+--------------------------------------------------+
-| [AI badge] Extracted from email                   |
-|                                                   |
-| Company Name *         [___________________]      |
-| Domain                 [___________________]      |
-| Stage                  [Seed v]                   |
-| Source                 [Warm Intro]               |
-|                                                   |
-| ---- Primary Contact ----                         |
-| Name                   [___________________]      |
-| Email                  [___________________]      |
-|                                                   |
-| Description            [___________________]      |
-| (AI one-liner, editable)                          |
-|                                                   |
-| Notes                                             |
-| [__________________________________]              |
-| [__________________________________]              |
-| (AI summary with intro context)                   |
-|                                                   |
-| Tags                   [fintech] [AI] [+]         |
-|                                                   |
-+--------------------------------------------------+
-|              [Cancel]   [Create Company]          |
-+--------------------------------------------------+
-```
-
-**Features:**
-- All fields are editable (user has full control)
-- Company Name is required
-- Default stage: "new" (first pipeline status)
-- Source defaults to "Warm Intro" (stored in `next_steps` or a future source field)
-- Tags displayed as editable chips
-- "Create Company" button triggers creation flow
-
-**Props:**
-```typescript
-interface CreatePipelineFromInboxModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  inboxItem: InboxItem;
-  prefillData: CreatePipelineCompanyMetadata;
-  onCompanyCreated: (companyId: string, companyName: string) => void;
-}
-```
-
-**Creation Flow:**
-1. Call `usePipeline().createCompany()` with extracted data
-2. Call `usePipelineContacts().createContact()` to add primary contact
-3. Create initial note with AI-generated summary via pipeline_interactions
-4. Call `linkCompany()` to associate inbox item with new company
-5. Show success toast and close modal
-
-### Part 4: Update SuggestionCard
-
-**File: `src/components/inbox/SuggestionCard.tsx`**
-
-Update the button label for `CREATE_PIPELINE_COMPANY`:
-- Current: "Create"
-- New: "Add to Pipeline" (more descriptive)
-
-### Part 5: Update Inbox Page Handler
-
-**File: `src/pages/Inbox.tsx`**
-
-Add state and handler for the new modal:
-
-```typescript
-// State
-const [pipelineModalItem, setPipelineModalItem] = useState<{
-  item: InboxItem;
-  metadata: CreatePipelineCompanyMetadata;
-} | null>(null);
-
-// In handleApproveSuggestion:
-case "CREATE_PIPELINE_COMPANY": {
-  const metadata = suggestion.metadata as CreatePipelineCompanyMetadata | undefined;
-  if (metadata?.extracted_company_name) {
-    // Open the new modal with pre-filled data
-    setPipelineModalItem({ item, metadata });
+const handlePreview = async (attachment: PipelineAttachment) => {
+  if (previewAttachmentId === attachment.id) {
+    // Close preview
+    setPreviewAttachmentId(null);
+    setPreviewUrl(null);
   } else {
-    // Fallback: Use basic extraction from email
-    setPipelineModalItem({
-      item,
-      metadata: {
-        extracted_company_name: item.senderName || "",
-        extracted_domain: item.senderEmail?.split("@")[1] || null,
-        primary_contact_name: item.senderName || "",
-        primary_contact_email: item.senderEmail || "",
-        description_oneliner: "",
-        notes_summary: item.preview || "",
-        suggested_tags: [],
-        intro_source: "Email",
-      },
-    });
+    // Open preview
+    const url = await getSignedUrl(attachment.storage_path);
+    if (url) {
+      setPreviewAttachmentId(attachment.id);
+      setPreviewUrl(url);
+    }
   }
-  break;
-}
-
-// Handler for company created
-const handlePipelineCompanyCreated = (companyId: string, companyName: string) => {
-  if (pipelineModalItem) {
-    linkCompany(pipelineModalItem.item.id, companyId, companyName, 'pipeline');
-    toast.success(`${companyName} added to pipeline and linked to email`);
-  }
-  setPipelineModalItem(null);
 };
 ```
 
-### Part 6: Update InboxActionRail Handler
+#### B. Add Eye/EyeOff button for previewable files
 
-**File: `src/components/inbox/InboxActionRail.tsx`**
+Add a preview toggle button before the download button:
 
-Ensure `onApproveSuggestion` is called with full suggestion including metadata, so the parent component can extract the prefill data.
+```typescript
+{canPreviewInline(attachment.file_type) && (
+  <Button
+    variant="ghost"
+    size="icon"
+    className="h-8 w-8"
+    onClick={() => handlePreview(attachment)}
+    title={isPreviewOpen ? "Hide preview" : "Preview"}
+  >
+    {isPreviewOpen ? (
+      <EyeOff className="w-4 h-4" />
+    ) : (
+      <Eye className="w-4 h-4" />
+    )}
+  </Button>
+)}
+```
+
+#### C. Add AttachmentPreview component
+
+Create an inline preview component that renders below the file card when open:
+
+```typescript
+function AttachmentPreview({ 
+  attachment, 
+  signedUrl, 
+  onClose 
+}: { 
+  attachment: PipelineAttachment; 
+  signedUrl: string;
+  onClose: () => void;
+}) {
+  const isImage = attachment.file_type?.startsWith("image/");
+  const isPdf = attachment.file_type === "application/pdf";
+
+  return (
+    <div className="relative mt-2 rounded-lg border border-border overflow-hidden bg-muted/30">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-2 right-2 h-6 w-6 bg-background/80 hover:bg-background z-10"
+        onClick={onClose}
+      >
+        <X className="h-4 w-4" />
+      </Button>
+
+      {isImage && (
+        <img 
+          src={signedUrl} 
+          alt={attachment.file_name}
+          className="max-w-full max-h-[400px] object-contain mx-auto p-4"
+        />
+      )}
+
+      {isPdf && (
+        <iframe
+          src={signedUrl}
+          title={attachment.file_name}
+          className="w-full h-[500px] border-0"
+        />
+      )}
+    </div>
+  );
+}
+```
+
+#### D. Render preview below file card
+
+```typescript
+{attachments.map((attachment) => {
+  const FileIcon = getFileIcon(attachment.file_type);
+  const isDownloading = downloadingId === attachment.id;
+  const isDeleting = deletingId === attachment.id;
+  const isPreviewOpen = previewAttachmentId === attachment.id;
+
+  return (
+    <div key={attachment.id}>
+      <GlassSubcard className="p-3" hoverable={false}>
+        {/* existing file card content */}
+      </GlassSubcard>
+      
+      {isPreviewOpen && previewUrl && (
+        <AttachmentPreview
+          attachment={attachment}
+          signedUrl={previewUrl}
+          onClose={() => {
+            setPreviewAttachmentId(null);
+            setPreviewUrl(null);
+          }}
+        />
+      )}
+    </div>
+  );
+})}
+```
 
 ---
 
-## Files to Create
+## Visual Flow
 
-| File | Purpose |
-|------|---------|
-| `src/components/inbox/CreatePipelineFromInboxModal.tsx` | New modal for AI-assisted pipeline company creation |
+```text
+Before (current):
++--------------------------------------------------+
+| [FileIcon] Upside Invest.pdf                     |
+| 2.8 MB - Jan 29, 2026           [Download][Delete]|
++--------------------------------------------------+
+
+After (with preview):
++--------------------------------------------------+
+| [FileIcon] Upside Invest.pdf                     |
+| 2.8 MB - Jan 29, 2026    [Preview][Download][Delete]|
++--------------------------------------------------+
+                    |
+                    v (when Preview clicked)
++--------------------------------------------------+
+| [FileIcon] Upside Invest.pdf                     |
+| 2.8 MB - Jan 29, 2026    [Hide][Download][Delete]|
++--------------------------------------------------+
+| +----------------------------------------------+ |
+| |                  [X close]                   | |
+| |                                              | |
+| |        [PDF rendered in iframe]              | |
+| |          or                                  | |
+| |        [Image displayed inline]              | |
+| |                                              | |
+| +----------------------------------------------+ |
++--------------------------------------------------+
+```
+
+---
 
 ## Files to Modify
 
 | File | Change |
 |------|--------|
-| `supabase/functions/inbox-suggest-v2/index.ts` | Add metadata extraction for CREATE_PIPELINE_COMPANY |
-| `src/types/inboxSuggestions.ts` | Add CreatePipelineCompanyMetadata interface |
-| `src/components/inbox/SuggestionCard.tsx` | Update button label for pipeline action |
-| `src/pages/Inbox.tsx` | Add modal state and handler for pipeline creation |
+| `src/hooks/usePipelineAttachments.ts` | Add `canPreviewInline()` helper function |
+| `src/components/pipeline-detail/tabs/FilesTab.tsx` | Add preview state, handlers, Eye button, and AttachmentPreview component |
 
 ---
 
-## UX Considerations
+## Supported Preview Types
 
-1. **Approval-Oriented Design**: The modal emphasizes that "AI has done the work" but the user is in control. All fields are editable.
-
-2. **Confidence Signal**: Show an "AI" badge near the header to indicate this is auto-extracted data.
-
-3. **No Auto-Creation**: The company is only created when the user explicitly clicks "Create Company".
-
-4. **Seamless Linking**: After creation, the email is automatically linked to the new company, enabling future AI actions (drafting replies, scheduling follow-ups).
-
-5. **Graceful Fallback**: If AI metadata is missing or incomplete, use basic extraction from sender info.
+| File Type | Preview Method |
+|-----------|----------------|
+| PNG, JPEG, GIF, WebP | `<img>` tag |
+| PDF | `<iframe>` embed |
+| Other files | No preview (download only) |
 
 ---
 
-## Technical Considerations
+## UX Notes
 
-### Pipeline Company Fields
-
-Based on `usePipeline.createCompany()`, the minimal required fields are:
-- `company_name` (required)
-- `current_round` (required, RoundEnum - default to "Seed")
-
-Optional fields to pre-fill:
-- `website` - constructed from domain if available
-- `next_steps` - can store intro source/context
-- `status` - default to "new"
-
-### Contact Creation
-
-After company creation, use the company ID to create a contact:
-- `name` - from primary_contact_name
-- `email` - from primary_contact_email
-- `is_founder` - default true
-- `is_primary` - default true
-
-### Notes/Interactions
-
-Create an initial pipeline_interaction with type "note" containing the AI-generated summary.
-
----
-
-## Testing Checklist
-
-1. Forward an intro email to the inbox
-2. Generate AI suggestions - verify CREATE_PIPELINE_COMPANY appears with high priority
-3. Click "Add to Pipeline" - verify modal opens with pre-filled data
-4. Edit fields and click "Create Company"
-5. Verify:
-   - Company appears in Pipeline
-   - Contact is created and linked
-   - Email is linked to the company
-   - Initial note is created with summary
-6. Test fallback when metadata is missing
-7. Test Cancel button closes modal without side effects
+1. **Toggle behavior**: Clicking Eye opens preview, clicking EyeOff (or X button on preview) closes it
+2. **Only one preview at a time**: Opening a new preview auto-closes any open one
+3. **PDF height**: 500px iframe for comfortable reading
+4. **Image sizing**: Max height 400px with object-contain for proper aspect ratio
+5. **Consistent styling**: Matches Casper glassmorphic aesthetic with muted backgrounds and subtle borders
 
