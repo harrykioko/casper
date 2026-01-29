@@ -13,6 +13,7 @@ export interface InboxDrawerHandlers {
   onSaveAttachments?: (item: InboxItem) => void;
   onApproveSuggestion?: (item: InboxItem, suggestion: StructuredSuggestion) => void;
   onSaveAttachmentToCompany?: (item: InboxItem, attachment: InboxAttachment) => void;
+  onUnlinkCompany?: (id: string) => void;
 }
 
 interface GlobalInboxDrawerContextValue {

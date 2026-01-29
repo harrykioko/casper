@@ -485,7 +485,9 @@ export type Database = {
           is_top_priority: boolean
           received_at: string
           related_company_id: string | null
+          related_company_logo_url: string | null
           related_company_name: string | null
+          related_company_type: string | null
           snippet: string | null
           snoozed_until: string | null
           subject: string
@@ -515,7 +517,9 @@ export type Database = {
           is_top_priority?: boolean
           received_at?: string
           related_company_id?: string | null
+          related_company_logo_url?: string | null
           related_company_name?: string | null
+          related_company_type?: string | null
           snippet?: string | null
           snoozed_until?: string | null
           subject: string
@@ -545,7 +549,9 @@ export type Database = {
           is_top_priority?: boolean
           received_at?: string
           related_company_id?: string | null
+          related_company_logo_url?: string | null
           related_company_name?: string | null
+          related_company_type?: string | null
           snippet?: string | null
           snoozed_until?: string | null
           subject?: string

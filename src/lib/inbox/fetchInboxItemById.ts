@@ -34,6 +34,8 @@ export async function fetchInboxItemById(emailId: string): Promise<InboxItem | n
     snoozedUntil: data.snoozed_until,
     relatedCompanyId: data.related_company_id || undefined,
     relatedCompanyName: data.related_company_name || undefined,
+    relatedCompanyType: data.related_company_type as 'pipeline' | 'portfolio' | undefined,
+    relatedCompanyLogoUrl: data.related_company_logo_url || undefined,
     createdBy: data.created_by,
     isTopPriority: data.is_top_priority || false,
     cleanedText: data.cleaned_text,

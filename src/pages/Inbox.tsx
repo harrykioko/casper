@@ -39,7 +39,7 @@ export default function Inbox() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   const { openDrawer: openGlobalDrawer } = useGlobalInboxDrawer();
-  const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze, linkCompany } = useInboxItems();
+  const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze, linkCompany, unlinkCompany } = useInboxItems();
   const { inboxItems: archivedItems, isLoading: isLoadingArchived } = useInboxItems({ onlyArchived: true });
   const { createTask } = useTasks();
   const { createCompany: createPipelineCompany } = usePipeline();
@@ -174,6 +174,7 @@ export default function Inbox() {
       onSaveAttachments: handleSaveAttachments,
       onApproveSuggestion: handleApproveSuggestion,
       onSaveAttachmentToCompany: handleSaveAttachmentToCompany,
+      onUnlinkCompany: unlinkCompany,
     });
   };
 
@@ -314,9 +315,9 @@ export default function Inbox() {
     }
   };
 
-  const handleCompanyLinked = (companyId: string, companyName: string, companyType: 'pipeline' | 'portfolio') => {
+  const handleCompanyLinked = (companyId: string, companyName: string, companyType: 'pipeline' | 'portfolio', companyLogoUrl?: string | null) => {
     if (linkCompanyItem) {
-      linkCompany(linkCompanyItem.id, companyId, companyName);
+      linkCompany(linkCompanyItem.id, companyId, companyName, companyType, companyLogoUrl);
       setLinkCompanyItem(null);
     }
   };

@@ -16,6 +16,7 @@ interface InboxDetailWorkspaceProps {
   onSaveAttachments?: (item: InboxItem) => void;
   onApproveSuggestion?: (item: InboxItem, suggestion: StructuredSuggestion) => void;
   onSaveAttachmentToCompany?: (attachment: InboxAttachment) => void;
+  onUnlinkCompany?: (id: string) => void;
   attachmentCount?: number;
   hideCloseButton?: boolean;
 }
@@ -32,6 +33,7 @@ export function InboxDetailWorkspace({
   onSaveAttachments,
   onApproveSuggestion,
   onSaveAttachmentToCompany,
+  onUnlinkCompany,
   attachmentCount = 0,
   hideCloseButton = false,
 }: InboxDetailWorkspaceProps) {
@@ -44,6 +46,7 @@ export function InboxDetailWorkspace({
           onClose={onClose}
           hideCloseButton={hideCloseButton}
           onSaveAttachmentToCompany={onSaveAttachmentToCompany}
+          onUnlinkCompany={onUnlinkCompany}
         />
       </div>
       

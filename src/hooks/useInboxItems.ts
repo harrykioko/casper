@@ -20,6 +20,8 @@ interface InboxItemRow {
   snoozed_until: string | null;
   related_company_id: string | null;
   related_company_name: string | null;
+  related_company_type?: string | null;
+  related_company_logo_url?: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -53,6 +55,8 @@ function transformRow(row: InboxItemRow): InboxItem {
     snoozedUntil: row.snoozed_until,
     relatedCompanyId: row.related_company_id || undefined,
     relatedCompanyName: row.related_company_name || undefined,
+    relatedCompanyType: row.related_company_type as 'pipeline' | 'portfolio' | undefined,
+    relatedCompanyLogoUrl: row.related_company_logo_url || undefined,
     createdBy: row.created_by,
     isTopPriority: row.is_top_priority || false,
     // Cleaned content (server-side processed)
@@ -234,17 +238,23 @@ export function useInboxItems(options: UseInboxItemsOptions = {}) {
     mutationFn: async ({ 
       id, 
       companyId, 
-      companyName 
+      companyName,
+      companyType,
+      companyLogoUrl,
     }: { 
       id: string; 
       companyId: string | null; 
       companyName: string | null;
+      companyType?: 'pipeline' | 'portfolio' | null;
+      companyLogoUrl?: string | null;
     }) => {
       const { error } = await supabase
         .from("inbox_items")
         .update({ 
           related_company_id: companyId,
-          related_company_name: companyName 
+          related_company_name: companyName,
+          related_company_type: companyType || null,
+          related_company_logo_url: companyLogoUrl || null,
         })
         .eq("id", id);
 
@@ -262,6 +272,32 @@ export function useInboxItems(options: UseInboxItemsOptions = {}) {
     },
   });
 
+  const unlinkCompanyMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("inbox_items")
+        .update({ 
+          related_company_id: null,
+          related_company_name: null,
+          related_company_type: null,
+          related_company_logo_url: null,
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inbox_items"] });
+      queryClient.invalidateQueries({ queryKey: ["inbox_items_archived"] });
+      queryClient.invalidateQueries({ queryKey: ["company_linked_communications"] });
+      toast.success("Company unlinked");
+    },
+    onError: (error) => {
+      console.error("Error unlinking company:", error);
+      toast.error("Failed to unlink company");
+    },
+  });
+
   return {
     inboxItems,
     isLoading,
@@ -272,7 +308,13 @@ export function useInboxItems(options: UseInboxItemsOptions = {}) {
     unarchive: (id: string) => unarchiveMutation.mutate(id),
     snooze: (id: string, until: Date) => snoozeMutation.mutate({ id, until }),
     markTopPriority: (id: string, isTop: boolean) => markTopPriorityMutation.mutate({ id, isTop }),
-    linkCompany: (id: string, companyId: string | null, companyName: string | null) => 
-      linkCompanyMutation.mutate({ id, companyId, companyName }),
+    linkCompany: (
+      id: string, 
+      companyId: string | null, 
+      companyName: string | null,
+      companyType?: 'pipeline' | 'portfolio' | null,
+      companyLogoUrl?: string | null
+    ) => linkCompanyMutation.mutate({ id, companyId, companyName, companyType, companyLogoUrl }),
+    unlinkCompany: (id: string) => unlinkCompanyMutation.mutate(id),
   };
 }
