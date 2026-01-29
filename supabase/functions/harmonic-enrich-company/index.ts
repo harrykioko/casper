@@ -279,14 +279,23 @@ serve(async (req) => {
         ? await callHarmonicAPI(HARMONIC_API_KEY, { linkedin_url: existing.linkedin_url })
         : { data: null, error: "No domain or LinkedIn URL available for refresh" };
 
-      if (error || !data) {
+      if (error) {
         return new Response(JSON.stringify({ error: error || "Failed to refresh enrichment" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const parsed = parseHarmonicResponse(data as HarmonicCompany, existing.match_method || "domain");
+      // Handle array response - Harmonic returns array of companies
+      const companyData = Array.isArray(data) ? data[0] : data;
+      if (!companyData) {
+        return new Response(JSON.stringify({ error: "No matching company found in Harmonic" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const parsed = parseHarmonicResponse(companyData as HarmonicCompany, existing.match_method || "domain");
 
       const { data: updated, error: updateError } = await supabase
         .from("pipeline_company_enrichments")
@@ -331,14 +340,23 @@ serve(async (req) => {
       ? await callHarmonicAPI(HARMONIC_API_KEY, { website_domain: domain })
       : await callHarmonicAPI(HARMONIC_API_KEY, { linkedin_url: linkedIn! });
 
-    if (error || !data) {
+    if (error) {
       return new Response(JSON.stringify({ error: error || "No company data returned" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const parsed = parseHarmonicResponse(data as HarmonicCompany, matchMethod);
+    // Handle array response - Harmonic returns array of companies
+    const companyData = Array.isArray(data) ? data[0] : data;
+    if (!companyData) {
+      return new Response(JSON.stringify({ error: "No matching company found in Harmonic" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const parsed = parseHarmonicResponse(companyData as HarmonicCompany, matchMethod);
 
     // Upsert enrichment
     const { data: enrichment, error: upsertError } = await supabase

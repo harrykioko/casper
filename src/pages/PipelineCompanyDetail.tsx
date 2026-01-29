@@ -32,7 +32,14 @@ export default function PipelineCompanyDetail() {
   const { interactions, loading: interactionsLoading, createInteraction } = usePipelineInteractions(companyId);
   const { attachments, loading: attachmentsLoading } = usePipelineAttachments(companyId);
   const { linkedCommunications } = useCompanyLinkedCommunications(company?.primary_domain, companyId);
-  const { enrichment } = usePipelineEnrichment(companyId);
+  const {
+    enrichment,
+    loading: enrichmentLoading,
+    enriching,
+    enrichCompany,
+    searchCandidates,
+    refreshEnrichment,
+  } = usePipelineEnrichment(companyId);
   const timelineEvents = usePipelineTimeline(interactions, tasks, linkedCommunications);
 
   if (!companyId) {
@@ -76,6 +83,12 @@ export default function PipelineCompanyDetail() {
             interactions={interactions}
             attachments={attachments}
             linkedCommunications={linkedCommunications}
+            enrichment={enrichment}
+            enrichmentLoading={enrichmentLoading}
+            enriching={enriching}
+            onEnrich={enrichCompany}
+            onSearchCandidates={searchCandidates}
+            onRefreshEnrichment={refreshEnrichment}
             onRefetch={refetchCompany}
             onCreateTask={createTask}
             onViewAllTasks={() => setActiveTab('tasks')}
