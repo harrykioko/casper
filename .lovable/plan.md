@@ -1,97 +1,76 @@
 
-# Fix: Harmonic Enrichment Data Not Displaying
 
-## Root Cause Analysis
+# Fix: Fallback to Manual Match When Automatic Enrichment Fails
 
-There are two bugs preventing enrichment data from displaying:
+## Problem
 
-### Bug 1: Backend - Array Response Not Handled
+When a user clicks "Enrich with Harmonic" and the Harmonic API returns a 404 (no company found by domain), the frontend currently:
+1. Shows an error toast "No matching company found in Harmonic"
+2. Leaves the user stuck with no way forward
 
-The Harmonic API returns an **array** of companies, not a single object. Looking at the saved `source_payload: []`, the current code:
+The user needs to be automatically redirected to the manual match flow.
 
-```typescript
-// Line 341 in edge function
-const parsed = parseHarmonicResponse(data as HarmonicCompany, matchMethod);
-```
+---
 
-When `data` is `[]` or `[{...company...}]`:
-- Empty array `[]` has no properties, so all fields parse as `null`
-- Single-element array `[{...}]` also has no direct properties
+## Solution
 
-**Fix:** Extract the first element from the array before parsing:
-```typescript
-const companyData = Array.isArray(data) ? data[0] : data;
-if (!companyData) {
-  return { error: "No matching company found in Harmonic" };
-}
-const parsed = parseHarmonicResponse(companyData, matchMethod);
-```
-
-### Bug 2: Frontend - Duplicate Hook State
-
-The page and `OverviewTab` each create their own `usePipelineEnrichment` hook instance:
-
-```text
-PipelineCompanyDetail.tsx
-  └── usePipelineEnrichment(companyId) → enrichment (passed to rail)
-  └── OverviewTab
-        └── usePipelineEnrichment(company.id) → enrichment (used internally)
-```
-
-When `OverviewTab` calls `enrichCompany()`:
-1. Its local hook updates with new data
-2. The page-level hook remains stale
-3. Rail shows "Not connected" because it receives the stale data
-
-**Fix:** Lift enrichment logic to the page level and pass it down to OverviewTab as props.
+Add logic to detect the specific "not found" error and automatically open the HarmonicMatchModal with a helpful message.
 
 ---
 
 ## Implementation Changes
 
-### 1. Edge Function Fix
+### 1. Update Hook Return Type
 
-**File:** `supabase/functions/harmonic-enrich-company/index.ts`
+**File:** `src/hooks/usePipelineEnrichment.ts`
 
-**Change:** Handle array responses from Harmonic API
+Add a new return value to distinguish between "error" and "not found" states:
 
 ```typescript
-// After callHarmonicAPI returns, before parseHarmonicResponse
-// Around line 334-341
+// Add to return type
+lastErrorType: 'not_found' | 'api_error' | null;
 
-// Current:
-if (error || !data) {
-  return ...
+// In enrichCompany function, detect specific error:
+if (data?.error === "No matching company found in Harmonic" || 
+    invokeError?.message?.includes("404")) {
+  setLastErrorType('not_found');
+  // Don't show toast here - let parent handle the fallback UX
+  return null;
 }
-const parsed = parseHarmonicResponse(data as HarmonicCompany, matchMethod);
-
-// Fixed:
-if (error) {
-  return Response with error
-}
-
-// Handle array response - Harmonic returns array
-const companyData = Array.isArray(data) ? data[0] : data;
-if (!companyData) {
-  return Response with "No matching company found in Harmonic"
-}
-
-const parsed = parseHarmonicResponse(companyData as HarmonicCompany, matchMethod);
 ```
 
-Apply the same fix to the `refresh` mode block (around line 289).
+### 2. Update OverviewTab to Handle Fallback
 
-### 2. Lift Enrichment State to Page Level
+**File:** `src/components/pipeline-detail/tabs/OverviewTab.tsx`
+
+Modify the `handleEnrich` function to detect the "not found" scenario and automatically open the modal:
+
+```typescript
+const handleEnrich = async () => {
+  const domain = company.primary_domain || extractDomainFromWebsite(company.website);
+  
+  if (domain) {
+    const result = await onEnrich('enrich_by_domain', { website_domain: domain });
+    
+    // If enrichment returned null and error was "not found", open manual match
+    if (!result && lastErrorType === 'not_found') {
+      toast.info('No automatic match found. Search for the company manually.');
+      setMatchModalOpen(true);
+    }
+  } else {
+    // No domain available - go straight to manual match
+    setMatchModalOpen(true);
+  }
+};
+```
+
+### 3. Pass Error Type to OverviewTab
 
 **File:** `src/pages/PipelineCompanyDetail.tsx`
 
-**Change:** Pass enrichment actions to OverviewTab instead of letting it create its own hook
+Include the error type in the props passed down:
 
 ```typescript
-// Current (line 35):
-const { enrichment } = usePipelineEnrichment(companyId);
-
-// Changed to:
 const {
   enrichment,
   loading: enrichmentLoading,
@@ -99,66 +78,77 @@ const {
   enrichCompany,
   searchCandidates,
   refreshEnrichment,
+  lastErrorType, // Add this
 } = usePipelineEnrichment(companyId);
 
-// Pass to OverviewTab:
+// Pass to OverviewTab
 <OverviewTab
-  company={company}
-  tasks={tasks}
-  enrichment={enrichment}
-  enrichmentLoading={enrichmentLoading}
-  enriching={enriching}
-  onEnrich={enrichCompany}
-  onSearchCandidates={searchCandidates}
-  onRefreshEnrichment={refreshEnrichment}
-  // ... other props
+  ...
+  lastErrorType={lastErrorType}
 />
 ```
 
-### 3. Update OverviewTab Props
+### 4. Update OverviewTab Props Interface
 
 **File:** `src/components/pipeline-detail/tabs/OverviewTab.tsx`
-
-**Change:** Remove internal hook, receive enrichment as props
 
 ```typescript
 interface OverviewTabProps {
   // ... existing props ...
-  
-  // Add enrichment props:
-  enrichment: HarmonicEnrichment | null;
-  enrichmentLoading: boolean;
-  enriching: boolean;
-  onEnrich: (mode: EnrichmentMode, options?: EnrichOptions) => Promise<HarmonicEnrichment | null>;
-  onSearchCandidates: (queryName: string) => Promise<HarmonicCandidate[]>;
-  onRefreshEnrichment: () => Promise<HarmonicEnrichment | null>;
+  lastErrorType?: 'not_found' | 'api_error' | null;
 }
+```
 
-export function OverviewTab({
-  company,
-  tasks,
-  enrichment,           // Receive from parent
-  enrichmentLoading,    // Receive from parent
-  enriching,            // Receive from parent
-  onEnrich,             // Receive from parent
-  onSearchCandidates,   // Receive from parent
-  onRefreshEnrichment,  // Receive from parent
-  // ...
-}: OverviewTabProps) {
-  // Remove: const { enrichment, ... } = usePipelineEnrichment(company.id);
+---
+
+## Alternative Simpler Approach
+
+Instead of modifying multiple files, we can simplify by:
+
+1. **Modify only `usePipelineEnrichment.ts`** to return a result object that includes whether it was a "not found" error
+2. **Modify only `OverviewTab.tsx`** to check the result and open the modal
+
+This approach contains all changes to fewer files:
+
+### Hook Change
+
+```typescript
+// enrichCompany returns { success: false, notFound: true } on 404
+const enrichCompany = async (mode, options): Promise<{ 
+  enrichment: HarmonicEnrichment | null; 
+  notFound: boolean 
+}> => {
+  // ... existing logic ...
   
-  // Update handlers to use props:
-  const handleEnrich = () => {
-    const domain = ...;
-    if (domain) {
-      onEnrich('enrich_by_domain', { website_domain: domain });
-    } else {
+  if (data?.error === "No matching company found in Harmonic") {
+    return { enrichment: null, notFound: true };
+  }
+  
+  if (data?.enrichment) {
+    // ... success handling ...
+    return { enrichment: typedEnrichment, notFound: false };
+  }
+  
+  return { enrichment: null, notFound: false };
+};
+```
+
+### OverviewTab Change
+
+```typescript
+const handleEnrich = async () => {
+  const domain = ...;
+  if (domain) {
+    const result = await onEnrich('enrich_by_domain', { website_domain: domain });
+    
+    if (result.notFound) {
+      toast.info('No automatic match found. Search for the company manually.');
       setMatchModalOpen(true);
     }
-  };
-  
-  // ... rest of component
-}
+  } else {
+    setMatchModalOpen(true);
+  }
+};
 ```
 
 ---
@@ -167,25 +157,52 @@ export function OverviewTab({
 
 | File | Change Type | Description |
 |------|-------------|-------------|
-| `supabase/functions/harmonic-enrich-company/index.ts` | Fix | Handle array response from Harmonic API in both enrich and refresh modes |
-| `src/pages/PipelineCompanyDetail.tsx` | Update | Expand usePipelineEnrichment destructuring, pass enrichment props to OverviewTab |
-| `src/components/pipeline-detail/tabs/OverviewTab.tsx` | Update | Remove internal hook, receive enrichment state and actions as props |
+| `src/hooks/usePipelineEnrichment.ts` | Update | Modify `enrichCompany` to return structured result with `notFound` flag |
+| `src/components/pipeline-detail/tabs/OverviewTab.tsx` | Update | Handle `notFound` result by opening the manual match modal |
+| `src/pages/PipelineCompanyDetail.tsx` | Update | Update prop types to match new hook signature |
+
+---
+
+## User Experience Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ User clicks "Enrich with Harmonic"                              │
+│                                                                 │
+│         ↓                                                       │
+│ Edge function tries domain lookup (e.g., "oatfi.com")          │
+│                                                                 │
+│    ┌──────────────────┐        ┌────────────────────────────┐  │
+│    │  Match found     │        │  404: No match found       │  │
+│    └────────┬─────────┘        └──────────────┬─────────────┘  │
+│             │                                  │                │
+│             ↓                                  ↓                │
+│    Show enrichment data          Show info toast:              │
+│    in CompanyContextCard         "No automatic match found."   │
+│                                                │                │
+│                                                ↓                │
+│                                  Auto-open HarmonicMatchModal   │
+│                                  pre-filled with company name   │
+│                                                │                │
+│                                                ↓                │
+│                                  User searches & selects match  │
+│                                                │                │
+│                                                ↓                │
+│                                  Enrichment saved & displayed   │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Testing Steps
 
-1. Delete the existing (empty) enrichment record for OatFi
-2. Click "Enrich with Harmonic" button
-3. Verify the company description, metadata chips, and key people appear
-4. Verify the right rail shows "Harmonic: Connected" with refresh time
-5. Test the Refresh button to ensure data updates
-6. Test the Change Match flow to verify candidate selection works
+1. Go to a pipeline company page (like OatFi)
+2. Delete any existing enrichment record if present
+3. Click "Enrich with Harmonic"
+4. If 404 returned, verify:
+   - Info toast appears: "No automatic match found. Search for the company manually."
+   - HarmonicMatchModal opens automatically
+   - Search field is pre-filled with company name
+5. Search for the company manually
+6. Select a candidate and verify enrichment is saved and displayed
 
----
-
-## Technical Notes
-
-- The Harmonic API `GET /companies?website_domain=` endpoint returns an array, not a single object
-- The enrichment row with empty data needs to be refreshed or deleted to re-test
-- Both bugs must be fixed together - fixing only one won't resolve the UI issue
