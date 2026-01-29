@@ -1,13 +1,23 @@
 import { PipelineCompany } from '@/types/pipeline';
+import { PipelineCardAttention } from '@/lib/pipeline/pipelineAttentionHelpers';
 import { PipelineCard } from './PipelineCard';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface PipelineGridViewProps {
   companies: PipelineCompany[];
   onCardClick: (company: PipelineCompany) => void;
+  attentionMap?: Map<string, PipelineCardAttention>;
+  onAddTask?: (company: PipelineCompany) => void;
+  onLogNote?: (company: PipelineCompany) => void;
 }
 
-export function PipelineGridView({ companies, onCardClick }: PipelineGridViewProps) {
+export function PipelineGridView({ 
+  companies, 
+  onCardClick,
+  attentionMap,
+  onAddTask,
+  onLogNote,
+}: PipelineGridViewProps) {
   return (
     <div className="p-6">
       <ScrollArea className="h-[calc(100vh-12rem)]">
@@ -23,6 +33,9 @@ export function PipelineGridView({ companies, onCardClick }: PipelineGridViewPro
                 key={company.id}
                 company={company}
                 onClick={() => onCardClick(company)}
+                attention={attentionMap?.get(company.id)}
+                onAddTask={() => onAddTask?.(company)}
+                onLogNote={() => onLogNote?.(company)}
               />
             ))
           )}

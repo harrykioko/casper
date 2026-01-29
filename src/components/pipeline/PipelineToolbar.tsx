@@ -1,8 +1,10 @@
-import { Search, LayoutGrid, List, Kanban } from 'lucide-react';
+import { Search, LayoutGrid, List, Kanban, AlertCircle, Star, Clock } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Toggle } from '@/components/ui/toggle';
 import { PipelineViewMode, PipelineFilters, RoundEnum, SectorEnum } from '@/types/pipeline';
+import { cn } from '@/lib/utils';
 
 interface PipelineToolbarProps {
   filters: PipelineFilters;
@@ -47,7 +49,7 @@ export function PipelineToolbar({ filters, onFiltersChange, viewMode, onViewMode
           <SelectTrigger className="w-32">
             <SelectValue placeholder="Round" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-popover border border-border">
             <SelectItem value="all">All Rounds</SelectItem>
             {rounds.map(round => (
               <SelectItem key={round} value={round}>{round}</SelectItem>
@@ -68,13 +70,58 @@ export function PipelineToolbar({ filters, onFiltersChange, viewMode, onViewMode
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Sector" />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-popover border border-border">
             <SelectItem value="all">All Sectors</SelectItem>
             {sectors.map(sector => (
               <SelectItem key={sector} value={sector}>{sector}</SelectItem>
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* Toggle-style Attention Filters */}
+      <div className="flex items-center gap-2">
+        <Toggle
+          pressed={filters.needsAttention}
+          onPressedChange={(pressed) => 
+            onFiltersChange({ ...filters, needsAttention: pressed })
+          }
+          className={cn(
+            "gap-1.5 px-3 h-9 text-sm",
+            filters.needsAttention && "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+          )}
+        >
+          <AlertCircle className="h-3.5 w-3.5" />
+          Needs Attention
+        </Toggle>
+
+        <Toggle
+          pressed={filters.topOfMindOnly}
+          onPressedChange={(pressed) => 
+            onFiltersChange({ ...filters, topOfMindOnly: pressed })
+          }
+          className={cn(
+            "gap-1.5 px-3 h-9 text-sm",
+            filters.topOfMindOnly && "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+          )}
+        >
+          <Star className="h-3.5 w-3.5" />
+          Top of Mind
+        </Toggle>
+
+        <Toggle
+          pressed={filters.staleOnly}
+          onPressedChange={(pressed) => 
+            onFiltersChange({ ...filters, staleOnly: pressed })
+          }
+          className={cn(
+            "gap-1.5 px-3 h-9 text-sm",
+            filters.staleOnly && "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+          )}
+        >
+          <Clock className="h-3.5 w-3.5" />
+          Stale
+        </Toggle>
       </div>
 
       {/* View Mode Toggle */}

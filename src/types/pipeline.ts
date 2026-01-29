@@ -32,6 +32,8 @@ export interface PipelineCompany {
   next_steps?: string;
   logo_url?: string;
   is_top_of_mind?: boolean;
+  last_interaction_at?: string | null;
+  primary_domain?: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -53,4 +55,33 @@ export interface PipelineFilters {
   search: string;
   rounds: RoundEnum[];
   sectors: SectorEnum[];
+  // Attention-based toggle filters
+  needsAttention?: boolean;
+  topOfMindOnly?: boolean;
+  staleOnly?: boolean;
+}
+
+// Attention signals for a pipeline company card
+export interface PipelineCardAttention {
+  isStale: boolean;
+  daysSinceTouch: number | null;
+  hasOverdueTasks: boolean;
+  openTaskCount: number;
+  hasNextSteps: boolean;
+  isClosingSoon: boolean;
+  needsAttention: boolean;
+}
+
+// Pipeline company with computed attention signals
+export interface EnhancedPipelineCompany extends PipelineCompany {
+  attention: PipelineCardAttention;
+}
+
+// Column summary for Kanban headers
+export interface ColumnSummary {
+  staleCount: number;
+  openTaskCount: number;
+  closingSoonCount: number;
+  overdueCount: number;
+  summaryText: string;
 }
