@@ -33,7 +33,7 @@ interface PriorityFiltersProps {
   availableIconTypes: PriorityIconType[];
 }
 
-const sourceTypeLabels: Record<PrioritySourceType, { label: string; icon: typeof CheckSquare }> = {
+const sourceTypeLabels: Partial<Record<PrioritySourceType, { label: string; icon: typeof CheckSquare }>> = {
   task: { label: "Tasks", icon: CheckSquare },
   inbox: { label: "Inbox", icon: Mail },
   calendar_event: { label: "Calendar", icon: Calendar },
@@ -41,10 +41,11 @@ const sourceTypeLabels: Record<PrioritySourceType, { label: string; icon: typeof
   pipeline_company: { label: "Pipeline", icon: Building2 },
   reading_item: { label: "Reading", icon: CheckSquare },
   nonnegotiable: { label: "Habits", icon: CheckSquare },
+  commitment: { label: "Commitments", icon: Flag },
   project: { label: "Projects", icon: Building2 },
 };
 
-const iconTypeLabels: Record<PriorityIconType, { label: string; icon: typeof AlertTriangle }> = {
+const iconTypeLabels: Partial<Record<PriorityIconType, { label: string; icon: typeof AlertTriangle }>> = {
   overdue: { label: "Overdue", icon: AlertTriangle },
   "due-today": { label: "Due Today", icon: Clock },
   "due-soon": { label: "Due Soon", icon: Clock },
@@ -53,6 +54,8 @@ const iconTypeLabels: Record<PriorityIconType, { label: string; icon: typeof Ale
   "upcoming-event": { label: "Upcoming Event", icon: Calendar },
   "unread-reading": { label: "Unread Reading", icon: CheckSquare },
   nonnegotiable: { label: "Habit", icon: CheckSquare },
+  commitment: { label: "Commitment", icon: Flag },
+  "commitment-broken": { label: "Broken Commitment", icon: AlertTriangle },
   "high-importance": { label: "High Priority", icon: Flag },
 };
 

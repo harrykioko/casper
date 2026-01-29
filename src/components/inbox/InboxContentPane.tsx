@@ -12,9 +12,10 @@ import type { InboxItem } from "@/types/inbox";
 interface InboxContentPaneProps {
   item: InboxItem;
   onClose: () => void;
+  hideCloseButton?: boolean;
 }
 
-export function InboxContentPane({ item, onClose }: InboxContentPaneProps) {
+export function InboxContentPane({ item, onClose, hideCloseButton = false }: InboxContentPaneProps) {
   const [isRawOpen, setIsRawOpen] = useState(false);
   
   const bodyContent = item.body || item.preview || "";
@@ -55,17 +56,19 @@ export function InboxContentPane({ item, onClose }: InboxContentPaneProps) {
     <div className="flex flex-col h-full">
       {/* Header Section */}
       <div className="flex-shrink-0 p-5 border-b border-border">
-        {/* Close button - top right */}
-        <div className="flex justify-end mb-3">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-7 w-7 text-muted-foreground hover:text-foreground" 
-            onClick={onClose}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+        {/* Close button - top right (only if not hidden) */}
+        {!hideCloseButton && (
+          <div className="flex justify-end mb-3">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-7 w-7 text-muted-foreground hover:text-foreground" 
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
 
         {/* Sender info row */}
         <div className="flex items-center gap-3 mb-4">

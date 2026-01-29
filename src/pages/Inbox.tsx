@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { 
@@ -10,6 +10,7 @@ import {
 import { useInboxItems } from "@/hooks/useInboxItems";
 import { useTasks } from "@/hooks/useTasks";
 import { useIsDesktop } from "@/hooks/use-mobile";
+import { useGlobalInboxDrawer } from "@/contexts/GlobalInboxDrawerContext";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,6 +32,7 @@ type SortOption = "newest" | "oldest" | "unread";
 export default function Inbox() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
+  const { openDrawer: openGlobalDrawer, closeDrawer: closeGlobalDrawer } = useGlobalInboxDrawer();
   const { inboxItems, isLoading, markAsRead, markComplete, archive, snooze } = useInboxItems();
   const { inboxItems: archivedItems, isLoading: isLoadingArchived } = useInboxItems({ onlyArchived: true });
   const { createTask } = useTasks();
@@ -56,9 +58,8 @@ export default function Inbox() {
   // View filter from summary panel
   const [viewFilter, setViewFilter] = useState<InboxViewFilter>("all");
   
-  // Detail drawer state
+  // Detail pane state (for desktop embedded mode)
   const [selectedItem, setSelectedItem] = useState<InboxItem | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   
   // Task creation state
   const [taskPrefill, setTaskPrefill] = useState<TaskPrefillOptions | null>(null);
@@ -148,15 +149,26 @@ export default function Inbox() {
   }, [baseItems, statusFilter, dateFilter, search, sortBy, viewFilter]);
 
   const openInboxDetail = (item: InboxItem) => {
-    setSelectedItem(item);
-    setIsDetailOpen(true);
     if (!item.isRead) {
       markAsRead(item.id);
+    }
+    
+    if (isDesktop) {
+      // Desktop: Use embedded mode in 3-column layout
+      setSelectedItem(item);
+    } else {
+      // Mobile: Use global drawer
+      openGlobalDrawer(item, {
+        onCreateTask: handleCreateTask,
+        onMarkComplete: handleMarkComplete,
+        onArchive: handleArchive,
+        onSnooze: handleSnooze,
+        onAddNote: handleAddNote,
+      });
     }
   };
 
   const closeDetail = () => {
-    setIsDetailOpen(false);
     setSelectedItem(null);
   };
 
@@ -361,21 +373,6 @@ export default function Inbox() {
           )}
         </div>
       </div>
-
-      {/* Sheet mode for mobile only */}
-      {!isDesktop && (
-        <InboxDetailDrawer
-          mode="sheet"
-          open={isDetailOpen}
-          onClose={closeDetail}
-          item={selectedItem}
-          onCreateTask={handleCreateTask}
-          onMarkComplete={handleMarkComplete}
-          onArchive={handleArchive}
-          onSnooze={handleSnooze}
-          onAddNote={handleAddNote}
-        />
-      )}
 
       {/* Task Creation Dialog */}
       <AddTaskDialog

@@ -12,6 +12,8 @@ import { useEffect } from "react";
 import { NavSidebar } from "@/components/layout/NavSidebar";
 import { SidebarStateProvider, useSidebarState } from "@/contexts/SidebarStateContext";
 import { FloatingNoteProvider } from "@/contexts/FloatingNoteContext";
+import { GlobalInboxDrawerProvider } from "@/contexts/GlobalInboxDrawerContext";
+import { GlobalInboxDrawerOverlay } from "@/components/inbox/GlobalInboxDrawerOverlay";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -43,9 +45,12 @@ const App = () => {
             <Sonner />
             <SidebarStateProvider>
               <FloatingNoteProvider>
-                <BrowserRouter>
-                  <AppContent />
-                </BrowserRouter>
+                <GlobalInboxDrawerProvider>
+                  <BrowserRouter>
+                    <AppContent />
+                  </BrowserRouter>
+                  <GlobalInboxDrawerOverlay />
+                </GlobalInboxDrawerProvider>
               </FloatingNoteProvider>
             </SidebarStateProvider>
           </TooltipProvider>

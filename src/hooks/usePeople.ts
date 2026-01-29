@@ -195,7 +195,7 @@ export function usePeople(options: UsePeopleOptions = {}): UsePeopleReturn {
     const role: CompanyRole = {
       roleId: created.id,
       companyId: created.company_id,
-      companyType: created.company_type,
+      companyType: created.company_type as 'portfolio' | 'pipeline',
       role: created.role,
       isFounder: created.is_founder,
       isPrimaryContact: created.is_primary_contact,
@@ -257,7 +257,7 @@ export function usePeople(options: UsePeopleOptions = {}): UsePeopleReturn {
     const role: CompanyRole = {
       roleId: data.id,
       companyId: data.company_id,
-      companyType: data.company_type,
+      companyType: data.company_type as 'portfolio' | 'pipeline',
       role: data.role,
       isFounder: data.is_founder,
       isPrimaryContact: data.is_primary_contact,
@@ -417,7 +417,7 @@ export function usePersonProfile(personId: string | undefined) {
           // Recent interactions (from both portfolio and pipeline)
           supabase
             .from('company_interactions')
-            .select('id, type, content, occurred_at')
+            .select('id, interaction_type, content, occurred_at')
             .eq('person_id', personId)
             .order('occurred_at', { ascending: false })
             .limit(5),
@@ -437,7 +437,7 @@ export function usePersonProfile(personId: string | undefined) {
           supabase
             .from('inbox_items')
             .select('id, subject, received_at, is_read')
-            .eq('sender_email', person.email)
+            .ilike('from_email', person.email || '')
             .order('received_at', { ascending: false })
             .limit(5),
         ]);
@@ -485,9 +485,9 @@ export function usePersonProfile(personId: string | undefined) {
             dueAt: c.due_at,
             promisedAt: c.promised_at,
           })),
-          recentInteractions: (interactionsResult.data || []).map(i => ({
+          recentInteractions: ((interactionsResult.data as any[]) || []).map((i: any) => ({
             id: i.id,
-            type: i.type,
+            type: i.interaction_type,
             content: i.content,
             occurredAt: i.occurred_at,
           })),
