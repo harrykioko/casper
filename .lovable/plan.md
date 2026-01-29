@@ -1,154 +1,167 @@
 
 
-# Fix: Fallback to Manual Match When Automatic Enrichment Fails
+# Add Comprehensive Harmonic API Logging for Debugging
 
 ## Problem
 
-When a user clicks "Enrich with Harmonic" and the Harmonic API returns a 404 (no company found by domain), the frontend currently:
-1. Shows an error toast "No matching company found in Harmonic"
-2. Leaves the user stuck with no way forward
+The edge function currently logs that it's *calling* Harmonic, but not:
+- The HTTP status code returned
+- The raw response body
+- The structure/shape of the parsed JSON
 
-The user needs to be automatically redirected to the manual match flow.
-
----
+This makes it impossible to determine whether:
+- Harmonic returns 200 with JSON (and what shape)
+- Harmonic returns 401/403/429/404
+- Harmonic returns 200 with an array/wrapper we're not parsing correctly
 
 ## Solution
 
-Add logic to detect the specific "not found" error and automatically open the HarmonicMatchModal with a helpful message.
+Add detailed logging to `callHarmonicAPI()` to capture response status, raw body preview, and parsed data structure. Also update "not found" scenarios to return HTTP 200 with `{ notFound: true }` instead of HTTP 404 to prevent runtime errors in the frontend.
 
 ---
 
 ## Implementation Changes
 
-### 1. Update Hook Return Type
+### File: `supabase/functions/harmonic-enrich-company/index.ts`
 
-**File:** `src/hooks/usePipelineEnrichment.ts`
+#### 1. Refactor `callHarmonicAPI()` to log response details
 
-Add a new return value to distinguish between "error" and "not found" states:
+Replace the current fetch + response handling with comprehensive logging:
 
 ```typescript
-// Add to return type
-lastErrorType: 'not_found' | 'api_error' | null;
+async function callHarmonicAPI(
+  apiKey: string,
+  params: { website_domain?: string; linkedin_url?: string; query?: string }
+): Promise<{ data: HarmonicCompany | HarmonicCompany[] | null; error?: string }> {
+  const baseUrl = "https://api.harmonic.ai/companies";
+  const url = new URL(baseUrl);
 
-// In enrichCompany function, detect specific error:
-if (data?.error === "No matching company found in Harmonic" || 
-    invokeError?.message?.includes("404")) {
-  setLastErrorType('not_found');
-  // Don't show toast here - let parent handle the fallback UX
-  return null;
+  if (params.website_domain) {
+    url.searchParams.set("website_domain", params.website_domain);
+  } else if (params.linkedin_url) {
+    url.searchParams.set("linkedin_url", params.linkedin_url);
+  } else if (params.query) {
+    url.pathname = "/search/companies";
+    url.searchParams.set("query", params.query);
+    url.searchParams.set("limit", "10");
+  }
+
+  console.log(`Calling Harmonic API: ${url.toString()}`);
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      apikey: apiKey,
+      "Content-Type": "application/json",
+    },
+  });
+
+  // LOG: Status code
+  console.log("Harmonic response status:", response.status);
+
+  // Read raw text to log before parsing
+  const rawText = await response.text();
+  console.log("Harmonic raw response (first 2000 chars):", rawText.slice(0, 2000));
+
+  // Parse JSON safely
+  let data: any = null;
+  try {
+    data = rawText ? JSON.parse(rawText) : null;
+  } catch (e) {
+    console.error("Failed to parse Harmonic response as JSON:", e);
+    return { data: null, error: `Harmonic returned non-JSON: ${response.status}` };
+  }
+
+  // LOG: Data structure info
+  console.log("Harmonic response type:", Array.isArray(data) ? "array" : typeof data);
+  console.log("Harmonic array length:", Array.isArray(data) ? data.length : "N/A");
+  console.log("Harmonic keys:", data && !Array.isArray(data) ? Object.keys(data) : null);
+  console.log("Harmonic first item keys:", Array.isArray(data) && data[0] ? Object.keys(data[0]) : null);
+
+  // Handle error status codes
+  if (response.status === 401 || response.status === 403) {
+    return { data: null, error: "Harmonic API key invalid or missing" };
+  }
+
+  if (response.status === 429) {
+    // Rate limited - wait and retry once
+    console.log("Rate limited, retrying after 2s...");
+    await new Promise((r) => setTimeout(r, 2000));
+    
+    const retryResponse = await fetch(url.toString(), {
+      method: "GET",
+      headers: { apikey: apiKey, "Content-Type": "application/json" },
+    });
+
+    console.log("Retry response status:", retryResponse.status);
+    const retryRawText = await retryResponse.text();
+    console.log("Retry raw response (first 2000 chars):", retryRawText.slice(0, 2000));
+
+    if (!retryResponse.ok) {
+      return { data: null, error: `Harmonic API rate limited: ${retryResponse.status}` };
+    }
+
+    try {
+      const retryData = retryRawText ? JSON.parse(retryRawText) : null;
+      return { data: retryData };
+    } catch (e) {
+      return { data: null, error: `Harmonic retry returned non-JSON: ${retryResponse.status}` };
+    }
+  }
+
+  if (response.status === 404) {
+    return { data: null, error: "No matching company found in Harmonic" };
+  }
+
+  if (!response.ok) {
+    console.error("Harmonic API error:", response.status, rawText.slice(0, 500));
+    return { data: null, error: `Harmonic API error: ${response.status}` };
+  }
+
+  return { data };
 }
 ```
 
-### 2. Update OverviewTab to Handle Fallback
+#### 2. Return HTTP 200 with `notFound` flag instead of 404
 
-**File:** `src/components/pipeline-detail/tabs/OverviewTab.tsx`
+Update the "no match found" response handling so the frontend doesn't receive a runtime error:
 
-Modify the `handleEnrich` function to detect the "not found" scenario and automatically open the modal:
-
+**In the main enrich flow (around line 352):**
 ```typescript
-const handleEnrich = async () => {
-  const domain = company.primary_domain || extractDomainFromWebsite(company.website);
-  
-  if (domain) {
-    const result = await onEnrich('enrich_by_domain', { website_domain: domain });
-    
-    // If enrichment returned null and error was "not found", open manual match
-    if (!result && lastErrorType === 'not_found') {
-      toast.info('No automatic match found. Search for the company manually.');
-      setMatchModalOpen(true);
-    }
-  } else {
-    // No domain available - go straight to manual match
-    setMatchModalOpen(true);
-  }
-};
-```
-
-### 3. Pass Error Type to OverviewTab
-
-**File:** `src/pages/PipelineCompanyDetail.tsx`
-
-Include the error type in the props passed down:
-
-```typescript
-const {
-  enrichment,
-  loading: enrichmentLoading,
-  enriching,
-  enrichCompany,
-  searchCandidates,
-  refreshEnrichment,
-  lastErrorType, // Add this
-} = usePipelineEnrichment(companyId);
-
-// Pass to OverviewTab
-<OverviewTab
-  ...
-  lastErrorType={lastErrorType}
-/>
-```
-
-### 4. Update OverviewTab Props Interface
-
-**File:** `src/components/pipeline-detail/tabs/OverviewTab.tsx`
-
-```typescript
-interface OverviewTabProps {
-  // ... existing props ...
-  lastErrorType?: 'not_found' | 'api_error' | null;
+// Handle array response - Harmonic returns array of companies
+const companyData = Array.isArray(data) ? data[0] : data;
+if (!companyData) {
+  // Return 200 with notFound flag instead of 404
+  return new Response(
+    JSON.stringify({ success: false, notFound: true, error: "No matching company found in Harmonic" }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
 }
 ```
 
----
-
-## Alternative Simpler Approach
-
-Instead of modifying multiple files, we can simplify by:
-
-1. **Modify only `usePipelineEnrichment.ts`** to return a result object that includes whether it was a "not found" error
-2. **Modify only `OverviewTab.tsx`** to check the result and open the modal
-
-This approach contains all changes to fewer files:
-
-### Hook Change
-
+**In the refresh flow (around line 291):**
 ```typescript
-// enrichCompany returns { success: false, notFound: true } on 404
-const enrichCompany = async (mode, options): Promise<{ 
-  enrichment: HarmonicEnrichment | null; 
-  notFound: boolean 
-}> => {
-  // ... existing logic ...
-  
-  if (data?.error === "No matching company found in Harmonic") {
-    return { enrichment: null, notFound: true };
-  }
-  
-  if (data?.enrichment) {
-    // ... success handling ...
-    return { enrichment: typedEnrichment, notFound: false };
-  }
-  
-  return { enrichment: null, notFound: false };
-};
+const companyData = Array.isArray(data) ? data[0] : data;
+if (!companyData) {
+  // Return 200 with notFound flag instead of 404
+  return new Response(
+    JSON.stringify({ success: false, notFound: true, error: "No matching company found in Harmonic" }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
 ```
 
-### OverviewTab Change
+#### 3. Update frontend hook to handle `notFound` flag
+
+**File: `src/hooks/usePipelineEnrichment.ts`**
+
+Update the check to also look for `data?.notFound`:
 
 ```typescript
-const handleEnrich = async () => {
-  const domain = ...;
-  if (domain) {
-    const result = await onEnrich('enrich_by_domain', { website_domain: domain });
-    
-    if (result.notFound) {
-      toast.info('No automatic match found. Search for the company manually.');
-      setMatchModalOpen(true);
-    }
-  } else {
-    setMatchModalOpen(true);
-  }
-};
+if (data?.notFound) {
+  setError(data.error || 'No matching company found');
+  return { enrichment: null, notFound: true };
+}
 ```
 
 ---
@@ -157,52 +170,36 @@ const handleEnrich = async () => {
 
 | File | Change Type | Description |
 |------|-------------|-------------|
-| `src/hooks/usePipelineEnrichment.ts` | Update | Modify `enrichCompany` to return structured result with `notFound` flag |
-| `src/components/pipeline-detail/tabs/OverviewTab.tsx` | Update | Handle `notFound` result by opening the manual match modal |
-| `src/pages/PipelineCompanyDetail.tsx` | Update | Update prop types to match new hook signature |
+| `supabase/functions/harmonic-enrich-company/index.ts` | Update | Add comprehensive logging to `callHarmonicAPI()`, change 404 responses to 200 with `notFound` flag |
+| `src/hooks/usePipelineEnrichment.ts` | Update | Handle `data?.notFound` response from edge function |
 
 ---
 
-## User Experience Flow
+## What the Logs Will Show
+
+After deploying, the edge function logs will display:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│ User clicks "Enrich with Harmonic"                              │
-│                                                                 │
-│         ↓                                                       │
-│ Edge function tries domain lookup (e.g., "oatfi.com")          │
-│                                                                 │
-│    ┌──────────────────┐        ┌────────────────────────────┐  │
-│    │  Match found     │        │  404: No match found       │  │
-│    └────────┬─────────┘        └──────────────┬─────────────┘  │
-│             │                                  │                │
-│             ↓                                  ↓                │
-│    Show enrichment data          Show info toast:              │
-│    in CompanyContextCard         "No automatic match found."   │
-│                                                │                │
-│                                                ↓                │
-│                                  Auto-open HarmonicMatchModal   │
-│                                  pre-filled with company name   │
-│                                                │                │
-│                                                ↓                │
-│                                  User searches & selects match  │
-│                                                │                │
-│                                                ↓                │
-│                                  Enrichment saved & displayed   │
-└─────────────────────────────────────────────────────────────────┘
+Calling Harmonic API: https://api.harmonic.ai/companies?website_domain=wealth.com
+Harmonic response status: 200
+Harmonic raw response (first 2000 chars): [{"id":"abc123","name":"Wealth.com",...}]
+Harmonic response type: array
+Harmonic array length: 1
+Harmonic keys: null
+Harmonic first item keys: ["id","name","website","linkedin","location","headcount",...]
 ```
+
+This will reveal:
+- If Harmonic is returning data or empty array
+- The actual field names in the response (to verify our `HarmonicCompany` interface)
+- Any wrapper objects we're not accounting for
 
 ---
 
-## Testing Steps
+## Testing
 
-1. Go to a pipeline company page (like OatFi)
-2. Delete any existing enrichment record if present
-3. Click "Enrich with Harmonic"
-4. If 404 returned, verify:
-   - Info toast appears: "No automatic match found. Search for the company manually."
-   - HarmonicMatchModal opens automatically
-   - Search field is pre-filled with company name
-5. Search for the company manually
-6. Select a candidate and verify enrichment is saved and displayed
+1. Deploy the updated edge function
+2. Trigger enrichment for a pipeline company (e.g., OatFi)
+3. Check edge function logs for the new debug output
+4. Based on logged response structure, adjust `parseHarmonicResponse()` if needed
 
