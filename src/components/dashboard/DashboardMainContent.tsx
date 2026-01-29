@@ -325,7 +325,7 @@ export function DashboardMainContent({
       <AddTaskDialog 
         open={showAddTask} 
         onOpenChange={handleAddTaskOpenChange}
-        onAddTask={onAddTask}
+        onAddTask={(taskData) => onAddTask(taskData.content)}
         prefill={taskPrefill}
       />
 

@@ -8,10 +8,18 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { TaskPrefillOptions } from "@/types/inbox";
 
+export interface TaskCreateData {
+  content: string;
+  description?: string;
+  source_inbox_item_id?: string;
+  company_id?: string;
+  pipeline_company_id?: string;
+}
+
 interface AddTaskDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAddTask: (content: string) => void;
+  onAddTask: (taskData: TaskCreateData) => void;
   prefill?: TaskPrefillOptions;
 }
 
@@ -42,8 +50,26 @@ export function AddTaskDialog({ open, onOpenChange, onAddTask, prefill }: AddTas
     try {
       setIsLoading(true);
       
-      // For now, just pass the content. In the future, could pass full object with description, companyId, etc.
-      onAddTask(taskContent);
+      // Build full task data object including source_inbox_item_id and company links
+      const taskData: TaskCreateData = {
+        content: taskContent,
+      };
+      
+      // Include source inbox item ID if this task originated from an email
+      if (prefill?.sourceInboxItemId) {
+        taskData.source_inbox_item_id = prefill.sourceInboxItemId;
+      }
+      
+      // Include company links if provided
+      if (prefill?.companyId) {
+        if (prefill.companyType === 'pipeline') {
+          taskData.pipeline_company_id = prefill.companyId;
+        } else {
+          taskData.company_id = prefill.companyId;
+        }
+      }
+      
+      onAddTask(taskData);
       toast.success("Task added successfully");
       onOpenChange(false);
       resetForm();

@@ -84,7 +84,7 @@ export function ProjectTasksList({ tasks, onAddTask }: ProjectTasksListProps) {
       <AddTaskDialog
         open={isAddTaskOpen}
         onOpenChange={setIsAddTaskOpen}
-        onAddTask={handleAddTask}
+        onAddTask={(taskData) => handleAddTask(taskData.content)}
       />
     </>
   );

@@ -40,7 +40,7 @@ export function DashboardDialogs({
       <AddTaskDialog
         open={addTaskDialogOpen}
         onOpenChange={setAddTaskDialogOpen}
-        onAddTask={onAddTask}
+        onAddTask={(taskData) => onAddTask(taskData.content)}
       />
 
       {/* Create Project Modal */}
