@@ -5,6 +5,7 @@ import { PipelineCardAttention } from '@/lib/pipeline/pipelineAttentionHelpers';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   ExternalLink, Star, ArrowUpRight, MoreHorizontal, ClipboardList,
   MessageSquare, ArrowRight, CheckCircle2, AlertTriangle, Clock
@@ -133,7 +134,17 @@ export function PipelineListView({
                       className="cursor-pointer hover:bg-muted/8 dark:hover:bg-white/8 border-b border-muted/10 dark:border-white/10 transition-colors duration-150 h-16"
                       onClick={() => onCardClick(company)}
                     >
-                      <TableCell className="font-medium text-base py-4 align-middle">{company.company_name}</TableCell>
+                      <TableCell className="font-medium text-base py-4 align-middle">
+                        <div className="flex items-center gap-2.5">
+                          <Avatar className="h-7 w-7 shrink-0">
+                            <AvatarImage src={company.logo_url || undefined} alt={company.company_name} />
+                            <AvatarFallback className="bg-muted text-xs font-medium">
+                              {company.company_name.slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>{company.company_name}</span>
+                        </div>
+                      </TableCell>
                       <TableCell className="py-4 align-middle">
                         <Badge variant="secondary" className={roundColors[company.current_round]}>
                           {company.current_round}
