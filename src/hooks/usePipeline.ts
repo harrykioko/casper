@@ -47,7 +47,7 @@ export function usePipeline() {
   const fetchCompanies = async () => {
     try {
       const { data, error } = await supabase
-        .from('pipeline_companies' as any)
+        .from('pipeline_companies')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -59,7 +59,7 @@ export function usePipeline() {
           variant: "destructive",
         });
       } else {
-        setCompanies((data as any) ?? []);
+        setCompanies((data as PipelineCompany[]) ?? []);
       }
     } catch (err) {
       setError('Failed to fetch companies');
@@ -99,7 +99,7 @@ export function usePipeline() {
 
     try {
       const { data, error } = await supabase
-        .from('pipeline_companies' as any)
+        .from('pipeline_companies')
         .insert({
           ...companyData,
           primary_domain: extractDomainFromWebsite(companyData.website),
@@ -112,14 +112,14 @@ export function usePipeline() {
       if (error) throw error;
 
       // Replace temp with real data
-      setCompanies(prev => prev.map(c => c.id === tempCompany.id ? (data as any) : c));
+      setCompanies(prev => prev.map(c => c.id === tempCompany.id ? (data as PipelineCompany) : c));
       
       toast({
         title: "Success",
         description: `${companyData.company_name} added to pipeline`,
       });
 
-      return data;
+      return data as PipelineCompany;
     } catch (error: any) {
       // Remove temp company on error
       setCompanies(prev => prev.filter(c => c.id !== tempCompany.id));

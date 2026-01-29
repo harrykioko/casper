@@ -9,7 +9,7 @@ interface CommsTabProps {
 }
 
 export function CommsTab({ company }: CommsTabProps) {
-  const { linkedCommunications, loading } = useCompanyLinkedCommunications(company.primary_domain);
+  const { linkedCommunications, loading } = useCompanyLinkedCommunications(company.primary_domain, company.id);
 
   const events = linkedCommunications.filter(c => c.type === 'event');
   const emails = linkedCommunications.filter(c => c.type === 'email');
