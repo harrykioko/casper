@@ -42,6 +42,7 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
           companyId: data.company_id,
           companyType: data.company_type as 'pipeline' | 'portfolio',
           companyName: data.company_name,
+          companyLogoUrl: data.company_logo_url || null,
           linkedBy: data.linked_by as 'auto' | 'manual',
           confidence: data.confidence,
           createdBy: data.created_by,
@@ -230,6 +231,7 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
           company_id: company.id,
           company_type: company.type,
           company_name: company.name,
+          company_logo_url: company.logoUrl || null,
           linked_by: 'manual',
           confidence: 1.0,
           created_by: user.id,
@@ -245,6 +247,7 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
         companyId: data.company_id,
         companyType: data.company_type as 'pipeline' | 'portfolio',
         companyName: data.company_name,
+        companyLogoUrl: data.company_logo_url || null,
         linkedBy: data.linked_by as 'auto' | 'manual',
         confidence: data.confidence,
         createdBy: data.created_by,
@@ -289,13 +292,31 @@ export function useCalendarEventLinking(event: CalendarEvent | null) {
         .update({ status: 'accepted' })
         .eq('id', suggestion.id);
 
-      // Create the actual link
+      // Fetch the company's logo before linking
+      let logoUrl: string | null = null;
+      if (suggestion.companyType === 'pipeline') {
+        const { data } = await supabase
+          .from('pipeline_companies')
+          .select('logo_url')
+          .eq('id', suggestion.companyId)
+          .single();
+        logoUrl = data?.logo_url || null;
+      } else {
+        const { data } = await supabase
+          .from('companies')
+          .select('logo_url')
+          .eq('id', suggestion.companyId)
+          .single();
+        logoUrl = data?.logo_url || null;
+      }
+
+      // Create the actual link with the logo
       await linkCompany({
         id: suggestion.companyId,
         name: suggestion.companyName,
         type: suggestion.companyType,
         primaryDomain: suggestion.matchedDomain,
-        logoUrl: null,
+        logoUrl: logoUrl,
       });
     } catch (err) {
       console.error('Error accepting suggestion:', err);

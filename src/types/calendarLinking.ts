@@ -4,6 +4,7 @@ export interface LinkedCompany {
   companyId: string;
   companyType: 'pipeline' | 'portfolio';
   companyName: string;
+  companyLogoUrl: string | null;
   linkedBy: 'auto' | 'manual';
   confidence: number | null;
   createdBy: string;

@@ -112,6 +112,7 @@ export type Database = {
         Row: {
           calendar_event_id: string
           company_id: string
+          company_logo_url: string | null
           company_name: string
           company_type: string
           confidence: number | null
@@ -123,6 +124,7 @@ export type Database = {
         Insert: {
           calendar_event_id: string
           company_id: string
+          company_logo_url?: string | null
           company_name: string
           company_type: string
           confidence?: number | null
@@ -134,6 +136,7 @@ export type Database = {
         Update: {
           calendar_event_id?: string
           company_id?: string
+          company_logo_url?: string | null
           company_name?: string
           company_type?: string
           confidence?: number | null
@@ -568,6 +571,7 @@ export type Database = {
           display_from_name: string | null
           display_snippet: string | null
           display_subject: string | null
+          forwarded_by_email: string | null
           from_email: string
           from_name: string | null
           has_calendar: boolean
@@ -588,6 +592,9 @@ export type Database = {
           snippet: string | null
           snoozed_until: string | null
           subject: string
+          summary: string | null
+          summary_source: string | null
+          summary_updated_at: string | null
           text_body: string | null
           to_email: string | null
           updated_at: string
@@ -600,6 +607,7 @@ export type Database = {
           display_from_name?: string | null
           display_snippet?: string | null
           display_subject?: string | null
+          forwarded_by_email?: string | null
           from_email: string
           from_name?: string | null
           has_calendar?: boolean
@@ -620,6 +628,9 @@ export type Database = {
           snippet?: string | null
           snoozed_until?: string | null
           subject: string
+          summary?: string | null
+          summary_source?: string | null
+          summary_updated_at?: string | null
           text_body?: string | null
           to_email?: string | null
           updated_at?: string
@@ -632,6 +643,7 @@ export type Database = {
           display_from_name?: string | null
           display_snippet?: string | null
           display_subject?: string | null
+          forwarded_by_email?: string | null
           from_email?: string
           from_name?: string | null
           has_calendar?: boolean
@@ -652,6 +664,9 @@ export type Database = {
           snippet?: string | null
           snoozed_until?: string | null
           subject?: string
+          summary?: string | null
+          summary_source?: string | null
+          summary_updated_at?: string | null
           text_body?: string | null
           to_email?: string | null
           updated_at?: string
@@ -1751,7 +1766,12 @@ export type Database = {
       company_kind: "portfolio" | "pipeline" | "other"
       company_status: "active" | "watching" | "exited" | "archived"
       interaction_type: "note" | "call" | "meeting" | "email" | "update"
-      note_target_type: "task" | "company" | "project" | "reading_item" | "calendar_event"
+      note_target_type:
+        | "task"
+        | "company"
+        | "project"
+        | "reading_item"
+        | "calendar_event"
       round_enum:
         | "Seed"
         | "Series A"
@@ -1908,7 +1928,13 @@ export const Constants = {
       company_kind: ["portfolio", "pipeline", "other"],
       company_status: ["active", "watching", "exited", "archived"],
       interaction_type: ["note", "call", "meeting", "email", "update"],
-      note_target_type: ["task", "company", "project", "reading_item", "calendar_event"],
+      note_target_type: [
+        "task",
+        "company",
+        "project",
+        "reading_item",
+        "calendar_event",
+      ],
       round_enum: [
         "Seed",
         "Series A",

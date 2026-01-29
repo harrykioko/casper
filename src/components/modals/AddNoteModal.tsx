@@ -45,6 +45,7 @@ const targetTypeConfig: Record<NoteTargetType, { label: string; icon: React.Elem
   company: { label: 'Company', icon: Building2 },
   project: { label: 'Project', icon: FolderKanban },
   reading_item: { label: 'Reading Item', icon: BookOpen },
+  calendar_event: { label: 'Calendar Event', icon: FolderKanban },
 };
 
 export function AddNoteModal({ open, onOpenChange, defaultContext }: AddNoteModalProps) {

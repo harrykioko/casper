@@ -93,6 +93,7 @@ function getTargetLabel(target?: FloatingNoteContextTarget): string {
     company: 'Company',
     project: 'Project',
     reading_item: 'Reading Item',
+    calendar_event: 'Calendar Event',
   };
   
   const label = typeLabels[target.targetType] || 'Note';
