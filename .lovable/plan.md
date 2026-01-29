@@ -1,189 +1,246 @@
 
-# Fix Email Content Cleaning for Calendar Invite Emails
+# Server-Side Email Cleaning Pipeline
 
-## Problem Analysis
+## Overview
 
-The screenshot shows the email content is completely wrong - displaying calendar metadata (Location, Guests, Yes/No/Maybe links, Disclaimers) instead of the actual message body.
+This plan moves email content cleaning from the client (React `cleanEmailContent`) to the server (`email-inbox-ingest` edge function). The cleaned output is stored in the database, making it the single source of truth for all UI views and AI features.
 
-### Root Cause
+## Why This Change?
 
-Looking at the raw `text_body` from the database, the email structure is:
+The current client-side cleaning has fundamental issues:
 
+1. **Inconsistent results** - Different views may clean differently
+2. **Pattern failures** - Complex forwarded emails (like the Myles Patel calendar invite) aren't being cleaned properly because the frontend logic runs too late
+3. **AI sees raw content** - The inbox suggestions edge function receives unprocessed bodies
+4. **Performance** - Cleaning runs on every render instead of once at ingestion
+
+Moving to server-side cleaning solves all of these by processing once at ingestion time.
+
+## Database Schema Changes
+
+Add new columns to `inbox_items` to store cleaned content and signals:
+
+```text
+inbox_items (existing + new columns)
+├── text_body           (raw, keep for audit)
+├── html_body           (raw, keep for audit)
+├── cleaned_text        ← NEW: cleaned plain text for UI
+├── display_snippet     ← NEW: cleaned snippet (280 chars)
+├── display_subject     ← NEW: canonicalized subject (no Re:/Fwd:)
+├── display_from_email  ← NEW: original sender (for forwards)
+├── display_from_name   ← NEW: original sender name
+├── is_forwarded        ← NEW: boolean signal
+├── has_thread          ← NEW: boolean (quoted reply detected)
+├── has_disclaimer      ← NEW: boolean (legal disclaimer detected)
+└── has_calendar        ← NEW: boolean (calendar invite detected)
 ```
-Lines 1-18:    Forwarder's signature (Harrison Kioko)
-Line 20:       ---------- Forwarded message ----------  
-Lines 21-25:   Forwarded headers (From:/Date:/Subject:/To:)
-Lines 26-44:   **ACTUAL MESSAGE BODY** (Hey Harry... Best, Myles)
-Lines 46-52:   Myles's signature block (--\nimage\nMyles Patel\n224-655-9835)
-Lines 55-58:   Quoted reply (On Tue, Jan 13...wrote:)
-Lines 60-67:   Reply headers (From:/Sent:/To:/Subject:/When:/Where:)
-Lines 68-99:   Calendar update details (This event has been updated...)
-Lines 101-120: Calendar metadata (When/Location/Guests/View all guest info/Yes/No/Maybe/Invitation from Google Calendar...)
-Lines 122-124: DUPLICATE DISCLAIMER blocks
+
+## Edge Function Changes
+
+### File: `supabase/functions/email-inbox-ingest/index.ts`
+
+The edge function will be updated to:
+
+1. **Clean content at ingestion** using a new `extract-inbox-brief` helper module
+2. **Store both raw and cleaned** in the database
+3. **Set display fields** for canonicalized subject, original sender, etc.
+
+### New Helper: `supabase/functions/_shared/email-cleaner.ts`
+
+Create a shared module with the cleaning logic:
+
+```text
+email-cleaner.ts
+├── stripHtml()           - HTML to plain text
+├── detectForwarded()     - Find forwarded marker, extract original sender
+├── canonicalizeSubject() - Remove Re:/Fwd:/FW:/AW: prefixes
+├── stripQuotedReplies()  - Remove "On X wrote:" and following content
+├── stripSignatures()     - Remove -- markers, mobile signatures
+├── stripDisclaimers()    - Remove legal blocks
+├── stripCalendarContent() - Remove Google Calendar metadata
+├── normalizeWhitespace() - Collapse blank lines
+├── capLength()           - Limit to ~4000 chars
+└── extractBrief()        - Main pipeline (calls all above)
 ```
 
-**The actual desired output is lines 26-44 only.**
+### Processing Pipeline
 
-The current cleaning is failing because:
+The cleaning order matters:
 
-1. **`stripSignatures` cuts at `--` (line 46)** - This works but returns too late
-2. **The calendar content appears AFTER the signature** - So signature stripping should handle it
-3. **BUT: The displayed content shows lines 101+ (calendar metadata)** - This means the cleaning output is wrong
+```text
+1. HTML → Plain text (if no text_body)
+2. Detect forwarded message + extract original sender
+3. Canonicalize subject
+4. Strip calendar blocks (aggressive cut)
+5. Strip at signature delimiter (--)
+6. Strip quoted reply threads
+7. Strip disclaimers
+8. Normalize whitespace
+9. Cap length at ~4000 chars
+10. Generate snippet (first 280 chars of cleaned text)
+```
 
-After tracing through, the issue is:
-- `stripForwardedWrapper` correctly extracts content after the marker
-- `stripCalendarContent` checks each line but the exit logic `inCalendarBlock` exits on "substantive content" - the calendar lines like "Location" and "Google" are short and may not trigger the block
-- Calendar patterns like `Location\nGoogle\nView map` don't match the existing patterns which look for `Where:` with a colon
+### Key Pattern Additions
 
-### Solution
+These patterns are critical for the Myles Patel-style email:
 
-The fix needs to be more aggressive:
+**Calendar Block Indicators** (cut from first match):
+- "Join with Google Meet"
+- "This event has been updated"
+- "action=RESPOND&eid="
+- "Invitation from Google Calendar"
+- Standalone "When" / "Location" / "Guests" lines
 
-1. **Strip at `--` signature delimiter FIRST** - This will cut everything after "Best,\nMyles"
-2. **Add more calendar metadata patterns** - `Location\n` (without colon), `Guests\n`, `When\n` as line starters
-3. **Treat calendar links as hard stops** - Any line with `calendar.google.com/calendar/event?action=` should trigger cutting everything from that point forward
-4. **Aggressive "block detection"** - If we see calendar content, cut from earliest match point rather than line-by-line filtering
+**Forwarded Wrapper** - Strip everything BEFORE the marker:
+- If content before `---------- Forwarded message ----------` is < 300 chars or looks like a signature, discard it
 
----
+**Quoted Replies**:
+- `On [Day], [Month] [Date], [Year] at [Time] [Name] <email> wrote:`
+- Horizontal rule + `From:` header block
 
-## File Changes
+**Signature Delimiters**:
+- Standard RFC `--` on its own line
+- Mobile: "Sent from my iPhone/iPad"
+- Outlook: Name | Title patterns
 
-### 1. `src/lib/emailCleaners.ts`
+## Frontend Changes
 
-#### A. Add Early Calendar Block Detection
+### File: `src/components/inbox/InboxContentPane.tsx`
 
-Add aggressive detection that finds the EARLIEST calendar marker and cuts from there:
+Update to use the pre-cleaned fields:
+
+```text
+// Old: clean on render
+const cleanedEmail = useMemo(() => {
+  return cleanEmailContent(bodyContent, item.htmlBody);
+}, [bodyContent, item.htmlBody]);
+
+// New: use pre-cleaned fields from DB
+const displayBody = item.cleanedText || item.body || item.preview || "";
+const isForwarded = item.isForwarded || false;
+const originalSender = item.displayFromEmail || item.senderEmail;
+```
+
+### File: `src/types/inbox.ts`
+
+Extend the InboxItem interface:
 
 ```typescript
-// NEW: Early-cut patterns for calendar blocks - cut from first match
-const CALENDAR_BLOCK_STARTERS = [
-  "This event has been updated",
-  "This event has been changed", 
-  "Join with Google Meet",
-  "calendar.google.com/calendar/event?action=",
-  "View all guest info<https://calendar",
-  "Reply for ",
-  "Invitation from Google Calendar",
-];
-```
-
-In `cleanEmailContent()`, add a new step BEFORE existing calendar cleaning:
-
-```typescript
-// Step 1.5: Early calendar block cut - find first calendar block starter and cut
-for (const starter of CALENDAR_BLOCK_STARTERS) {
-  const idx = cleanedText.toLowerCase().indexOf(starter.toLowerCase());
-  if (idx !== -1 && idx > 50) {
-    cleanedText = cleanedText.substring(0, idx).trim();
-    cleaningApplied.push("calendar_block_cut");
-    break;
-  }
+export interface InboxItem {
+  // ...existing fields...
+  cleanedText?: string | null;
+  displaySnippet?: string | null;
+  displaySubject?: string | null;
+  displayFromEmail?: string | null;
+  displayFromName?: string | null;
+  isForwarded?: boolean;
+  hasThread?: boolean;
+  hasDisclaimer?: boolean;
+  hasCalendar?: boolean;
 }
 ```
 
-#### B. Enhance Calendar Metadata Patterns
+### File: `src/hooks/useInboxItems.ts`
 
-Update `CALENDAR_METADATA_PATTERNS` to catch headerless variants:
+Update the row transformer to include new fields.
 
-```typescript
-const CALENDAR_METADATA_PATTERNS = [
-  /^When:\s*.+$/im,
-  /^Where:\s*.+$/im,
-  /^Guests:\s*.+$/im,
-  /^Calendar:\s*.+$/im,
-  /^Who:\s*.+$/im,
-  /^Video call:\s*.+$/im,
-  // NEW: Standalone labels (no colon)
-  /^When$/im,
-  /^Where$/im,
-  /^Location$/im,
-  /^Guests$/im,
-  /^Description$/im,
-];
+### File: `src/lib/emailCleaners.ts`
+
+Keep as a **fallback only** for existing items that don't have `cleaned_text` populated. The file remains but is no longer the primary cleaner.
+
+## Data Migration
+
+Existing inbox items won't have cleaned fields. Two options:
+
+1. **Lazy migration** - If `cleaned_text` is null, fall back to client-side cleaning (already works)
+2. **Backfill script** - Optional: run a one-time query to update existing items
+
+The lazy approach requires no migration and handles the transition gracefully.
+
+## Files Changed Summary
+
+| File | Action |
+|------|--------|
+| `supabase/migrations/XXXXXX_inbox_cleaned_fields.sql` | Add 8 new columns |
+| `supabase/functions/_shared/email-cleaner.ts` | NEW: Server-side cleaning logic |
+| `supabase/functions/email-inbox-ingest/index.ts` | Import cleaner, store cleaned fields |
+| `src/types/inbox.ts` | Extend InboxItem interface |
+| `src/hooks/useInboxItems.ts` | Map new DB columns |
+| `src/components/inbox/InboxContentPane.tsx` | Use pre-cleaned fields |
+| `src/components/dashboard/InboxDetailDrawer.tsx` | Use pre-cleaned fields |
+| `src/lib/emailCleaners.ts` | Keep as fallback |
+
+## Technical Details
+
+### New Database Columns
+
+```sql
+ALTER TABLE inbox_items
+  ADD COLUMN cleaned_text text,
+  ADD COLUMN display_snippet text,
+  ADD COLUMN display_subject text,
+  ADD COLUMN display_from_email text,
+  ADD COLUMN display_from_name text,
+  ADD COLUMN is_forwarded boolean NOT NULL DEFAULT false,
+  ADD COLUMN has_thread boolean NOT NULL DEFAULT false,
+  ADD COLUMN has_disclaimer boolean NOT NULL DEFAULT false,
+  ADD COLUMN has_calendar boolean NOT NULL DEFAULT false;
+
+COMMENT ON COLUMN inbox_items.cleaned_text IS 'Cleaned email body for UI display';
+COMMENT ON COLUMN inbox_items.display_subject IS 'Canonicalized subject without Re:/Fwd: prefixes';
+COMMENT ON COLUMN inbox_items.display_from_email IS 'Original sender email (extracted from forwards)';
 ```
 
-#### C. Add Calendar Link Detection in `stripCalendarContent`
-
-Add pattern matching for long calendar URLs:
+### Cleaning Function Interface
 
 ```typescript
-// In stripCalendarContent, add to isCalendarLine check:
-const isCalendarLine = 
-  // ...existing checks...
-  /action=RESPOND&eid=/i.test(lineTrimmed) ||
-  /action=VIEW&eid=/i.test(lineTrimmed) ||
-  /^Reply for /i.test(lineTrimmed) ||
-  /^View map</i.test(lineTrimmed) ||
-  /^View all guest info</i.test(lineTrimmed) ||
-  /^More phone numbers</i.test(lineTrimmed) ||
-  /^Join by phone/i.test(lineTrimmed) ||
-  /^Meeting link/i.test(lineTrimmed) ||
-  /^PIN:/i.test(lineTrimmed);
-```
-
-#### D. Add Aggressive Calendar Block Cutting
-
-Add a new function that finds calendar blocks and cuts everything from first occurrence:
-
-```typescript
-function cutAtCalendarBlock(text: string): string {
-  // Find the earliest calendar block indicator
-  const calendarIndicators = [
-    "This event has been updated",
-    "This event has been changed",
-    "Join with Google Meet<",
-    "View all guest info<https://calendar",
-    "Invitation from Google Calendar",
-    "Reply for ",
-    "\nWhen\n",  // Standalone "When" line
-    "\nLocation\n", // Standalone "Location" line
-    "\nGuests\n", // Standalone "Guests" line
-    "Yes<https://calendar.google.com",
-    "No<https://calendar.google.com", 
-    "Maybe<https://calendar.google.com",
-    "More options<https://calendar.google.com",
-    "action=RESPOND&eid=",
-    "action=VIEW&eid=",
-  ];
-  
-  let earliestIndex = text.length;
-  for (const indicator of calendarIndicators) {
-    const idx = text.toLowerCase().indexOf(indicator.toLowerCase());
-    if (idx !== -1 && idx > 50 && idx < earliestIndex) {
-      earliestIndex = idx;
-    }
-  }
-  
-  if (earliestIndex < text.length) {
-    return text.substring(0, earliestIndex).trim();
-  }
-  return text;
+interface CleanedEmailResult {
+  cleanedText: string;
+  snippet: string;
+  displaySubject: string;
+  displayFromEmail: string | null;
+  displayFromName: string | null;
+  signals: {
+    isForwarded: boolean;
+    hasThread: boolean;
+    hasDisclaimer: boolean;
+    hasCalendar: boolean;
+  };
 }
+
+function extractBrief(
+  textBody: string,
+  htmlBody: string | null,
+  subject: string,
+  fromEmail: string,
+  fromName: string | null
+): CleanedEmailResult;
 ```
 
-Call this function EARLY in the cleaning pipeline (after forwarded wrapper but before other cleaning).
+### Edge Function Flow
 
-#### E. Fix Processing Order
-
-Update `cleanEmailContent()` to use this order:
-
-```typescript
-// Step 1: Extract and strip forwarded wrapper
-// Step 2: Cut at calendar block (NEW - aggressive early cut)
-// Step 3: Strip at signature delimiter (--)
-// Step 4: Strip after sign-off (Best,\nName)
-// Step 5: Strip inline quotes  
-// Step 6: Strip disclaimers
-// Step 7: Strip remaining signatures
+```text
+Webhook Payload
+     │
+     ▼
+┌────────────────────────────────┐
+│  1. Parse email fields         │
+│  2. Call extractBrief()        │
+│     - Clean text               │
+│     - Detect forwards          │
+│     - Canonicalize subject     │
+│  3. Insert into inbox_items    │
+│     - Raw: text_body, html_body│
+│     - Cleaned: cleaned_text    │
+│     - Display: display_*       │
+│     - Signals: is_forwarded... │
+│  4. Process attachments        │
+└────────────────────────────────┘
 ```
-
-This ensures we cut calendar content BEFORE signature stripping, so the `--` cut happens on the main body, not after calendar junk.
-
----
 
 ## Expected Result
 
-After these changes, the Myles Patel email should display:
+For the Myles Patel email, the `cleaned_text` column will contain:
 
 ```
 Hey Harry,
@@ -203,33 +260,28 @@ Best,
 Myles
 ```
 
-Everything after "Best,\nMyles" (signature block, quoted replies, calendar update, disclaimers) will be stripped.
-
----
-
-## Technical Implementation
-
-### Changes to `src/lib/emailCleaners.ts`
-
-1. Add `CALENDAR_BLOCK_STARTERS` constant (hard-cut triggers)
-2. Add `cutAtCalendarBlock()` function
-3. Update `CALENDAR_METADATA_PATTERNS` with standalone labels
-4. Update `stripCalendarContent()` with more URL patterns
-5. Reorder steps in `cleanEmailContent()`:
-   - Move calendar block cutting to happen immediately after forwarded wrapper extraction
-   - Move signature stripping (`--`) before inline quote stripping
-
-### No changes needed to:
-- `InboxContentPane.tsx` - display logic already prefers cleaned text when cleaning was applied
-- Edge function - attachment handling is working correctly
-
----
+With signals:
+- `is_forwarded: true`
+- `has_calendar: true`
+- `has_thread: true`
+- `has_disclaimer: true`
+- `display_from_email: myles@pathlit.ai`
+- `display_subject: 30 Min Meeting between Myles Patel and Harry Kioko`
 
 ## Acceptance Criteria
 
-1. The Myles Patel "30 Min Meeting" email displays only the core message body
-2. No calendar metadata (Location, Guests, Yes/No/Maybe, View all guest info) appears
-3. No disclaimer blocks appear  
-4. No quoted reply threads appear
-5. Myles's signature block after `--` is stripped
-6. All existing emails continue to clean correctly (no regression)
+1. New forwarded emails display only the core message body
+2. Calendar metadata, disclaimers, signatures, and quoted threads are stripped
+3. Existing inbox items continue to work (fallback to client-side cleaning)
+4. Attachments continue to be processed correctly
+5. AI suggestions receive cleaned content for better analysis
+6. "View original email" still shows the raw content
+
+## Implementation Order
+
+1. Database migration (add columns)
+2. Create `_shared/email-cleaner.ts` module
+3. Update `email-inbox-ingest/index.ts` to use cleaner
+4. Update frontend types and hooks
+5. Update UI components to prefer cleaned fields
+6. Deploy and test with a new forwarded email
