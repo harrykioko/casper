@@ -179,11 +179,13 @@ export default function FocusQueue() {
       </div>
 
       {/* Content - 2 column layout */}
-      <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-6 py-6">
+      <div className="max-w-[1400px] 2xl:max-w-[1600px] mx-auto px-6 py-6">
         <div
           className={cn(
             "grid gap-6",
-            isDesktop ? "grid-cols-[240px_1fr]" : "grid-cols-1"
+            isDesktop
+              ? "grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[320px_1fr]"
+              : "grid-cols-1"
           )}
         >
           {/* Left: Summary Panel (desktop only) */}

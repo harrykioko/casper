@@ -39,6 +39,8 @@ async function backfill(userId: string): Promise<number> {
     (existing || []).map((r) => `${r.source_type}:${r.source_id}`)
   );
 
+  console.log(`[Focus Queue Backfill] Existing work_items: ${existingKeys.size}`);
+
   // Backfill emails: unresolved inbox items
   const { data: emails } = await supabase
     .from("inbox_items")
