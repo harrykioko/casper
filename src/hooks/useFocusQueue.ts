@@ -160,24 +160,56 @@ export function useFocusQueue() {
       // Fetch source titles + source records for scoring
       const sourceData = await fetchSourceData(items, user.id);
 
-      // Compose items with priority scores
-      const composedItems: FocusQueueItem[] = items.map(item => {
+      // Compose items with priority scores, reconciling stale reason codes
+      const composedItems: FocusQueueItem[] = [];
+      const autoResolveIds: string[] = [];
+
+      for (const item of items) {
         const key = `${item.source_type}:${item.source_id}`;
         const sd = sourceData[key];
         const priorityScore = computeItemScore(item.source_type, sd?.scoreData);
+        const hasLink = !!entityLinks[key] || !!sd?.hasSourceLink;
 
-        return {
+        // Reconcile reason_codes: remove unlinked_company if item now has a link
+        let reasonCodes = item.reason_codes || [];
+        if (hasLink && reasonCodes.includes("unlinked_company")) {
+          reasonCodes = reasonCodes.filter((c: string) => c !== "unlinked_company");
+          // Persist the fix back to DB (fire-and-forget)
+          supabase
+            .from("work_items")
+            .update({ reason_codes: reasonCodes })
+            .eq("id", item.id)
+            .then();
+        }
+
+        // If all reason codes are now cleared, auto-resolve to trusted
+        if (reasonCodes.length === 0) {
+          autoResolveIds.push(item.id);
+          continue; // Don't include in the focus list
+        }
+
+        composedItems.push({
           ...item,
           status: item.status as WorkItemStatus,
           source_type: item.source_type as WorkItemSourceType,
-          reason_codes: item.reason_codes || [],
+          reason_codes: reasonCodes,
           source_title: sd?.title || "Untitled",
           source_snippet: sd?.snippet || undefined,
           primary_link: entityLinks[key] || null,
           one_liner: extracts[key] || null,
           priorityScore,
-        };
-      });
+        });
+      }
+
+      // Auto-resolve fully-linked items (fire-and-forget)
+      if (autoResolveIds.length > 0) {
+        console.log(`[Focus Queue] Auto-resolving ${autoResolveIds.length} fully-linked items`);
+        supabase
+          .from("work_items")
+          .update({ status: "trusted", trusted_at: new Date().toISOString(), reason_codes: [] })
+          .in("id", autoResolveIds)
+          .then();
+      }
 
       // Sort by priority score descending
       composedItems.sort((a, b) => b.priorityScore - a.priorityScore);
@@ -250,6 +282,8 @@ interface SourceDataEntry {
   title: string;
   snippet?: string;
   scoreData?: any;
+  /** True if the source record itself has a company/project link (e.g. inbox_items.related_company_id) */
+  hasSourceLink?: boolean;
 }
 
 async function fetchSourceData(
@@ -270,13 +304,14 @@ async function fetchSourceData(
     fetches.push(async () => {
       const { data } = await supabase
         .from("inbox_items")
-        .select("id, subject, snippet, display_subject, display_snippet, received_at, is_read")
+        .select("id, subject, snippet, display_subject, display_snippet, received_at, is_read, related_company_id")
         .in("id", byType["email"]);
       for (const row of data || []) {
         result[`email:${row.id}`] = {
           title: row.display_subject || row.subject || "No subject",
           snippet: row.display_snippet || row.snippet || undefined,
           scoreData: { receivedAt: row.received_at, isRead: row.is_read },
+          hasSourceLink: !!row.related_company_id,
         };
       }
     });
@@ -288,10 +323,22 @@ async function fetchSourceData(
         .from("calendar_events")
         .select("id, title, start_time")
         .in("id", byType["calendar_event"]);
+
+      // Also check calendar_event_links for company associations
+      const { data: calLinks } = await supabase
+        .from("calendar_event_links")
+        .select("calendar_event_id, company_id")
+        .in("calendar_event_id", byType["calendar_event"]);
+
+      const linkedEventIds = new Set(
+        (calLinks || []).filter(l => l.company_id).map(l => l.calendar_event_id)
+      );
+
       for (const row of data || []) {
         result[`calendar_event:${row.id}`] = {
           title: row.title || "No title",
           scoreData: { startTime: row.start_time },
+          hasSourceLink: linkedEventIds.has(row.id),
         };
       }
     });
@@ -301,12 +348,13 @@ async function fetchSourceData(
     fetches.push(async () => {
       const { data } = await supabase
         .from("tasks")
-        .select("id, content, scheduled_for, priority")
+        .select("id, content, scheduled_for, priority, project_id, company_id, pipeline_company_id")
         .in("id", byType["task"]);
       for (const row of data || []) {
         result[`task:${row.id}`] = {
           title: row.content || "Untitled task",
           scoreData: { scheduledFor: row.scheduled_for, priority: row.priority },
+          hasSourceLink: !!(row.project_id || row.company_id || row.pipeline_company_id),
         };
       }
     });
@@ -316,13 +364,14 @@ async function fetchSourceData(
     fetches.push(async () => {
       const { data } = await supabase
         .from("project_notes")
-        .select("id, title, content")
+        .select("id, title, content, project_id")
         .in("id", byType["note"]);
       for (const row of data || []) {
         result[`note:${row.id}`] = {
           title: row.title || "Untitled note",
           snippet: row.content?.substring(0, 120) || undefined,
           scoreData: {},
+          hasSourceLink: !!row.project_id,
         };
       }
     });
@@ -332,12 +381,13 @@ async function fetchSourceData(
     fetches.push(async () => {
       const { data } = await supabase
         .from("reading_items")
-        .select("id, title, url")
+        .select("id, title, url, project_id")
         .in("id", byType["reading"]);
       for (const row of data || []) {
         result[`reading:${row.id}`] = {
           title: row.title || row.url || "Untitled",
           scoreData: {},
+          hasSourceLink: !!row.project_id,
         };
       }
     });
