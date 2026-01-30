@@ -100,6 +100,13 @@ export function useWorkItemActions() {
 
   const noActionMutation = useMutation({
     mutationFn: async (workItemId: string) => {
+      // Fetch source info to promote tasks
+      const { data: item } = await supabase
+        .from("work_items")
+        .select("source_type, source_id")
+        .eq("id", workItemId)
+        .single();
+
       const { error } = await supabase
         .from("work_items")
         .update({
@@ -111,9 +118,18 @@ export function useWorkItemActions() {
         .eq("id", workItemId);
 
       if (error) throw error;
+
+      // If the source is a task, promote it out of inbox so it appears on the Tasks page
+      if (item?.source_type === 'task') {
+        await supabase
+          .from("tasks")
+          .update({ is_quick_task: false })
+          .eq("id", item.source_id);
+      }
     },
     onSuccess: () => {
       invalidateQueue();
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
       toast.success("Marked as no action");
     },
     onError: (error) => {
@@ -133,30 +149,6 @@ export function useWorkItemActions() {
 
       if (!item) throw new Error("Work item not found");
 
-      // Check for entity links
-      const { data: links } = await supabase
-        .from("entity_links")
-        .select("id")
-        .eq("source_type", item.source_type)
-        .eq("source_id", item.source_id)
-        .limit(1);
-
-      // Check for saved extracts
-      const { data: extracts } = await supabase
-        .from("item_extracts")
-        .select("id")
-        .eq("source_type", item.source_type)
-        .eq("source_id", item.source_id)
-        .limit(1);
-
-      const hasLinks = links && links.length > 0;
-      const hasExtracts = extracts && extracts.length > 0;
-      const isIgnored = item.status === 'ignored';
-
-      if (!hasLinks && !isIgnored && !hasExtracts) {
-        throw new Error("Cannot mark as trusted: item must be linked, have saved extracts, or be marked no-action first");
-      }
-
       const { error } = await supabase
         .from("work_items")
         .update({
@@ -169,9 +161,18 @@ export function useWorkItemActions() {
         .eq("id", workItemId);
 
       if (error) throw error;
+
+      // If the source is a task, promote it out of inbox so it appears on the Tasks page
+      if (item.source_type === 'task') {
+        await supabase
+          .from("tasks")
+          .update({ is_quick_task: false })
+          .eq("id", item.source_id);
+      }
     },
     onSuccess: () => {
       invalidateQueue();
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
       toast.success("Marked as trusted");
     },
     onError: (error: Error) => {

@@ -104,7 +104,7 @@ export function useCalendarFollowups() {
       const tasksToInsert = items.map(item => ({
         content: item.content,
         created_by: user.id,
-        is_quick_task: true,
+        is_quick_task: false,
         completed: false,
         is_top_priority: false,
         ...(companyType === 'pipeline' ? { pipeline_company_id: companyId } : {}),
