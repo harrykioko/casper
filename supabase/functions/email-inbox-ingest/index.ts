@@ -164,6 +164,30 @@ serve(async (req) => {
       isForwarded: cleanedResult.signals.isForwarded,
     });
 
+    // Create work item for Focus Queue
+    try {
+      const workItemData = {
+        created_by: user.id,
+        source_type: 'email',
+        source_id: inboxItemId,
+        status: 'needs_review',
+        reason_codes: ['unlinked_company', 'missing_summary'],
+        priority: 5,
+      };
+
+      const { error: workItemError } = await supabaseClient
+        .from("work_items")
+        .insert(workItemData);
+
+      if (workItemError) {
+        console.error("Failed to create work item:", workItemError);
+      } else {
+        console.log("Work item created for email:", inboxItemId);
+      }
+    } catch (workItemErr) {
+      console.error("Work item creation error:", workItemErr);
+    }
+
     // Process attachments
     const attachments = payload.attachments || [];
     let attachmentsProcessed = 0;

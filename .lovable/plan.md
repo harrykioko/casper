@@ -1,235 +1,138 @@
 
+# Fix Focus Queue: Auto-Create Work Items on Email Ingestion
 
-# Add File Preview Capability to Pipeline Details Page
+## Problem Summary
 
-## Overview
+The Focus Queue is empty because work items are never being created when emails arrive. The backfill SQL just executed successfully (network logs show items now), but **new emails won't appear** without modifying the ingestion pipeline.
 
-Add inline preview functionality for files (images and PDFs) in the Pipeline Company Detail Files tab, matching the existing preview capability in the Inbox attachments system.
+**Root Cause:**
+- `email-inbox-ingest` edge function creates inbox_items but doesn't create work_items
+- `ensureWorkItem()` function exists but is never called from the ingestion flow
+- The Focus Queue reads from `work_items` table, which remains empty without this step
 
----
+## Solution
 
-## Current State
-
-The FilesTab component currently allows:
-- File upload (with drag and drop)
-- File download (opens in new tab)
-- File deletion
-
-Missing: **No inline preview capability for images or PDFs**
+Modify the `email-inbox-ingest` edge function to insert a `work_items` record after successfully creating an inbox item.
 
 ---
 
 ## Implementation
 
-### Part 1: Add Helper Functions to Pipeline Attachments Hook
+### Part 1: Update Edge Function (`supabase/functions/email-inbox-ingest/index.ts`)
 
-**File: `src/hooks/usePipelineAttachments.ts`**
-
-Add the same helper functions used by Inbox attachments:
+Add work_items insert after line 165 (after successful inbox_items insert):
 
 ```typescript
-// Helper to check if attachment can be previewed inline
-export function canPreviewInline(fileType: string | null): boolean {
-  if (!fileType) return false;
-  const previewable = [
-    "image/png",
-    "image/jpeg",
-    "image/jpg",
-    "image/gif",
-    "image/webp",
-    "application/pdf",
-  ];
-  return previewable.includes(fileType);
-}
-```
+// After: console.log("Inserted inbox item", { ... });
 
----
+// Create work item for Focus Queue
+try {
+  const workItemData = {
+    created_by: user.id,
+    source_type: 'email',
+    source_id: inboxItemId,
+    status: 'needs_review',
+    reason_codes: ['unlinked_company', 'missing_summary'],
+    priority: 5, // Emails are high priority
+  };
 
-### Part 2: Update FilesTab Component
+  const { error: workItemError } = await supabaseClient
+    .from("work_items")
+    .insert(workItemData);
 
-**File: `src/components/pipeline-detail/tabs/FilesTab.tsx`**
-
-#### A. Add preview state and handlers
-
-```typescript
-const [previewAttachmentId, setPreviewAttachmentId] = useState<string | null>(null);
-const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
-const handlePreview = async (attachment: PipelineAttachment) => {
-  if (previewAttachmentId === attachment.id) {
-    // Close preview
-    setPreviewAttachmentId(null);
-    setPreviewUrl(null);
+  if (workItemError) {
+    console.error("Failed to create work item:", workItemError);
+    // Non-blocking - email still ingested even if work item fails
   } else {
-    // Open preview
-    const url = await getSignedUrl(attachment.storage_path);
-    if (url) {
-      setPreviewAttachmentId(attachment.id);
-      setPreviewUrl(url);
-    }
+    console.log("Work item created for email:", inboxItemId);
   }
-};
-```
-
-#### B. Add Eye/EyeOff button for previewable files
-
-Add a preview toggle button before the download button:
-
-```typescript
-{canPreviewInline(attachment.file_type) && (
-  <Button
-    variant="ghost"
-    size="icon"
-    className="h-8 w-8"
-    onClick={() => handlePreview(attachment)}
-    title={isPreviewOpen ? "Hide preview" : "Preview"}
-  >
-    {isPreviewOpen ? (
-      <EyeOff className="w-4 h-4" />
-    ) : (
-      <Eye className="w-4 h-4" />
-    )}
-  </Button>
-)}
-```
-
-#### C. Add AttachmentPreview component
-
-Create an inline preview component that renders below the file card when open:
-
-```typescript
-function AttachmentPreview({ 
-  attachment, 
-  signedUrl, 
-  onClose 
-}: { 
-  attachment: PipelineAttachment; 
-  signedUrl: string;
-  onClose: () => void;
-}) {
-  const isImage = attachment.file_type?.startsWith("image/");
-  const isPdf = attachment.file_type === "application/pdf";
-
-  return (
-    <div className="relative mt-2 rounded-lg border border-border overflow-hidden bg-muted/30">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="absolute top-2 right-2 h-6 w-6 bg-background/80 hover:bg-background z-10"
-        onClick={onClose}
-      >
-        <X className="h-4 w-4" />
-      </Button>
-
-      {isImage && (
-        <img 
-          src={signedUrl} 
-          alt={attachment.file_name}
-          className="max-w-full max-h-[400px] object-contain mx-auto p-4"
-        />
-      )}
-
-      {isPdf && (
-        <iframe
-          src={signedUrl}
-          title={attachment.file_name}
-          className="w-full h-[500px] border-0"
-        />
-      )}
-    </div>
-  );
+} catch (workItemErr) {
+  console.error("Work item creation error:", workItemErr);
 }
 ```
 
-#### D. Render preview below file card
+### Part 2: Backfill Existing Unresolved Emails
 
-```typescript
-{attachments.map((attachment) => {
-  const FileIcon = getFileIcon(attachment.file_type);
-  const isDownloading = downloadingId === attachment.id;
-  const isDeleting = deletingId === attachment.id;
-  const isPreviewOpen = previewAttachmentId === attachment.id;
+Run SQL to populate work_items for emails that already exist but haven't been processed:
 
-  return (
-    <div key={attachment.id}>
-      <GlassSubcard className="p-3" hoverable={false}>
-        {/* existing file card content */}
-      </GlassSubcard>
-      
-      {isPreviewOpen && previewUrl && (
-        <AttachmentPreview
-          attachment={attachment}
-          signedUrl={previewUrl}
-          onClose={() => {
-            setPreviewAttachmentId(null);
-            setPreviewUrl(null);
-          }}
-        />
-      )}
-    </div>
+```sql
+-- One-time backfill for existing inbox_items
+INSERT INTO work_items (created_by, source_type, source_id, status, reason_codes, priority)
+SELECT 
+  created_by,
+  'email',
+  id,
+  'needs_review',
+  ARRAY['unlinked_company', 'missing_summary']::text[],
+  5
+FROM inbox_items
+WHERE is_resolved = false 
+  AND is_deleted = false
+  AND NOT EXISTS (
+    SELECT 1 FROM work_items 
+    WHERE work_items.source_type = 'email' 
+      AND work_items.source_id = inbox_items.id
+      AND work_items.created_by = inbox_items.created_by
   );
-})}
+```
+
+### Part 3: (Optional) Backfill Unlinked Tasks
+
+For tasks without company/project links:
+
+```sql
+INSERT INTO work_items (created_by, source_type, source_id, status, reason_codes, priority)
+SELECT 
+  created_by,
+  'task',
+  id,
+  'needs_review',
+  ARRAY['unlinked_company']::text[],
+  2
+FROM tasks
+WHERE completed = false 
+  AND project_id IS NULL 
+  AND company_id IS NULL 
+  AND pipeline_company_id IS NULL
+  AND created_by IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM work_items 
+    WHERE work_items.source_type = 'task' 
+      AND work_items.source_id = tasks.id
+      AND work_items.created_by = tasks.created_by
+  );
 ```
 
 ---
 
-## Visual Flow
+## Technical Details
 
-```text
-Before (current):
-+--------------------------------------------------+
-| [FileIcon] Upside Invest.pdf                     |
-| 2.8 MB - Jan 29, 2026           [Download][Delete]|
-+--------------------------------------------------+
-
-After (with preview):
-+--------------------------------------------------+
-| [FileIcon] Upside Invest.pdf                     |
-| 2.8 MB - Jan 29, 2026    [Preview][Download][Delete]|
-+--------------------------------------------------+
-                    |
-                    v (when Preview clicked)
-+--------------------------------------------------+
-| [FileIcon] Upside Invest.pdf                     |
-| 2.8 MB - Jan 29, 2026    [Hide][Download][Delete]|
-+--------------------------------------------------+
-| +----------------------------------------------+ |
-| |                  [X close]                   | |
-| |                                              | |
-| |        [PDF rendered in iframe]              | |
-| |          or                                  | |
-| |        [Image displayed inline]              | |
-| |                                              | |
-| +----------------------------------------------+ |
-+--------------------------------------------------+
-```
-
----
-
-## Files to Modify
+### Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/hooks/usePipelineAttachments.ts` | Add `canPreviewInline()` helper function |
-| `src/components/pipeline-detail/tabs/FilesTab.tsx` | Add preview state, handlers, Eye button, and AttachmentPreview component |
+| `supabase/functions/email-inbox-ingest/index.ts` | Add work_items insert after inbox_items insert |
+
+### Database Operations
+
+| Action | Purpose |
+|--------|---------|
+| Run email backfill SQL | Populate work_items for existing unresolved emails |
+| Run task backfill SQL | Populate work_items for existing unlinked tasks |
+
+### Why This Works
+
+1. **Edge function handles new items**: Every new email automatically creates a work_item
+2. **Backfill handles existing items**: SQL populates work_items for emails/tasks already in the system
+3. **Non-blocking design**: Work item creation failures don't prevent email ingestion
+4. **RLS compatible**: All operations use `created_by` matching the authenticated user
 
 ---
 
-## Supported Preview Types
+## Expected Result
 
-| File Type | Preview Method |
-|-----------|----------------|
-| PNG, JPEG, GIF, WebP | `<img>` tag |
-| PDF | `<iframe>` embed |
-| Other files | No preview (download only) |
-
----
-
-## UX Notes
-
-1. **Toggle behavior**: Clicking Eye opens preview, clicking EyeOff (or X button on preview) closes it
-2. **Only one preview at a time**: Opening a new preview auto-closes any open one
-3. **PDF height**: 500px iframe for comfortable reading
-4. **Image sizing**: Max height 400px with object-contain for proper aspect ratio
-5. **Consistent styling**: Matches Casper glassmorphic aesthetic with muted backgrounds and subtle borders
-
+After implementation:
+- All new emails immediately appear in Focus Queue with "3 to review" count
+- Existing unresolved emails are backfilled into the queue
+- Unlinked tasks appear in the queue (if enabled)
+- Users can triage, snooze, or mark items as trusted
