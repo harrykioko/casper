@@ -14,6 +14,7 @@ import { FocusEmptyState } from "@/components/focus/FocusEmptyState";
 import { FocusInboxDrawer } from "@/components/focus/FocusInboxDrawer";
 import { FocusTaskDrawer } from "@/components/focus/FocusTaskDrawer";
 import { FocusEventModal } from "@/components/focus/FocusEventModal";
+import { FocusGenericSheet } from "@/components/focus/FocusGenericSheet";
 import { cn } from "@/lib/utils";
 import type { InboxItem } from "@/types/inbox";
 import type { Task } from "@/hooks/useTasks";
@@ -46,6 +47,7 @@ export default function FocusQueue() {
   const [inboxDrawerItem, setInboxDrawerItem] = useState<InboxItem | null>(null);
   const [taskDrawerItem, setTaskDrawerItem] = useState<Task | null>(null);
   const [eventModalItem, setEventModalItem] = useState<any>(null);
+  const [genericSheetItem, setGenericSheetItem] = useState<FocusQueueItem | null>(null);
 
   // Auto-advance to next item after triage
   const advanceToNext = useCallback(() => {
@@ -82,8 +84,11 @@ export default function FocusQueue() {
           }
           break;
         }
+        case "note":
+        case "reading":
+          setGenericSheetItem(item);
+          break;
         default:
-          // Notes and reading items don't have dedicated drawers yet
           break;
       }
     },
@@ -94,6 +99,7 @@ export default function FocusQueue() {
     setInboxDrawerItem(null);
     setTaskDrawerItem(null);
     setEventModalItem(null);
+    setGenericSheetItem(null);
   }, []);
 
   // Triage handlers that close drawer + advance
@@ -267,6 +273,16 @@ export default function FocusQueue() {
         event={eventModalItem}
         isOpen={!!eventModalItem}
         onClose={closeAllDrawers}
+        onMarkTrusted={handleTrusted}
+        onSnooze={handleSnooze}
+        onNoAction={handleNoAction}
+        showLink={showLink}
+      />
+
+      <FocusGenericSheet
+        open={!!genericSheetItem}
+        onClose={closeAllDrawers}
+        item={genericSheetItem}
         onMarkTrusted={handleTrusted}
         onSnooze={handleSnooze}
         onNoAction={handleNoAction}
