@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Mail, Calendar, Paperclip } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useCompany } from '@/hooks/useCompany';
@@ -8,23 +8,43 @@ import { useCompanyContacts } from '@/hooks/useCompanyContacts';
 import { useCompanyInteractions } from '@/hooks/useCompanyInteractions';
 import { useCompanyTasks } from '@/hooks/useCompanyTasks';
 import { useCompanyTimeline } from '@/hooks/useCompanyTimeline';
-import { CompanyHeader } from '@/components/portfolio/CompanyHeader';
-import { CompanyFoundersPanel } from '@/components/portfolio/CompanyFoundersPanel';
-import { CompanyTasksSection } from '@/components/portfolio/CompanyTasksSection';
-import { CompanyInteractionsSection } from '@/components/portfolio/CompanyInteractionsSection';
-import { CompanyTimeline } from '@/components/portfolio/CompanyTimeline';
 import { AddCompanyModal } from '@/components/portfolio/AddCompanyModal';
 import { DashboardLoading } from '@/components/dashboard/DashboardLoading';
-import { CompanyStatus, FounderInput } from '@/types/portfolio';
+import { CompanyStatus, FounderInput, InteractionType } from '@/types/portfolio';
+
+// Layout components
+import { PortfolioCompanyLayout } from '@/components/portfolio-detail/PortfolioCompanyLayout';
+import { PortfolioCompanyHero } from '@/components/portfolio-detail/PortfolioCompanyHero';
+import { PortfolioModeNav, PortfolioMode } from '@/components/portfolio-detail/PortfolioModeNav';
+import { PortfolioContextRail } from '@/components/portfolio-detail/PortfolioContextRail';
+
+// Mode views
+import { OverviewMode } from '@/components/portfolio-detail/modes/OverviewMode';
+import { PeopleMode } from '@/components/portfolio-detail/modes/PeopleMode';
+import { NotesMode } from '@/components/portfolio-detail/modes/NotesMode';
+import { TasksMode } from '@/components/portfolio-detail/modes/TasksMode';
+import { EmptyMode } from '@/components/portfolio-detail/modes/EmptyMode';
+
+function usePortfolioMode(): [PortfolioMode, (mode: PortfolioMode) => void] {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const mode = (searchParams.get('mode') as PortfolioMode) || 'overview';
+  
+  const setMode = useCallback((newMode: PortfolioMode) => {
+    setSearchParams({ mode: newMode }, { replace: true });
+  }, [setSearchParams]);
+  
+  return [mode, setMode];
+}
 
 export default function PortfolioCompanyDetail() {
   const { companyId } = useParams<{ companyId: string }>();
   const navigate = useNavigate();
+  const [mode, setMode] = usePortfolioMode();
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [showNoteComposer, setShowNoteComposer] = useState(false);
 
   const {
     company,
-    contacts,
     loading: companyLoading,
     error: companyError,
     updateCompany,
@@ -46,6 +66,7 @@ export default function PortfolioCompanyDetail() {
 
   const {
     tasks,
+    openTasks,
     loading: tasksLoading,
     createTask,
     toggleComplete,
@@ -73,6 +94,14 @@ export default function PortfolioCompanyDetail() {
     refetchContacts();
   };
 
+  const handleAddTask = () => {
+    setMode('tasks');
+  };
+
+  const handleAddNote = () => {
+    setMode('notes');
+  };
+
   if (companyLoading) {
     return <DashboardLoading />;
   }
@@ -92,61 +121,131 @@ export default function PortfolioCompanyDetail() {
     );
   }
 
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-screen p-6 lg:p-8"
-    >
-      {/* Back button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="mb-4"
-        onClick={() => navigate('/portfolio')}
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Portfolio
-      </Button>
-
-      {/* Header */}
-      <CompanyHeader
-        company={{ ...company, open_task_count: tasks.filter((t) => !t.completed).length }}
-        onEdit={() => setEditModalOpen(true)}
-      />
-
-      {/* Content Grid */}
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {/* Left column - Founders + Tasks */}
-        <div className="lg:col-span-1 space-y-6">
-          <CompanyFoundersPanel founders={founders} />
-          <CompanyTasksSection
+  const renderModeContent = () => {
+    switch (mode) {
+      case 'overview':
+        return (
+          <OverviewMode
+            tasks={tasks}
+            interactions={interactions}
+            founders={founders}
+            onModeChange={setMode}
+            onAddNote={handleAddNote}
+          />
+        );
+      
+      case 'people':
+        return <PeopleMode founders={founders} />;
+      
+      case 'notes':
+        return (
+          <NotesMode
+            interactions={interactions}
+            loading={interactionsLoading}
+            onCreateInteraction={createInteraction}
+            onDeleteInteraction={deleteInteraction}
+          />
+        );
+      
+      case 'tasks':
+        return (
+          <TasksMode
             tasks={tasks}
             loading={tasksLoading}
             onCreateTask={createTask}
             onToggleComplete={toggleComplete}
             onDeleteTask={deleteTask}
           />
-        </div>
-
-        {/* Middle column - Interactions */}
-        <div className="lg:col-span-1">
-          <CompanyInteractionsSection
-            interactions={interactions}
-            loading={interactionsLoading}
-            onCreateInteraction={createInteraction}
-            onDeleteInteraction={deleteInteraction}
+        );
+      
+      case 'emails':
+        return (
+          <EmptyMode
+            icon={Mail}
+            title="Emails"
+            description="Email threads with this company will appear here once the integration is connected."
+            ctaLabel="Coming soon"
+            ctaDisabled
           />
-        </div>
-
-        {/* Right column - Timeline */}
-        <div className="lg:col-span-1">
-          <CompanyTimeline
-            events={timeline}
-            loading={interactionsLoading || tasksLoading}
+        );
+      
+      case 'meetings':
+        return (
+          <EmptyMode
+            icon={Calendar}
+            title="Meetings"
+            description="Calendar events with this company will appear here once linked."
+            ctaLabel="Coming soon"
+            ctaDisabled
           />
-        </div>
+        );
+      
+      case 'files':
+        return (
+          <EmptyMode
+            icon={Paperclip}
+            title="Files"
+            description="Documents and attachments related to this company will be stored here."
+            ctaLabel="Coming soon"
+            ctaDisabled
+          />
+        );
+      
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+    >
+      {/* Back button - positioned absolutely */}
+      <div className="absolute top-4 left-4 z-40">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate('/portfolio')}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Portfolio
+        </Button>
       </div>
+
+      <PortfolioCompanyLayout
+        hero={
+          <PortfolioCompanyHero
+            company={{ ...company, open_task_count: openTasks.length }}
+            onEdit={() => setEditModalOpen(true)}
+            onAddTask={handleAddTask}
+            onAddNote={handleAddNote}
+          />
+        }
+        nav={
+          <PortfolioModeNav
+            currentMode={mode}
+            onModeChange={setMode}
+            counts={{
+              peopleCount: founders.length,
+              notesCount: interactions.length,
+              tasksCount: openTasks.length,
+            }}
+          />
+        }
+        content={renderModeContent()}
+        rail={
+          <PortfolioContextRail
+            openTasksCount={openTasks.length}
+            notesCount={interactions.length}
+            lastActivityAt={company.last_interaction_at}
+            tasks={tasks}
+            timeline={timeline}
+            onToggleComplete={toggleComplete}
+            onViewFullTimeline={() => setMode('notes')}
+          />
+        }
+      />
 
       {/* Edit Modal */}
       <AddCompanyModal
