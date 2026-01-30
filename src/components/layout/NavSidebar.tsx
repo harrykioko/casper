@@ -3,7 +3,6 @@ import { useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard,
-  AlertTriangle,
   Crosshair,
   Inbox,
   List,
@@ -36,16 +35,10 @@ export function NavSidebar() {
       active: location.pathname === "/dashboard" 
     },
     {
-      icon: AlertTriangle,
-      path: "/priority",
-      label: "Priority",
-      active: location.pathname.startsWith("/priority")
-    },
-    {
       icon: Crosshair,
       path: "/focus",
       label: "Focus",
-      active: location.pathname.startsWith("/focus")
+      active: location.pathname.startsWith("/focus") || location.pathname.startsWith("/priority")
     },
     {
       icon: Inbox,

@@ -1,62 +1,151 @@
-import { useState, useMemo } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import { Crosshair, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsDesktop } from "@/hooks/use-mobile";
-import { useWorkQueue, type WorkItemStatus, type WorkItemSourceType, type WorkQueueItem } from "@/hooks/useWorkQueue";
-import { useWorkItemActions } from "@/hooks/useWorkItemActions";
-import { useWorkItemDetail } from "@/hooks/useWorkItemDetail";
-import { FocusFiltersPanel } from "@/components/focus/FocusFiltersPanel";
-import { WorkQueueList } from "@/components/focus/WorkQueueList";
-import { WorkItemReviewCard } from "@/components/focus/WorkItemReviewCard";
-import { WorkItemContextRail } from "@/components/focus/WorkItemContextRail";
-import { useBackfillWorkItems } from "@/hooks/useBackfillWorkItems";
+import { useFocusQueue, type FocusQueueItem } from "@/hooks/useFocusQueue";
+import { useFocusTriageActions } from "@/hooks/useFocusTriageActions";
+import { useTasks } from "@/hooks/useTasks";
+import { useInboxItems } from "@/hooks/useInboxItems";
+import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
+import { FocusSummaryPanel } from "@/components/focus/FocusSummaryPanel";
+import { FocusItemRow } from "@/components/focus/FocusItemRow";
+import { FocusEmptyState } from "@/components/focus/FocusEmptyState";
+import { FocusInboxDrawer } from "@/components/focus/FocusInboxDrawer";
+import { FocusTaskDrawer } from "@/components/focus/FocusTaskDrawer";
+import { FocusEventModal } from "@/components/focus/FocusEventModal";
 import { cn } from "@/lib/utils";
+import type { InboxItem } from "@/types/inbox";
+import type { Task } from "@/hooks/useTasks";
 
 export default function FocusQueue() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
 
-  // Backfill work_items from existing source records on first load
-  useBackfillWorkItems();
+  // Focus data
+  const {
+    items,
+    counts,
+    isLoading,
+    isAllClear,
+    filters,
+    toggleSourceType,
+    toggleReasonCode,
+    clearFilters,
+  } = useFocusQueue();
 
-  // Filter state
-  const [statusFilter, setStatusFilter] = useState<WorkItemStatus | 'all'>('all');
-  const [reasonFilter, setReasonFilter] = useState<string[]>([]);
-  const [sourceTypeFilter, setSourceTypeFilter] = useState<WorkItemSourceType[]>([]);
+  const triageActions = useFocusTriageActions();
 
-  // Selected item
-  const [selectedItem, setSelectedItem] = useState<WorkQueueItem | null>(null);
+  // Source data hooks (for fetching full records when opening drawers)
+  const { tasks, updateTask, deleteTask, archiveTask, unarchiveTask } = useTasks();
+  const { inboxItems, markComplete, archive: archiveInbox } = useInboxItems();
+  const { events } = useOutlookCalendar();
 
-  // Data
-  const { items, isLoading, counts, isSystemClear, refetch } = useWorkQueue({
-    status: statusFilter === 'all' ? undefined : statusFilter,
-    reason_codes: reasonFilter.length > 0 ? reasonFilter : undefined,
-    source_types: sourceTypeFilter.length > 0 ? sourceTypeFilter : undefined,
-  });
+  // Drawer state
+  const [selectedItem, setSelectedItem] = useState<FocusQueueItem | null>(null);
+  const [inboxDrawerItem, setInboxDrawerItem] = useState<InboxItem | null>(null);
+  const [taskDrawerItem, setTaskDrawerItem] = useState<Task | null>(null);
+  const [eventModalItem, setEventModalItem] = useState<any>(null);
 
-  const { data: itemDetail, isLoading: isDetailLoading } = useWorkItemDetail(selectedItem);
+  // Auto-advance to next item after triage
+  const advanceToNext = useCallback(() => {
+    if (!selectedItem) return;
+    const currentIndex = items.findIndex(i => i.id === selectedItem.id);
+    const nextItem = items[currentIndex + 1] || items[currentIndex - 1] || null;
+    setSelectedItem(nextItem);
+  }, [selectedItem, items]);
 
-  const actions = useWorkItemActions();
+  // Open the appropriate drawer for a selected item
+  const handleItemClick = useCallback(
+    (item: FocusQueueItem) => {
+      setSelectedItem(item);
 
-  // Find related items (same entity links)
-  const relatedItems = useMemo(() => {
-    if (!selectedItem || !itemDetail?.entityLinks.length) return [];
-    const linkedTargets = new Set(itemDetail.entityLinks.map(l => `${l.target_type}:${l.target_id}`));
-    return items.filter(
-      item => item.id !== selectedItem.id && item.primary_link &&
-        linkedTargets.has(`${item.primary_link.target_type}:${item.primary_link.target_id}`)
-    );
-  }, [selectedItem, itemDetail, items]);
+      switch (item.source_type) {
+        case "email": {
+          const inboxItem = inboxItems.find(i => i.id === item.source_id);
+          if (inboxItem) {
+            setInboxDrawerItem(inboxItem);
+          }
+          break;
+        }
+        case "task": {
+          const task = tasks.find(t => t.id === item.source_id);
+          if (task) {
+            setTaskDrawerItem(task);
+          }
+          break;
+        }
+        case "calendar_event": {
+          const event = events.find(e => e.id === item.source_id);
+          if (event) {
+            setEventModalItem(event);
+          }
+          break;
+        }
+        default:
+          // Notes and reading items don't have dedicated drawers yet
+          break;
+      }
+    },
+    [inboxItems, tasks, events]
+  );
 
-  const handleSelect = (item: WorkQueueItem) => {
-    setSelectedItem(item);
-  };
+  const closeAllDrawers = useCallback(() => {
+    setInboxDrawerItem(null);
+    setTaskDrawerItem(null);
+    setEventModalItem(null);
+  }, []);
 
-  const handleClose = () => {
-    setSelectedItem(null);
-  };
+  // Triage handlers that close drawer + advance
+  const handleTrusted = useCallback(() => {
+    if (!selectedItem) return;
+    triageActions.markTrusted(selectedItem.id);
+    closeAllDrawers();
+    advanceToNext();
+  }, [selectedItem, triageActions, closeAllDrawers, advanceToNext]);
+
+  const handleSnooze = useCallback(
+    (until: Date) => {
+      if (!selectedItem) return;
+      triageActions.snooze(selectedItem.id, until);
+      closeAllDrawers();
+      advanceToNext();
+    },
+    [selectedItem, triageActions, closeAllDrawers, advanceToNext]
+  );
+
+  const handleNoAction = useCallback(() => {
+    if (!selectedItem) return;
+    triageActions.noAction(selectedItem.id);
+    closeAllDrawers();
+    advanceToNext();
+  }, [selectedItem, triageActions, closeAllDrawers, advanceToNext]);
+
+  const showLink = selectedItem?.reason_codes.includes("unlinked_company") ?? false;
+
+  // Inbox-specific handlers
+  const handleCreateTaskFromInbox = useCallback((item: InboxItem) => {
+    // Navigate to tasks page with context — or open task creation
+    navigate("/tasks");
+  }, [navigate]);
+
+  const handleMarkInboxComplete = useCallback(
+    (id: string) => {
+      markComplete(id);
+      closeAllDrawers();
+      advanceToNext();
+    },
+    [markComplete, closeAllDrawers, advanceToNext]
+  );
+
+  const handleArchiveInbox = useCallback(
+    (id: string) => {
+      archiveInbox(id);
+      closeAllDrawers();
+      advanceToNext();
+    },
+    [archiveInbox, closeAllDrawers, advanceToNext]
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -77,11 +166,11 @@ export default function FocusQueue() {
                 <Crosshair className="h-5 w-5 text-violet-600 dark:text-violet-400" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-foreground">Focus Queue</h1>
+                <h1 className="text-xl font-semibold text-foreground">Focus</h1>
                 <p className="text-sm text-muted-foreground">
-                  {counts.needsReview} to review
-                  {counts.snoozed > 0 && ` · ${counts.snoozed} snoozed`}
-                  {isSystemClear && " · All clear"}
+                  {isAllClear
+                    ? "All clear"
+                    : `${counts.total} item${counts.total !== 1 ? "s" : ""} need review`}
                 </p>
               </div>
             </div>
@@ -89,155 +178,98 @@ export default function FocusQueue() {
         </div>
       </div>
 
-      {/* Content - 3 column layout */}
+      {/* Content - 2 column layout */}
       <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-6 py-6">
-        <div className={cn(
-          "grid gap-6",
-          isDesktop && selectedItem
-            ? "grid-cols-[240px_minmax(0,1fr)_300px]"
-            : isDesktop
-              ? "grid-cols-[240px_1fr]"
-              : "grid-cols-1"
-        )}>
-          {/* Left: Filters Panel (desktop only) */}
+        <div
+          className={cn(
+            "grid gap-6",
+            isDesktop ? "grid-cols-[240px_1fr]" : "grid-cols-1"
+          )}
+        >
+          {/* Left: Summary Panel (desktop only) */}
           {isDesktop && (
-            <FocusFiltersPanel
+            <FocusSummaryPanel
               counts={counts}
-              isSystemClear={isSystemClear}
-              statusFilter={statusFilter}
-              onStatusFilterChange={setStatusFilter}
-              reasonFilter={reasonFilter}
-              onReasonFilterChange={setReasonFilter}
-              sourceTypeFilter={sourceTypeFilter}
-              onSourceTypeFilterChange={setSourceTypeFilter}
+              isAllClear={isAllClear}
+              filters={filters}
+              onToggleSourceType={toggleSourceType}
+              onToggleReasonCode={toggleReasonCode}
+              onClearFilters={clearFilters}
             />
           )}
 
-          {/* Center: Queue list or Review Card */}
-          <div className={cn(
-            isDesktop && "lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto lg:pr-2"
-          )}>
-            {selectedItem && !isDesktop ? (
-              <WorkItemReviewCard
-                detail={itemDetail || null}
-                isLoading={isDetailLoading}
-                onLinkEntity={(targetType, targetId) => {
-                  if (!selectedItem) return;
-                  actions.linkEntity({
-                    workItemId: selectedItem.id,
-                    sourceType: selectedItem.source_type,
-                    sourceId: selectedItem.source_id,
-                    targetType,
-                    targetId,
-                  });
-                }}
-                onCreateTask={(task) => {
-                  if (!selectedItem) return;
-                  actions.createTaskFromSuggestion({
-                    workItemId: selectedItem.id,
-                    sourceType: selectedItem.source_type,
-                    sourceId: selectedItem.source_id,
-                    taskContent: task.content,
-                    taskPriority: task.priority,
-                  });
-                }}
-                onSaveAsNote={(content, title) => {
-                  if (!selectedItem) return;
-                  actions.saveAsNote({
-                    workItemId: selectedItem.id,
-                    content,
-                    title,
-                  });
-                }}
-                onSnooze={(until) => {
-                  if (!selectedItem) return;
-                  actions.snooze(selectedItem.id, until);
-                  setSelectedItem(null);
-                }}
-                onNoAction={() => {
-                  if (!selectedItem) return;
-                  actions.noAction(selectedItem.id);
-                  setSelectedItem(null);
-                }}
-                onMarkTrusted={() => {
-                  if (!selectedItem) return;
-                  actions.markTrusted(selectedItem.id);
-                  setSelectedItem(null);
-                }}
-                onClose={handleClose}
-              />
+          {/* Center: Item list */}
+          <div
+            className={cn(
+              isDesktop &&
+                "lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto lg:pr-2"
+            )}
+          >
+            {isLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map(i => (
+                  <div
+                    key={i}
+                    className="h-16 rounded-lg bg-muted/20 animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : isAllClear ? (
+              <FocusEmptyState />
             ) : (
-              <>
-                <WorkQueueList
-                  items={items}
-                  selectedId={selectedItem?.id || null}
-                  onSelect={handleSelect}
-                  isLoading={isLoading}
-                  isSystemClear={isSystemClear}
-                />
-                {/* Desktop: Review card appears in the center when item selected */}
-                {isDesktop && selectedItem && (
-                  <div className="mt-4">
-                    <WorkItemReviewCard
-                      detail={itemDetail || null}
-                      isLoading={isDetailLoading}
-                      onLinkEntity={(targetType, targetId) => {
-                        actions.linkEntity({
-                          workItemId: selectedItem.id,
-                          sourceType: selectedItem.source_type,
-                          sourceId: selectedItem.source_id,
-                          targetType,
-                          targetId,
-                        });
-                      }}
-                      onCreateTask={(task) => {
-                        actions.createTaskFromSuggestion({
-                          workItemId: selectedItem.id,
-                          sourceType: selectedItem.source_type,
-                          sourceId: selectedItem.source_id,
-                          taskContent: task.content,
-                          taskPriority: task.priority,
-                        });
-                      }}
-                      onSaveAsNote={(content, title) => {
-                        actions.saveAsNote({
-                          workItemId: selectedItem.id,
-                          content,
-                          title,
-                        });
-                      }}
-                      onSnooze={(until) => {
-                        actions.snooze(selectedItem.id, until);
-                        setSelectedItem(null);
-                      }}
-                      onNoAction={() => {
-                        actions.noAction(selectedItem.id);
-                        setSelectedItem(null);
-                      }}
-                      onMarkTrusted={() => {
-                        actions.markTrusted(selectedItem.id);
-                        setSelectedItem(null);
-                      }}
-                      onClose={handleClose}
-                    />
-                  </div>
-                )}
-              </>
+              <div className="space-y-1.5">
+                {items.map((item, index) => (
+                  <FocusItemRow
+                    key={item.id}
+                    item={item}
+                    isSelected={selectedItem?.id === item.id}
+                    onClick={() => handleItemClick(item)}
+                    index={index}
+                  />
+                ))}
+              </div>
             )}
           </div>
-
-          {/* Right: Context Rail (desktop only, when item selected) */}
-          {isDesktop && selectedItem && (
-            <WorkItemContextRail
-              workItem={selectedItem}
-              entityLinks={itemDetail?.entityLinks || []}
-              extracts={itemDetail?.extracts || []}
-              relatedItems={relatedItems}
-              isLoading={isDetailLoading}
-            />
-          )}
         </div>
       </div>
+
+      {/* Drawers / Modals */}
+      <FocusInboxDrawer
+        open={!!inboxDrawerItem}
+        onClose={closeAllDrawers}
+        item={inboxDrawerItem}
+        onCreateTask={handleCreateTaskFromInbox}
+        onMarkComplete={handleMarkInboxComplete}
+        onArchive={handleArchiveInbox}
+        onMarkTrusted={handleTrusted}
+        onSnooze={handleSnooze}
+        onNoAction={handleNoAction}
+        showLink={showLink}
+      />
+
+      <FocusTaskDrawer
+        open={!!taskDrawerItem}
+        onClose={closeAllDrawers}
+        task={taskDrawerItem}
+        onUpdateTask={updateTask}
+        onDeleteTask={deleteTask}
+        onArchiveTask={archiveTask}
+        onUnarchiveTask={unarchiveTask}
+        onMarkTrusted={handleTrusted}
+        onSnooze={handleSnooze}
+        onNoAction={handleNoAction}
+        showLink={showLink}
+      />
+
+      <FocusEventModal
+        event={eventModalItem}
+        isOpen={!!eventModalItem}
+        onClose={closeAllDrawers}
+        onMarkTrusted={handleTrusted}
+        onSnooze={handleSnooze}
+        onNoAction={handleNoAction}
+        showLink={showLink}
+      />
     </div>
   );
 }

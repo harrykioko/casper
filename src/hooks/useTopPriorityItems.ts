@@ -1,6 +1,8 @@
 /**
+ * @deprecated Use useFocusQueue instead. Starring/top-priority is replaced by Focus triage.
+ *
  * useTopPriorityItems Hook
- * 
+ *
  * Derived hook that filters the unified priority list to only include
  * items explicitly flagged as "Top Priority" by the user.
  * 

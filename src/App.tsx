@@ -27,7 +27,7 @@ import PipelineCompanyDetail from "./pages/PipelineCompanyDetail";
 import Portfolio from "./pages/Portfolio";
 import PortfolioCompanyDetail from "./pages/PortfolioCompanyDetail";
 import PromptBuilder from "./pages/PromptBuilder";
-import Priority from "./pages/Priority";
+// Priority page removed — /priority now redirects to /focus
 import Inbox from "./pages/Inbox";
 import Settings from "./pages/Settings";
 import Notes from "./pages/Notes";
@@ -120,7 +120,7 @@ const MainContent = () => {
           <Route path="/pipeline/:companyId" element={<PipelineCompanyDetail />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/portfolio/:companyId" element={<PortfolioCompanyDetail />} />
-          <Route path="/priority" element={<Priority />} />
+          <Route path="/priority" element={<Navigate to="/focus" replace />} />
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/focus" element={<FocusQueue />} />
           <Route path="/notes" element={<Notes />} />

@@ -1,4 +1,6 @@
 /**
+ * @deprecated Use useFocusQueue instead. This hook is superseded by the unified Focus system.
+ *
  * useUnifiedPriorityV1 Hook - Unified Priority Engine (v1)
  *
  * This is the v1 implementation of the unified priority system.

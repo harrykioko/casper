@@ -1,4 +1,6 @@
 /**
+ * @deprecated Use useFocusQueue instead. This hook was never shipped and is superseded by the unified Focus system.
+ *
  * useUnifiedPriorityV2 Hook - Full Coverage Priority Engine
  *
  * Combines 9 data sources into a single prioritized list:

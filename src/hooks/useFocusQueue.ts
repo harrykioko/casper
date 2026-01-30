@@ -1,0 +1,352 @@
+import { useState, useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useBackfillWorkItems } from "./useBackfillWorkItems";
+import type { WorkItemSourceType, WorkItemStatus, WorkQueueItem } from "./useWorkQueue";
+import {
+  computePriorityScoreV1,
+  computeTaskUrgencyScore,
+  computeTaskImportanceScore,
+  computeInboxUrgencyScore,
+  computeInboxImportanceScore,
+  computeCalendarUrgencyScore,
+  computeCalendarImportanceScore,
+} from "@/lib/priority/priorityScoringV1";
+
+export interface FocusFilters {
+  sourceTypes: WorkItemSourceType[];
+  reasonCodes: string[];
+}
+
+export interface FocusCounts {
+  total: number;
+  bySource: Record<WorkItemSourceType, number>;
+  byReason: Record<string, number>;
+}
+
+export interface FocusQueueItem extends WorkQueueItem {
+  priorityScore: number;
+}
+
+export function useFocusQueue() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Run backfill on mount
+  useBackfillWorkItems();
+
+  // Filter state
+  const [filters, setFilters] = useState<FocusFilters>({
+    sourceTypes: [],
+    reasonCodes: [],
+  });
+
+  const toggleSourceType = useCallback((type: WorkItemSourceType) => {
+    setFilters(prev => ({
+      ...prev,
+      sourceTypes: prev.sourceTypes.includes(type)
+        ? prev.sourceTypes.filter(t => t !== type)
+        : [...prev.sourceTypes, type],
+    }));
+  }, []);
+
+  const toggleReasonCode = useCallback((code: string) => {
+    setFilters(prev => ({
+      ...prev,
+      reasonCodes: prev.reasonCodes.includes(code)
+        ? prev.reasonCodes.filter(c => c !== code)
+        : [...prev.reasonCodes, code],
+    }));
+  }, []);
+
+  const clearFilters = useCallback(() => {
+    setFilters({ sourceTypes: [], reasonCodes: [] });
+  }, []);
+
+  const queryKey = ["focus_queue", user?.id];
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey,
+    queryFn: async () => {
+      if (!user?.id) return { items: [], counts: emptyCounts() };
+
+      const now = new Date().toISOString();
+
+      // Mark stale items
+      await supabase.rpc("mark_stale_work_items", { p_user_id: user.id }).catch(() => {
+        // Function may not exist yet if migration hasn't run
+      });
+
+      // Fetch active work items (needs_review, enriched_pending, snoozed with expired snooze)
+      const { data: workItems, error } = await supabase
+        .from("work_items")
+        .select("*")
+        .eq("created_by", user.id)
+        .in("status", ["needs_review", "enriched_pending", "snoozed"])
+        .order("created_at", { ascending: true });
+
+      if (error) throw error;
+
+      // Filter expired snoozed items back in
+      let items = (workItems || []).filter(item => {
+        if (item.status === "snoozed") {
+          return item.snooze_until && new Date(item.snooze_until) <= new Date(now);
+        }
+        return true;
+      });
+
+      // Fetch entity links
+      const entityLinks: Record<string, { target_type: string; target_id: string; link_reason: string | null }> = {};
+      if (items.length > 0) {
+        const { data: links } = await supabase
+          .from("entity_links")
+          .select("source_type, source_id, target_type, target_id, link_reason")
+          .eq("created_by", user.id);
+
+        const itemKeys = new Set(items.map(i => `${i.source_type}:${i.source_id}`));
+        for (const link of links || []) {
+          const key = `${link.source_type}:${link.source_id}`;
+          if (itemKeys.has(key)) {
+            entityLinks[key] = { target_type: link.target_type, target_id: link.target_id, link_reason: link.link_reason };
+          }
+        }
+      }
+
+      // Fetch extracts for one-liners
+      const extracts: Record<string, string> = {};
+      if (items.length > 0) {
+        const { data: extractData } = await supabase
+          .from("item_extracts")
+          .select("source_type, source_id, content")
+          .eq("created_by", user.id)
+          .eq("extract_type", "summary");
+
+        for (const ext of extractData || []) {
+          const key = `${ext.source_type}:${ext.source_id}`;
+          const content = ext.content as any;
+          if (content?.one_liner) {
+            extracts[key] = content.one_liner;
+          }
+        }
+      }
+
+      // Fetch source titles + source records for scoring
+      const sourceData = await fetchSourceData(items, user.id);
+
+      // Compose items with priority scores
+      const composedItems: FocusQueueItem[] = items.map(item => {
+        const key = `${item.source_type}:${item.source_id}`;
+        const sd = sourceData[key];
+        const priorityScore = computeItemScore(item.source_type, sd?.scoreData);
+
+        return {
+          ...item,
+          status: item.status as WorkItemStatus,
+          source_type: item.source_type as WorkItemSourceType,
+          reason_codes: item.reason_codes || [],
+          source_title: sd?.title || "Untitled",
+          source_snippet: sd?.snippet || undefined,
+          primary_link: entityLinks[key] || null,
+          one_liner: extracts[key] || null,
+          priorityScore,
+        };
+      });
+
+      // Sort by priority score descending
+      composedItems.sort((a, b) => b.priorityScore - a.priorityScore);
+
+      // Compute counts
+      const counts = computeCounts(composedItems);
+
+      return { items: composedItems, counts };
+    },
+    enabled: !!user?.id,
+  });
+
+  // Apply client-side filters
+  const filteredItems = useMemo(() => {
+    let result = data?.items || [];
+
+    if (filters.sourceTypes.length > 0) {
+      result = result.filter(item => filters.sourceTypes.includes(item.source_type));
+    }
+    if (filters.reasonCodes.length > 0) {
+      result = result.filter(item =>
+        filters.reasonCodes.some(code => item.reason_codes.includes(code))
+      );
+    }
+
+    return result;
+  }, [data?.items, filters]);
+
+  const isAllClear = data ? data.items.length === 0 : false;
+
+  return {
+    items: filteredItems,
+    allItems: data?.items || [],
+    counts: data?.counts || emptyCounts(),
+    isLoading,
+    isAllClear,
+    filters,
+    toggleSourceType,
+    toggleReasonCode,
+    clearFilters,
+    refetch,
+  };
+}
+
+function emptyCounts(): FocusCounts {
+  return {
+    total: 0,
+    bySource: { email: 0, calendar_event: 0, task: 0, note: 0, reading: 0 },
+    byReason: {},
+  };
+}
+
+function computeCounts(items: FocusQueueItem[]): FocusCounts {
+  const bySource: Record<WorkItemSourceType, number> = { email: 0, calendar_event: 0, task: 0, note: 0, reading: 0 };
+  const byReason: Record<string, number> = {};
+
+  for (const item of items) {
+    bySource[item.source_type] = (bySource[item.source_type] || 0) + 1;
+    for (const code of item.reason_codes) {
+      byReason[code] = (byReason[code] || 0) + 1;
+    }
+  }
+
+  return { total: items.length, bySource, byReason };
+}
+
+interface SourceDataEntry {
+  title: string;
+  snippet?: string;
+  scoreData?: any;
+}
+
+async function fetchSourceData(
+  items: Array<{ source_type: string; source_id: string }>,
+  userId: string
+): Promise<Record<string, SourceDataEntry>> {
+  const result: Record<string, SourceDataEntry> = {};
+  const byType: Record<string, string[]> = {};
+
+  for (const item of items) {
+    if (!byType[item.source_type]) byType[item.source_type] = [];
+    byType[item.source_type].push(item.source_id);
+  }
+
+  const fetches: (() => Promise<void>)[] = [];
+
+  if (byType["email"]?.length) {
+    fetches.push(async () => {
+      const { data } = await supabase
+        .from("inbox_items")
+        .select("id, subject, snippet, display_subject, display_snippet, received_at, is_read")
+        .in("id", byType["email"]);
+      for (const row of data || []) {
+        result[`email:${row.id}`] = {
+          title: row.display_subject || row.subject || "No subject",
+          snippet: row.display_snippet || row.snippet || undefined,
+          scoreData: { receivedAt: row.received_at, isRead: row.is_read },
+        };
+      }
+    });
+  }
+
+  if (byType["calendar_event"]?.length) {
+    fetches.push(async () => {
+      const { data } = await supabase
+        .from("calendar_events")
+        .select("id, title, start_time")
+        .in("id", byType["calendar_event"]);
+      for (const row of data || []) {
+        result[`calendar_event:${row.id}`] = {
+          title: row.title || "No title",
+          scoreData: { startTime: row.start_time },
+        };
+      }
+    });
+  }
+
+  if (byType["task"]?.length) {
+    fetches.push(async () => {
+      const { data } = await supabase
+        .from("tasks")
+        .select("id, content, scheduled_for, priority")
+        .in("id", byType["task"]);
+      for (const row of data || []) {
+        result[`task:${row.id}`] = {
+          title: row.content || "Untitled task",
+          scoreData: { scheduledFor: row.scheduled_for, priority: row.priority },
+        };
+      }
+    });
+  }
+
+  if (byType["note"]?.length) {
+    fetches.push(async () => {
+      const { data } = await supabase
+        .from("project_notes")
+        .select("id, title, content")
+        .in("id", byType["note"]);
+      for (const row of data || []) {
+        result[`note:${row.id}`] = {
+          title: row.title || "Untitled note",
+          snippet: row.content?.substring(0, 120) || undefined,
+          scoreData: {},
+        };
+      }
+    });
+  }
+
+  if (byType["reading"]?.length) {
+    fetches.push(async () => {
+      const { data } = await supabase
+        .from("reading_items")
+        .select("id, title, url")
+        .in("id", byType["reading"]);
+      for (const row of data || []) {
+        result[`reading:${row.id}`] = {
+          title: row.title || row.url || "Untitled",
+          scoreData: {},
+        };
+      }
+    });
+  }
+
+  await Promise.all(fetches.map(fn => fn()));
+  return result;
+}
+
+function computeItemScore(sourceType: string, scoreData: any): number {
+  if (!scoreData) return 0.3; // default
+
+  switch (sourceType) {
+    case "email": {
+      const urgency = scoreData.receivedAt
+        ? computeInboxUrgencyScore(scoreData.receivedAt)
+        : 0.5;
+      const importance = computeInboxImportanceScore(!scoreData.isRead);
+      return computePriorityScoreV1(urgency, importance);
+    }
+    case "task": {
+      const urgency = computeTaskUrgencyScore(scoreData.scheduledFor);
+      const importance = computeTaskImportanceScore(scoreData.priority);
+      return computePriorityScoreV1(urgency, importance);
+    }
+    case "calendar_event": {
+      const urgency = scoreData.startTime
+        ? computeCalendarUrgencyScore(scoreData.startTime)
+        : 0.5;
+      const importance = computeCalendarImportanceScore();
+      return computePriorityScoreV1(urgency, importance);
+    }
+    case "note":
+      return 0.2;
+    case "reading":
+      return 0.15;
+    default:
+      return 0.3;
+  }
+}

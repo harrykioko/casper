@@ -20,6 +20,7 @@ export function useBackfillWorkItems() {
     backfill(user.id).then((count) => {
       if (count > 0) {
         queryClient.invalidateQueries({ queryKey: ["work_queue"] });
+        queryClient.invalidateQueries({ queryKey: ["focus_queue"] });
       }
     });
   }, [user?.id]);
@@ -72,6 +73,23 @@ async function backfill(userId: string): Promise<number> {
         const result = await ensureWorkItem("task", task.id, userId);
         if (result?.isNew) created++;
       }
+    }
+  }
+
+  // Backfill calendar events (recent, within last 7 days)
+  const { data: calendarEvents } = await supabase
+    .from("calendar_events")
+    .select("id, user_id")
+    .eq("user_id", userId)
+    .gte("start_time", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+    .order("start_time", { ascending: false })
+    .limit(50);
+
+  if (calendarEvents) {
+    for (const event of calendarEvents) {
+      if (existingKeys.has(`calendar_event:${event.id}`)) continue;
+      const result = await ensureWorkItem("calendar_event", event.id, userId);
+      if (result?.isNew) created++;
     }
   }
 

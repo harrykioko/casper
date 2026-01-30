@@ -1,3 +1,6 @@
+/**
+ * @deprecated Use useFocusTriageActions instead. Replaced by work_items status management.
+ */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
