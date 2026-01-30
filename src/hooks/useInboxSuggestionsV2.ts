@@ -1,6 +1,6 @@
 // useInboxSuggestionsV2 - VC-Intent Aware Suggestions Hook
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type {
@@ -29,6 +29,7 @@ export function useInboxSuggestionsV2(
   const queryClient = useQueryClient();
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [isGenerating, setIsGenerating] = useState(false);
+  const autoGenRef = useRef<string | null>(null);
 
   // Fetch cached suggestions from database
   const { data: cachedData, isLoading } = useQuery({
@@ -61,7 +62,7 @@ export function useInboxSuggestionsV2(
       dismissed_ids?: unknown;
       generated_at?: string;
     };
-    
+
     if (rawData.version !== 2) return null;
 
     const suggestions = (rawData.suggestions || []) as StructuredSuggestion[];
@@ -81,7 +82,7 @@ export function useInboxSuggestionsV2(
   // Filter out dismissed suggestions
   const visibleSuggestions = useMemo(() => {
     if (!parsedData) return [];
-    
+
     const allDismissed = new Set([
       ...parsedData.dismissedFromDb,
       ...dismissedIds,
@@ -113,6 +114,22 @@ export function useInboxSuggestionsV2(
       setIsGenerating(false);
     },
   });
+
+  // Auto-generate suggestions when an item is opened and none exist yet
+  useEffect(() => {
+    if (
+      !isLoading &&
+      inboxItemId &&
+      !parsedData &&
+      !cachedData &&
+      !isGenerating &&
+      autoGenRef.current !== inboxItemId
+    ) {
+      autoGenRef.current = inboxItemId;
+      setIsGenerating(true);
+      generateMutation.mutate(false);
+    }
+  }, [isLoading, inboxItemId, parsedData, cachedData, isGenerating, generateMutation]);
 
   const generateSuggestions = useCallback(
     (force: boolean = false) => {

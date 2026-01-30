@@ -306,9 +306,14 @@ export function InboxActionRail({
             <Loader2 className="h-3 w-3 animate-spin" />
             Loading...
           </div>
+        ) : suggestions.length === 0 && isGenerating ? (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Generating suggestions...
+          </div>
         ) : suggestions.length === 0 ? (
           <p className="text-xs text-muted-foreground italic">
-            No suggestions yet
+            No suggestions available
           </p>
         ) : (
           <div className="space-y-2">
@@ -337,7 +342,7 @@ export function InboxActionRail({
           ) : (
             <Wand2 className="h-3 w-3 mr-1.5" />
           )}
-          {isGenerating ? "Generating..." : isAI ? "Regenerate" : "Generate with AI"}
+          {isGenerating ? "Generating..." : "Regenerate"}
         </Button>
       </div>
 
