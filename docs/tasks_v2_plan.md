@@ -1,672 +1,546 @@
-  # Tasks V2 — Audit, Gap Analysis & Implementation Plan
-
-  ---
-
-  ## 1. Current System Map
-
-  ### Data Model
-
-  **Primary table: `tasks`** (21 columns)
-
-  | Column | Type | Notes |
-  |--------|------|-------|
-  | `id` | UUID PK | Auto-generated |
-  | `content` | text | Task title (required) |
-  | `status` | text | "todo" / "inprogress" / "done" |
-  | `priority` | text | "low" / "medium" / "high" |
-  | `completed` | boolean (nullable) | Redundant with status="done" |
-  | `completed_at` | timestamptz | Set on completion |
-  | `created_by` | UUID FK → auth.users | Owner |
-  | `created_at` / `updated_at` | timestamptz | Timestamps |
-  | `project_id` | UUID FK → projects | Optional project link |
-  | `category_id` | UUID FK → categories | Optional category |
-  | `company_id` | UUID FK → companies | Portfolio company link |
-  | `pipeline_company_id` | UUID FK → pipeline_companies | Pipeline company link |
-  | `source_inbox_item_id` | UUID FK → inbox_items | Email origin |
-  | `scheduled_for` | timestamptz | Due date |
-  | `is_quick_task` | boolean | **"Inbox" flag** |
-  | `is_top_priority` | boolean | Top-priority pin |
-  | `snoozed_until` | timestamptz | Snooze target |
-  | `snooze_count` | integer | Times snoozed |
-  | `last_snoozed_at` | timestamptz | Last snooze timestamp |
-  | `effort_minutes` | integer | Effort estimate |
-  | `effort_category` | text | "quick"/"medium"/"deep"/"unknown" |
-
-  **Related tables:**
-  - `project_notes` + `note_links` — Polymorphic notes system. Notes stored in `project_notes`, linked to tasks via `note_links` where `target_type = 'task'`.
-  - `snooze_log` — Audit trail for snooze actions.
-  - `categories`, `projects` — Reference data.
-
-  **RLS:** `created_by = auth.uid()` pattern on all operations.
-
-  ### Frontend Files
-
-  | File | Role |
-  |------|------|
-  | `src/hooks/useTasks.ts` | Core CRUD, transforms (`Task` interface, `transformTask`, `transformTaskForDatabase`, `createTask`, `updateTask`, `deleteTask`, `getInboxTasks`, `getNonInboxTasks`) |
-  | `src/hooks/useTasksManager.tsx` | Orchestrator: `handleAddTask` (sets `is_quick_task: true`), `handleCompleteTask`, `handleUpdateTaskStatus`, `handleUpdateTask`, `quickInlineUpdate`, `bulkUpdate` |
-  | `src/hooks/useTaskDetails.ts` | Form state for edit modal |
-  | `src/hooks/useTaskFiltering.ts` | Filter/sort logic (excludes inbox by default) |
-  | `src/hooks/useCompanyTasks.ts` | Tasks scoped to `company_id` with real-time subscription |
-  | `src/hooks/usePipelineTasks.ts` | Tasks scoped to `pipeline_company_id` with real-time subscription |
-  | `src/hooks/usePipelineTasksAggregate.ts` | Multi-company task aggregation for pipeline views |
-  | `src/hooks/useProjectTasks.ts` | Tasks scoped to `project_id` |
-  | `src/hooks/useTaskAttachments.ts` | Email attachments via `source_inbox_item_id` |
-  | `src/hooks/useNotes.ts` | Polymorphic notes: `useNotesForTarget`, `createNote`, `updateNote`, `deleteNote` |
-  | `src/pages/Tasks.tsx` | **Main page**: quick-add, view toggle, filters, inbox section, main content, task details modal |
-  | `src/components/tasks/QuickTaskInput.tsx` | Quick-add input (content only) |
-  | `src/components/tasks/ViewModeToggle.tsx` | List/Kanban toggle + inbox show/hide |
-  | `src/components/tasks/TasksFilters.tsx` | Filter bar (status, priority, category, project, sort) |
-  | `src/components/tasks/TasksMainContent.tsx` | List view container |
-  | `src/components/tasks/TasksKanbanView.tsx` | Kanban with drag-drop (react-beautiful-dnd) |
-  | `src/components/tasks/InboxSection.tsx` | Inbox triage UI with keyboard shortcuts, bulk actions |
-  | `src/components/tasks/kanban/InboxColumn.tsx` | Kanban inbox column |
-  | `src/components/modals/AddTaskDialog.tsx` | "New Task" modal (content + description textarea + company prefill display) |
-  | `src/components/modals/TaskDetailsDialog.tsx` | Edit task modal (form + notes section + attachments) |
-  | `src/components/modals/task-details/TaskDetailsForm.tsx` | Form fields container |
-  | `src/components/modals/task-details/TaskContentInput.tsx` | Title input |
-  | `src/components/modals/task-details/ProjectSelector.tsx` | Project dropdown |
-  | `src/components/modals/task-details/CategorySelector.tsx` | Category dropdown |
-  | `src/components/modals/task-details/DateSelector.tsx` | Due date picker |
-  | `src/components/modals/task-details/PrioritySelector.tsx` | Priority toggle group |
-  | `src/components/modals/task-details/StatusSelector.tsx` | Status toggle group |
-  | `src/components/notes/TaskNotesSection.tsx` | Notes list + editor for task detail modal |
-  | `src/components/tasks/TaskAttachmentsSection.tsx` | Email attachments display |
-  | `src/components/dashboard/TaskList.tsx` | Shared task row renderer |
-  | `src/components/task-cards/TaskCardContent.tsx` | Card text display |
-  | `src/components/task-cards/TaskCardMetadata.tsx` | Metadata chips (priority, project, date) |
-  | `src/components/command-pane/CompanyCommandTasks.tsx` | Tasks tab inside company detail pane |
-  | `src/components/command-pane/CompanyCommandTimeline.tsx` | Timeline merging interactions + task events |
-  | `src/components/dashboard/InboxDetailDrawer.tsx` | Email detail drawer with "Create Task" button |
+# Tasks V2 — Audit, Gap Analysis & Implementation Plan
+
+---
+
+## 1. Current System Map
+
+### Data Model
+
+**Primary table: `tasks`** (23 columns)
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | UUID PK | Auto-generated |
+| `content` | text | Task title (required) |
+| `status` | text | "todo" / "inprogress" / "done" |
+| `priority` | text | "low" / "medium" / "high" |
+| `completed` | boolean (nullable) | Redundant with status="done" |
+| `completed_at` | timestamptz | Set on completion |
+| `created_by` | UUID FK → auth.users | Owner |
+| `created_at` / `updated_at` | timestamptz | Timestamps |
+| `project_id` | UUID FK → projects | Optional project link |
+| `category_id` | UUID FK → categories | Optional category |
+| `company_id` | UUID FK → companies | Portfolio company link |
+| `pipeline_company_id` | UUID FK → pipeline_companies | Pipeline company link |
+| `source_inbox_item_id` | UUID FK → inbox_items | Email origin |
+| `scheduled_for` | timestamptz | Due date |
+| `is_quick_task` | boolean | **"Triage" flag** |
+| `is_top_priority` | boolean | Top-priority pin |
+| `snoozed_until` | timestamptz | Snooze target |
+| `snooze_count` | integer | Times snoozed |
+| `last_snoozed_at` | timestamptz | Last snooze timestamp |
+| `effort_minutes` | integer | Effort estimate |
+| `effort_category` | text | "quick"/"medium"/"deep"/"unknown" |
+| `archived_at` | timestamptz | When archived; null = active |
+
+**Related tables:**
+- `project_notes` + `note_links` — Polymorphic notes system. Notes stored in `project_notes`, linked to tasks via `note_links` where `target_type = 'task'`.
+- `snooze_log` — Audit trail for snooze actions.
+- `categories`, `projects` — Reference data.
+- `work_items` + `entity_links` + `item_extracts` — Focus Queue system (separate from tasks).
+
+**RLS:** `created_by = auth.uid()` pattern on all operations.
+
+### Frontend Files
+
+| File | Role |
+|------|------|
+| `src/hooks/useTasks.ts` | Core CRUD, transforms (`Task` interface, `transformTask`, `transformTaskForDatabase`, `createTask`, `updateTask`, `deleteTask`, `snoozeTask`, `markTaskTopPriority`, `getInboxTasks`, `getNonInboxTasks`, `getArchivedTasks`, `archiveTask`, `unarchiveTask`) |
+| `src/hooks/useTasksManager.tsx` | Orchestrator: `handleAddTask` (sets `is_quick_task: true`), `handleCompleteTask`, `handlePromoteTask`, `handleUpdateTaskStatus`, `handleUpdateTask`, `quickInlineUpdate`, `bulkUpdate`, `handleArchiveTask`, `handleUnarchiveTask` |
+| `src/hooks/useTaskDetails.ts` | Form state for edit panel (includes `companyLink` via `TaskCompanyLink`) |
+| `src/hooks/useTaskFiltering.ts` | Filter/sort logic (excludes inbox by default) |
+| `src/hooks/useCompanyTasks.ts` | Tasks scoped to `company_id` with real-time subscription |
+| `src/hooks/usePipelineTasks.ts` | Tasks scoped to `pipeline_company_id` with real-time subscription |
+| `src/hooks/usePipelineTasksAggregate.ts` | Multi-company task aggregation for pipeline views |
+| `src/hooks/useProjectTasks.ts` | Tasks scoped to `project_id` |
+| `src/hooks/useTaskAttachments.ts` | Email attachments via `source_inbox_item_id` |
+| `src/hooks/useNotes.ts` | Polymorphic notes: `useNotesForTarget`, `createNote`, `updateNote`, `deleteNote` |
+| `src/pages/Tasks.tsx` | **Main page**: 2-column grid (summary panel + content), quick-add, view toggle, filters, triage section, main content, task details slide-over |
+| `src/components/tasks/QuickTaskInput.tsx` | Quick-add input (content only) |
+| `src/components/tasks/TasksSummaryPanel.tsx` | **Left sidebar**: search, status/priority stat chips, filter dropdowns, view toggle, triage/archive toggles |
+| `src/components/tasks/TasksFilters.tsx` | Filter bar (mobile fallback) |
+| `src/components/tasks/TasksMainContent.tsx` | List view container |
+| `src/components/tasks/TasksKanbanView.tsx` | Kanban with drag-drop (react-beautiful-dnd) |
+| `src/components/tasks/InboxSection.tsx` | Triage UI with keyboard shortcuts, bulk actions, promote button |
+| `src/components/tasks/kanban/InboxColumn.tsx` | Kanban triage column |
+| `src/components/modals/AddTaskDialog.tsx` | "New Task" modal |
+| `src/components/modals/TaskDetailsDialog.tsx` | **Sheet-based slide-over panel** with properties, links, notes, attachments, activity sections; footer with delete/archive/save |
+| `src/components/modals/task-details/TaskDetailsForm.tsx` | Form fields container |
+| `src/components/modals/task-details/TaskContentInput.tsx` | Title input |
+| `src/components/modals/task-details/CompanySelector.tsx` | **Unified company selector** (portfolio + pipeline) |
+| `src/components/modals/task-details/ProjectSelector.tsx` | Project dropdown |
+| `src/components/modals/task-details/CategorySelector.tsx` | Category dropdown |
+| `src/components/modals/task-details/DateSelector.tsx` | Due date picker |
+| `src/components/modals/task-details/PrioritySelector.tsx` | Priority toggle group |
+| `src/components/modals/task-details/StatusSelector.tsx` | Status toggle group |
+| `src/components/modals/task-details/TaskLinksSection.tsx` | Source email link, company links |
+| `src/components/modals/task-details/TaskActivitySection.tsx` | Created/updated timestamps |
+| `src/components/notes/TaskNotesSection.tsx` | Notes list + editor for task detail panel |
+| `src/components/tasks/TaskAttachmentsSection.tsx` | Email attachments display with inline preview |
+| `src/components/dashboard/TaskList.tsx` | Shared task row renderer |
+| `src/components/task-cards/TaskCardContent.tsx` | Card text display |
+| `src/components/task-cards/TaskCardMetadata.tsx` | Metadata chips (priority, project, date) |
+| `src/components/command-pane/CompanyCommandTasks.tsx` | Tasks tab inside company detail pane |
+| `src/components/command-pane/CompanyCommandTimeline.tsx` | Timeline merging interactions + task events |
+| `src/components/dashboard/InboxDetailDrawer.tsx` | Email detail drawer with "Create Task" button |
 
-  ### Data Flow
+### Data Flow
 
-  ```
-  QuickTaskInput → handleAddTask(content) → createTask({ content, is_quick_task: true })
-                                                      ↓
-                                                Supabase INSERT → tasks table
-                                                      ↓
-                                                TanStack Query invalidation → re-fetch
-                                                      ↓
-                                                getInboxTasks() filter → InboxSection UI
+```
+QuickTaskInput → handleAddTask(content) → createTask({ content, is_quick_task: true })
+                                                    ↓
+                                              Supabase INSERT → tasks table
+                                                    ↓
+                                              setTasks() → local state update
+                                                    ↓
+                                              getInboxTasks() filter → InboxSection UI
 
-  InboxSection triage → quickInlineUpdate / bulkUpdate → Supabase UPDATE
-                                                      ↓
-                                                (DB trigger clears is_quick_task when status ≠ 'todo')
-                                                      ↓
-                                                Task appears in main list (getNonInboxTasks)
-  ```
+InboxSection triage → quickInlineUpdate / bulkUpdate / handlePromoteTask → Supabase UPDATE
+                                                    ↓
+                                              (DB trigger clears is_quick_task when status ≠ 'todo')
+                                                    ↓
+                                              Task appears in main list (getNonInboxTasks)
 
-  ---
+Completed tasks → 14-day auto-archive (client-side isTaskArchived check)
+                → or manual archive (archived_at set)
+                → getArchivedTasks() filter → shown when "Show Archived" toggled
+```
 
-  ## 2. Gap Analysis
+---
 
-  ### Gap 1: Quick-Add Notes Are Not Persisted
+## 2. Gap Analysis
 
-  **Where it manifests:** `AddTaskDialog.tsx:54-56` — The `taskDescription` state is captured in a `<Textarea>` but the `TaskCreateData` object built on submit only ever sets `content`. The `description` field exists on `TaskCreateData` interface but is **never assigned** from `taskDescription`.
+### ~~Gap 1: Quick-Add Notes Are Not Persisted~~ → PARTIALLY ADDRESSED
 
-  **Root cause:** Code omission. Line 54-56 builds `taskData` with only `content`, never `taskData.description = taskDescription`. Furthermore, even if it were set, the `tasks` table has **no `description` column** — the description would need to be persisted as a polymorphic note via `project_notes` + `note_links`.
+**Status:** The `description` column was **not added** to the tasks table. However, the threaded notes system (`TaskNotesSection`) is now integrated into the task detail slide-over panel. Users can add longer notes via that section.
 
-  **Fix:** After creating the task, if `taskDescription` is non-empty, create a `project_notes` entry linked via `note_links` with `target_type = 'task'`. Alternatively, add a `description` column to `tasks` for simple one-liner notes.
+**Remaining gap:** No inline description field on the task itself — only separate threaded notes.
 
-  **Recommendation:** Add a `description` text column to `tasks` (simple, inline with the task) **and** keep the polymorphic notes system for longer threaded notes. This mirrors how most task tools have a "description" field plus a "comments/notes" section.
+**Recommendation:** Consider adding a `description` text column for a simple one-liner description distinct from threaded notes. Low priority since notes system serves the purpose.
 
-  ### Gap 2: Inbox Is a Boolean Flag, Not a Status
+### ~~Gap 2: Inbox Is a Boolean Flag, Not a Status~~ → DEFERRED (Option A applied)
 
-  **Where it manifests:** `is_quick_task` boolean on `tasks` table. Frontend maps it to `inbox` property.
+**Status:** The `is_quick_task` boolean remains. The UI now labels it **"Triage"** instead of "Inbox". An explicit **Promote** button (`handlePromoteTask`) was added so users can manually move tasks out of triage without needing to set date/project/status.
 
-  **Root cause:** The "inbox" concept is implemented as an orthogonal boolean (`is_quick_task`) rather than as a value in the `status` enum. This creates a parallel state dimension: a task can be `status = 'todo'` AND `inbox = true`, which leads to the confusing dual-gating where inbox tasks are filtered out of the main list by default.
+**Remaining gap:** `is_quick_task` field name is still confusing in the schema. No migration to status-based inbox yet.
 
-  **Why it's confusing:** Users must "triage" inbox tasks before they appear in the real task list. There is a DB trigger that clears `is_quick_task` when status changes, but this implicit behavior is not surfaced clearly in the UI.
+### ~~Gap 3: AddTaskDialog Lacks Company Linking UI~~ → COMPLETED
 
-  **Fix direction:** Convert inbox to an explicit status value. Add `"inbox"` as a status option. Remove `is_quick_task` column. Tasks created from quick-add start with `status = 'inbox'`. Triaging sets status to `'todo'` (or another value). This eliminates the parallel boolean state.
+**Status:** `CompanySelector.tsx` was built as a unified search component supporting both portfolio and pipeline companies. It is integrated into `TaskDetailsDialog` via `TaskDetailsForm`.
 
-  ### Gap 3: AddTaskDialog Lacks Company Linking UI
+**Note:** The `AddTaskDialog` modal still relies on prefill for company info. The full `CompanySelector` is available in the detail panel.
 
-  **Where it manifests:** `AddTaskDialog.tsx` — The modal only shows company info if `prefill.companyName` is provided (read-only display). There is no search/select UI for choosing a company.
+### ~~Gap 4: TaskDetailsDialog Has No Company Linking~~ → COMPLETED
 
-  **Root cause:** The dialog was designed for the email→task flow where company is pre-known. No company search component was built into it.
+**Status:** `CompanySelector` is now a field in `TaskDetailsForm`. The `useTaskDetails` hook manages `companyLink` state via `TaskCompanyLink` type. `handleUpdateTask` in `useTasksManager` passes through `company_id` / `pipeline_company_id`.
 
-  **Fix:** Add a company search/select component to `AddTaskDialog` and `TaskDetailsDialog`. The `CompanyCommandTasks` component already has inline task creation with company context, so the pattern exists — it just needs to be exposed in the standalone dialogs.
+### ~~Gap 5: No Aging/Archive for Completed Tasks~~ → COMPLETED
 
-  ### Gap 4: TaskDetailsDialog Has No Company Linking
+**Status:** Fully implemented:
+- Migration `20260129300000_pr3_archive_column.sql` added `archived_at` column with indexes
+- Backfill ran for tasks completed >30 days ago
+- Client-side `isTaskArchived()` auto-archives tasks completed >14 days
+- `archiveTask()` / `unarchiveTask()` for manual archive
+- "Show Archived" toggle in `TasksSummaryPanel`
+- Archive/Unarchive buttons in `TaskDetailsDialog` footer
 
-  **Where it manifests:** `TaskDetailsDialog.tsx` / `TaskDetailsForm.tsx` — The edit form has fields for content, status, date, project, priority, category. **No company selector.**
+### Gap 6: Tasks Not Visible in Email Detail Pane → OPEN
 
-  **Root cause:** The form was built without company awareness. The `useTaskDetails` hook doesn't manage `company_id` or `pipeline_company_id`.
+**Where it manifests:** `InboxDetailDrawer.tsx` has a "Create Task" button but does not show existing tasks linked to that email.
 
-  **Fix:** Add a `CompanySelector` component to `TaskDetailsForm` (similar to `ProjectSelector`). The `useTaskDetails` hook needs `companyId` and `companyType` state fields.
+**Root cause:** No query fetches tasks by `source_inbox_item_id` in the email detail view.
 
-  ### Gap 5: No Aging/Archive for Completed Tasks
+**Fix:** In `InboxDetailDrawer`, query `tasks` where `source_inbox_item_id = currentEmail.id` and render them in a small section. Reuse `TaskCardContent` + `TaskCardMetadata` components.
 
-  **Where it manifests:** Tasks page main list and kanban "Done" column. Completed tasks accumulate indefinitely.
+### Gap 7: No "Create Follow-Up Task" from Calendar Events → OPEN
 
-  **Root cause:** No `archived_at` column exists. No time-based filtering is applied. The only filter is the manual status filter.
+**Where it manifests:** Calendar event detail modal shows event info but has no task creation action.
 
-  **Fix:** Add `archived_at` timestamptz column. Implement default query filter: exclude tasks where `completed_at` is older than 14 days (or user-configured). Add "Show archived" toggle. Optionally, add a scheduled function or client-side logic to auto-set `archived_at` for tasks completed > N days ago.
+**Root cause:** Feature not built. No link from calendar events to tasks exists in the schema.
 
-  ### Gap 6: Tasks Not Visible in Email Detail Pane
+**Fix:** Add a "Create Follow-Up Task" button to `EventDetailsModal`. Pre-fill task content with event title, due date with event date + 1 day, and company if the event matches a company via domain. No schema change needed.
 
-  **Where it manifests:** `InboxDetailDrawer.tsx` has a "Create Task" button but does not show existing tasks linked to that email.
+### ~~Gap 8: `completed` Boolean Is Redundant with `status = 'done'`~~ → DEFERRED
 
-  **Root cause:** No query fetches tasks by `source_inbox_item_id` in the email detail view.
+**Status:** Both fields remain synced. `handleCompleteTask` toggles both. No migration planned — low risk.
 
-  **Fix:** In `InboxDetailDrawer`, query `tasks` where `source_inbox_item_id = currentEmail.id` and render them in a small section. Reuse `useCompanyTasks`-style hook pattern.
+### ~~Gap 9: Tasks Page Layout Wastes Space~~ → COMPLETED
 
-  ### Gap 7: No "Create Follow-Up Task" from Calendar Events
+**Status:** The tasks page now uses a **2-column workspace layout**:
+- Left: `TasksSummaryPanel` (desktop-only, sticky) with search, stat chips, filters, view/toggle controls
+- Right: Quick-add + main content area (list or kanban)
+- Mobile: Collapsible filter panel, single-column layout
 
-  **Where it manifests:** Calendar event detail modal shows event info but has no task creation action.
+The original stacked header/view-toggle/filter/inbox/content layout was replaced.
 
-  **Root cause:** Feature not built. No link from calendar events to tasks exists in the schema.
+### Gap 10: No Importance Ranking Separate from Priority → DEFERRED
 
-  **Fix:** Add a "Create Follow-Up Task" button to `EventDetailsModal`. Pre-fill task content with event title, due date with event date + 1 day, and company if the event matches a company via domain. No schema change needed (tasks already have `scheduled_for` and company FKs).
+**Status:** `is_top_priority` boolean exists. No `importance_rank` column added. Low priority — the top-priority pin serves the basic need.
 
-  ### Gap 8: `completed` Boolean Is Redundant with `status = 'done'`
+### Gap 11: Filters Don't Support Company Type → OPEN
 
-  **Where it manifests:** `handleCompleteTask` in `useTasksManager.tsx:14-21` sets both `completed` and `status` in parallel. Various filters check either or both.
+**Where it manifests:** `TasksSummaryPanel` has category, project, sort — no company filter.
 
-  **Root cause:** Legacy design. `completed` was the original field; `status` was added later with the kanban view.
+**Fix:** Add "Company" filter dropdown that searches across portfolio + pipeline companies.
 
-  **Fix direction:** Deprecate `completed` boolean over time. For now, keep syncing both. In V2, `status = 'done'` is the source of truth; `completed` becomes a computed/legacy field. No immediate migration needed — just ensure all new code checks `status`.
+---
 
-  ### Gap 9: Tasks Page Layout Wastes Space
+## 3. Tasks V2 Data Model
 
-  **Where it manifests:** `Tasks.tsx` — Linear vertical stack: quick-add → view toggle → filters → inbox → main content. No side panels or workspace density.
+### Schema Changes Applied
 
-  **Root cause:** The page was built as a simple stacked layout without workspace-style density. The task detail is a full-screen modal overlay, not an inline panel.
+**`archived_at` column** (migration `20260129300000_pr3_archive_column.sql`):
+```sql
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_tasks_archived ON tasks (created_by, archived_at) WHERE archived_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_tasks_completed_aging ON tasks (created_by, completed_at) WHERE completed_at IS NOT NULL;
+-- Backfill: archive tasks completed more than 30 days ago
+UPDATE tasks SET archived_at = completed_at
+WHERE completed = true AND completed_at < now() - interval '30 days' AND archived_at IS NULL;
+```
 
-  **Fix:** Redesign to a workspace layout: compact header with command bar, optional side rail for "Now" view / quick stats, task detail as a slide-over panel rather than a centered modal. Details in UX section below.
+**Focus Queue tables** (migration `20260130100000_focus_queue_tables.sql`):
+- `work_items` — Unified review queue entries
+- `entity_links` — Polymorphic links from work items to companies/projects
+- `item_extracts` — AI-generated summaries and suggestions
 
-  ### Gap 10: No Importance Ranking Separate from Priority
+### Remaining Schema Changes (Not Yet Applied)
 
-  **Where it manifests:** `is_top_priority` boolean exists but is a simple pin. Priority is "low/medium/high". No separate importance dimension.
+```sql
+-- Task description (inline short notes, distinct from threaded notes)
+ALTER TABLE tasks ADD COLUMN description text;
 
-  **Root cause:** Only `priority` (urgency) exists. No importance axis.
+-- Importance rank (1=highest, null=unranked)
+ALTER TABLE tasks ADD COLUMN importance_rank smallint CHECK (importance_rank BETWEEN 1 AND 5);
+```
 
-  **Fix:** Add `importance` integer field (1-5 or 1-3) for Eisenhower-matrix style filtering. Or repurpose `is_top_priority` as the importance signal and rename it in the UI to be clearer. **Recommendation:** Keep it simple — use `is_top_priority` as the importance flag for now. Add a numeric `importance_rank` column later if needed.
+These are optional and deferred.
 
-  ### Gap 11: Filters Don't Support Company Type
+### Relationship Diagram
 
-  **Where it manifests:** `TasksFilters.tsx` has category, project, status, priority, sort — no company filter.
+```
+tasks
+  ├─── company_id ────────────→ companies (portfolio)
+  ├─── pipeline_company_id ───→ pipeline_companies
+  ├─── project_id ────────────→ projects
+  ├─── category_id ───────────→ categories
+  ├─── source_inbox_item_id ──→ inbox_items (email origin)
+  ├─── created_by ────────────→ auth.users
+  │
+  └─── (via note_links.target_id where target_type='task')
+      └── note_links ──→ project_notes (threaded notes/comments)
+
+work_items (Focus Queue — separate system)
+  ├─── source_type + source_id → polymorphic (email, calendar_event, task, note, reading)
+  ├─── created_by → auth.users
+  │
+  ├─── entity_links → companies / projects (with confidence score)
+  └─── item_extracts → AI summaries, suggested tasks, highlights
+```
 
-  **Root cause:** Filter component wasn't built with company awareness.
+### RLS Policy (Unchanged Pattern)
 
-  **Fix:** Add "Company" filter dropdown that searches across portfolio + pipeline companies. Query tasks by `company_id` or `pipeline_company_id`.
+```sql
+CREATE POLICY "Users can manage their own tasks"
+  ON tasks FOR ALL
+  USING (created_by = auth.uid())
+  WITH CHECK (created_by = auth.uid());
+```
 
-  ---
+---
 
-  ## 3. Tasks V2 Data Model
+## 4. UX Implementation Status
 
-  ### Schema Changes (Minimal)
+### Tasks Page — Workspace Layout ✅ COMPLETED
 
-  **ALTER `tasks` table — add columns:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ [Mobile: Filters toggle button]                                 │
+├──────────────────────────┬──────────────────────────────────────┤
+│ TASKS COMMAND            │ [+ Quick Add ________________________]│
+│                          │                                      │
+│ [🔍 Search tasks...]    │  ▸ Triage (3)       [promote]        │
+│                          │    ☐ Review deck from Acme Corp      │
+│ BY STATUS                │    ☐ Follow up on intro email        │
+│ [● All Items     12]    │    ☐ Check pipeline data             │
+│ [○ To Do          5]    │                                      │
+│ [⟳ In Progress    3]    │  TASKS                               │
+│ [✓ Done           4]    │  ────────────────────────────────     │
+│ [📦 Archived      8]    │  ☐ Prepare board memo  P1 ProjectX 📅│
+│                          │  ☐ Send term sheet     P2 DealY   📅│
+│ BY PRIORITY              │  ☐ Update model        P3 Ops       │
+│ [↑ High    2]           │  ☑ Draft LP letter (done)            │
+│ [→ Medium  4]           │                                      │
+│ [↓ Low     3]           │                                      │
+│                          │                                      │
+│ FILTERS                  │                                      │
+│ Category: [All ▾]       │                                      │
+│ Project:  [All ▾]       │                                      │
+│ Sort by:  [Date ▾]      │                                      │
+│                          │                                      │
+│ VIEW                     │                                      │
+│ [List] [Kanban]          │                                      │
+│ Show Triage   [toggle] 3│                                      │
+│ Show Archived [toggle] 8│                                      │
+└──────────────────────────┴──────────────────────────────────────┘
+```
 
-  ```sql
-  -- Task description (inline short notes, distinct from threaded notes)
-  ALTER TABLE tasks ADD COLUMN description text;
+### Task Detail Slide-Over Panel ✅ COMPLETED
 
-  -- Archive support
-  ALTER TABLE tasks ADD COLUMN archived_at timestamptz;
+Replaced centered `GlassModal` with right slide-over `Sheet`:
 
-  -- Importance rank (1=highest, null=unranked)
-  ALTER TABLE tasks ADD COLUMN importance_rank smallint CHECK (importance_rank BETWEEN 1 AND 5);
+```
+┌──────────────────────────────────┐
+│ ✏ Task Detail          [Float]  │
+├──────────────────────────────────┤
+│                                  │
+│ ─── PROPERTIES ─────────────     │
+│ Content:  [Prepare board memo__] │
+│ Status:    [● In Progress ▾]     │
+│ Priority:  [High ▾]             │
+│ Due Date:  [Jan 30, 2026 ▾]     │
+│ Project:   [Board Meetings ▾]    │
+│ Category:  [Ops ▾]              │
+│ Company:   [Acme Corp ▾]  🏢    │
+│                                  │
+│ ─── LINKS ──────────────────     │
+│ 📧 Source email: "Re: Board..." │
+│ 🏢 Company: Acme Corp           │
+│                                  │
+│ ─── NOTES (2) ──────────────     │
+│ Jan 28 — Updated with Q4 data   │
+│ Jan 25 — Initial draft started   │
+│ [+ Add note]                     │
+│                                  │
+│ ─── ATTACHMENTS (1) ────────     │
+│ 📎 board_deck_v3.pdf  2.1MB     │
+│                                  │
+│ ─── ACTIVITY ───────────────     │
+│ Created: Jan 25, 2026            │
+│ Updated: Jan 28, 2026            │
+│                                  │
+├──────────────────────────────────┤
+│ [🗑 Delete][📦 Archive] [Cancel][Save]│
+└──────────────────────────────────┘
+```
 
-  -- Index for archive queries
-  CREATE INDEX idx_tasks_archived ON tasks (created_by, archived_at) WHERE archived_at IS NOT NULL;
+**Implemented sections:**
+1. **Properties** — Content, status, priority, date, project, category, company (via `CompanySelector`)
+2. **Links** — Source email link, company link display (`TaskLinksSection`)
+3. **Notes** — Threaded notes via `TaskNotesSection`
+4. **Attachments** — Email attachments via `TaskAttachmentsSection`
+5. **Activity** — Created/updated timestamps (`TaskActivitySection`)
+6. **Float button** — Opens floating note editor linked to the task
 
-  -- Index for completed aging queries
-  CREATE INDEX idx_tasks_completed_aging ON tasks (created_by, completed_at) WHERE completed_at IS NOT NULL;
-  ```
+---
 
-  **No new tables needed.** The existing `project_notes` + `note_links` system handles threaded notes. Company linking already exists via `company_id` and `pipeline_company_id`.
+## 5. Global Integration Points
 
-  ### Relationship Diagram
+### 5A. Company Detail Pane — Tasks Tab ✅ WORKING
 
-  ```
-  tasks
-    ├─── company_id ────────────→ companies (portfolio)
-    ├─── pipeline_company_id ───→ pipeline_companies
-    ├─── project_id ────────────→ projects
-    ├─── category_id ───────────→ categories
-    ├─── source_inbox_item_id ──→ inbox_items (email origin)
-    ├─── created_by ────────────→ auth.users
-    │
-    └─── (via note_links.target_id where target_type='task')
-        └── note_links ──→ project_notes (threaded notes/comments)
-  ```
+**File:** `src/components/command-pane/CompanyCommandTasks.tsx`
 
-  ### RLS Policy (Unchanged Pattern)
+Uses `useCompanyTasks` / `usePipelineTasks`. Tasks linked via `company_id` / `pipeline_company_id` appear here. Real-time Supabase subscriptions keep it in sync.
 
-  ```sql
-  -- Same pattern as existing:
-  CREATE POLICY "Users can manage their own tasks"
-    ON tasks FOR ALL
-    USING (created_by = auth.uid())
-    WITH CHECK (created_by = auth.uid());
-  ```
+### 5B. Email Detail Pane — Show Linked Tasks ❌ NOT DONE
 
-  No changes to RLS needed since we're only adding columns.
+**File to modify:** `src/components/dashboard/InboxDetailDrawer.tsx`
 
-  ### Backfill Plan
+**Current state:** Has "Create Task" button. Does NOT show existing tasks linked to this email.
 
-  1. `description` — no backfill needed (all existing tasks have `NULL`).
-  2. `archived_at` — backfill: `UPDATE tasks SET archived_at = completed_at WHERE completed = true AND completed_at < now() - interval '30 days'`. This hides old completed tasks from default views.
-  3. `importance_rank` — no backfill needed (optional field).
+**Change:** After the "Create Task" button, add a section querying tasks by `source_inbox_item_id`. Reuse `TaskCardContent` + `TaskCardMetadata` components.
 
-  ### Inbox Status Migration (Optional, Recommended)
+### 5C. Calendar Event Detail — "Create Follow-Up Task" ❌ NOT DONE
 
-  **Option A (Recommended): Keep `is_quick_task` but rename in UI.**
-  - Rename "Inbox" to "Triage" in the UI.
-  - Make the triage section opt-in (collapsed by default for users who don't want it).
-  - No schema change. Low risk.
+**File to modify:** `src/components/modals/EventDetailsModal.tsx` (or equivalent)
 
-  **Option B: Convert to status value.**
-  - Add `'inbox'` as a status value, migrate `is_quick_task = true` tasks to `status = 'inbox'`.
-  - Drop `is_quick_task` column after migration.
-  - Higher risk, touches more code paths (DB triggers, filters, kanban columns).
+**Change:** Add a "Create Follow-Up Task" button that opens `AddTaskDialog` with prefill:
+```tsx
+const prefill: TaskPrefillOptions = {
+  content: `Follow up: ${event.title}`,
+  dueDate: addDays(new Date(event.end_time), 1),
+  companyId: matchedCompany?.id,
+  companyType: matchedCompany?.type,
+  companyName: matchedCompany?.name,
+};
+```
 
-  **Recommendation: Option A** for now. Rename in UI, make it less mandatory. Revisit Option B in a future iteration if the boolean still causes issues.
+### 5D. Company Timeline — Task Events ✅ WORKING
 
-  ---
+**File:** `src/hooks/useCompanyTimeline.ts` merges task_created/task_completed into the timeline.
 
-  ## 4. UX Redesign Spec
+### 5E. Focus Queue — Task Creation ✅ WORKING
 
-  ### Tasks Page — Workspace Layout
+**File:** `src/components/focus/WorkItemReviewCard.tsx`
 
-  ```
-  ┌─────────────────────────────────────────────────────────────────┐
-  │ [+ Quick Add ___________________________________] [List|Kanban] │  ← Header bar
-  ├─────────────────────────────────────────────────────────────────┤
-  │ [Search] [Status ▾] [Priority ▾] [Project ▾] [Company ▾]       │  ← Command bar
-  │ [Category ▾] [Sort: Due Date ▾]  [Show Archived ○]             │
-  ├───────────────────────────────────────────────┬─────────────────┤
-  │                                               │  NOW RAIL       │
-  │  ▸ Triage (3)        [collapse]               │                 │
-  │    ☐ Review deck from Acme Corp               │  Overdue (2)    │
-  │    ☐ Follow up on intro email                 │  · Task A       │
-  │    ☐ Check pipeline data                      │  · Task B       │
-  │                                               │                 │
-  │  TASKS                                        │  Due Soon (3)   │
-  │  ────────────────────────────────────         │  · Task C       │
-  │  ☐ Prepare board memo        P1  ProjectX  📅 │  · Task D       │
-  │  ☐ Send term sheet           P2  DealY     📅 │  · Task E       │
-  │  ☐ Update portfolio model    P3  Ops          │                 │
-  │  ☑ Draft LP letter (done)                     │  ──────────     │
-  │                                               │  Open: 12       │
-  │                                               │  Overdue: 2     │
-  │                                               │  Done today: 4  │
-  └───────────────────────────────────────────────┴─────────────────┘
-  ```
+Task suggestions can be created from focus queue work items via `useWorkItemActions.createTaskFromSuggestion`. Content and priority are editable before creation via `TaskSuggestionEditor`.
 
-  **Key changes:**
-  1. **Command bar** replaces stacked filter rows. Inline search + filter dropdowns + archive toggle in one row.
-  2. **"Triage" replaces "Inbox"** — collapsible, off by default for users who prefer direct creation.
-  3. **Right "Now" rail** (desktop only) — shows overdue + due-soon + quick stats. Always visible.
-  4. **Task rows** show company name chip alongside project/priority/date.
-  5. **Kanban** retains current 4-column layout but renames "Inbox" column to "Triage".
+---
 
-  ### Task Detail Modal → Slide-Over Panel
+## 6. Aging Logic ✅ IMPLEMENTED
 
-  Replace the centered `GlassModal` with a right slide-over panel (consistent with `InboxDetailDrawer` pattern):
+### Default Behavior
 
-  ```
-  ┌──────────────────────────────────┐
-  │ ← Back          Task Detail   ⋮  │
-  ├──────────────────────────────────┤
-  │                                  │
-  │ TITLE                            │
-  │ [Prepare board memo____________] │
-  │                                  │
-  │ DESCRIPTION                      │
-  │ [Need to include Q4 numbers     ]│
-  │ [and portfolio performance      ]│
-  │                                  │
-  │ ─── PROPERTIES ─────────────     │
-  │ Status:    [● In Progress ▾]     │
-  │ Priority:  [P1 ▾]               │
-  │ Importance: [★★★☆☆]             │
-  │ Due Date:  [Jan 30, 2026 ▾]     │
-  │ Project:   [Board Meetings ▾]    │
-  │ Category:  [Ops ▾]              │
-  │ Company:   [Acme Corp ▾]  🏢    │
-  │                                  │
-  │ ─── LINKS ──────────────────     │
-  │ 📧 Created from: "Re: Board..." │
-  │ 🏢 Company: Acme Corp           │
-  │                                  │
-  │ ─── NOTES (2) ──────────────     │
-  │ Jan 28 — Updated with Q4 data   │
-  │ Jan 25 — Initial draft started   │
-  │ [+ Add note]                     │
-  │                                  │
-  │ ─── ATTACHMENTS (1) ────────     │
-  │ 📎 board_deck_v3.pdf  2.1MB     │
-  │                                  │
-  │ ─── ACTIVITY ───────────────     │
-  │ Jan 28 — Status → In Progress    │
-  │ Jan 25 — Created from email      │
-  │                                  │
-  ├──────────────────────────────────┤
-  │ [🗑 Delete]        [Cancel][Save]│
-  └──────────────────────────────────┘
-  ```
+1. **Completed tasks older than 14 days** are considered archived (client-side `isTaskArchived()`)
+2. Tasks with `archived_at IS NOT NULL` are also archived (manual or backfill)
+3. Archived tasks are hidden from `getNonInboxTasks()` and shown via `getArchivedTasks()`
+4. **"Show Archived"** toggle in `TasksSummaryPanel` reveals them
 
-  **New sections in the detail panel:**
-  1. **Description field** — persisted to `tasks.description` column.
-  2. **Company selector** — search across portfolio + pipeline companies.
-  3. **Importance** — star rating or simple 1-5 selector.
-  4. **Links section** — shows source email (clickable), linked company.
-  5. **Activity log** — status changes, due date changes. Read from `updated_at` diffs or a lightweight audit approach. *Phase 2 — stub the section initially.*
+### Archive Detection Logic
 
-  **Existing design patterns to reuse:**
-  - `GlassModal` / `GlassModalContent` for the container (or convert to a drawer)
-  - `CompanyCommandPane` slide-over pattern for the panel approach
-  - `TaskNotesSection` for notes (already built)
-  - `TaskAttachmentsSection` for attachments (already built)
-  - `ProjectSelector`, `CategorySelector`, `DateSelector`, `PrioritySelector`, `StatusSelector` — all already exist
+```typescript
+const isTaskArchived = (task: Task): boolean => {
+  if (task.archived_at) return true;           // Explicitly archived
+  if (task.completed && task.completed_at) {
+    const completedDate = new Date(task.completed_at);
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+    return completedDate < fourteenDaysAgo;     // Auto-archived after 14 days
+  }
+  return false;
+};
+```
 
-  ---
+### UI Controls
 
-  ## 5. Global Integration Points
+In `TasksSummaryPanel`:
+- **"Show Archived"** toggle switch with count badge
+- **Archive/Unarchive** buttons in `TaskDetailsDialog` footer
 
-  ### 5A. Company Detail Pane — Tasks Tab
+### Database Backfill (Applied)
 
-  **Already exists:** `src/components/command-pane/CompanyCommandTasks.tsx`
+```sql
+UPDATE tasks SET archived_at = completed_at
+WHERE completed = true AND completed_at < now() - interval '30 days' AND archived_at IS NULL;
+```
 
-  Uses `useCompanyTasks` / `usePipelineTasks`. Tasks linked via `company_id` / `pipeline_company_id` already appear here.
+### Auto-Archive Cron (Not Implemented)
 
-  **Improvement needed:** When a task is linked to a company via the new `CompanySelector` in `TaskDetailsDialog`, it should immediately appear in the company's tasks tab. Currently this works via real-time Supabase subscriptions — **no code change needed** as long as the company FK is set correctly on save.
+A Supabase Edge Function or pg_cron job for periodic auto-archive is **not implemented**. The client-side `isTaskArchived()` check handles this transparently.
 
-  ### 5B. Email Detail Pane — Show Linked Tasks
+---
 
-  **File to modify:** `src/components/dashboard/InboxDetailDrawer.tsx`
+## 7. Implementation Plan — Status Tracker
 
-  **Current state:** Has "Create Task" button. Does NOT show existing tasks linked to this email.
+### PR1: Fix Quick-Add Note Persistence + Add Description Column — SKIPPED
 
-  **Change:** After the "Create Task" button, add a section:
+**Decision:** The threaded notes system (`TaskNotesSection`) serves the purpose. No `description` column was added. This can be revisited if user feedback indicates a need.
 
-  ```tsx
-  // New: show tasks created from this email
-  const { data: linkedTasks } = useQuery({
-    queryKey: ['email-tasks', inboxItem.id],
-    queryFn: () => supabase
-      .from('tasks')
-      .select('id, content, status, completed, priority')
-      .eq('source_inbox_item_id', inboxItem.id)
-  });
-  ```
+---
 
-  Render as a small list with completion toggles. Reuse `TaskCardContent` + `TaskCardMetadata` components.
+### PR2: Add Company Selector to Task Modals — ✅ COMPLETED
 
-  ### 5C. Calendar Event Detail — "Create Follow-Up Task"
+**What was done:**
+- Created `src/components/modals/task-details/CompanySelector.tsx` — unified search across portfolio + pipeline companies
+- Created `src/lib/taskCompanyLink.ts` — utility for `TaskCompanyLink` type (get/set)
+- Updated `src/hooks/useTaskDetails.ts` — added `companyLink` state via `TaskCompanyLink`
+- Updated `src/components/modals/task-details/TaskDetailsForm.tsx` — added `CompanySelector`
+- Updated `src/hooks/useTasksManager.tsx` — `handleUpdateTask` passes `company_id` / `pipeline_company_id`
 
-  **File to modify:** `src/components/modals/EventDetailsModal.tsx` (or equivalent)
+---
 
-  **Change:** Add a "Create Follow-Up Task" button that opens `AddTaskDialog` with prefill:
+### PR3: Aging Logic + Archive Column — ✅ COMPLETED
 
-  ```tsx
-  const prefill: TaskPrefillOptions = {
-    content: `Follow up: ${event.title}`,
-    dueDate: addDays(new Date(event.end_time), 1),
-    companyId: matchedCompany?.id,
-    companyType: matchedCompany?.type,
-    companyName: matchedCompany?.name,
-  };
-  ```
+**What was done:**
+- Migration `20260129300000_pr3_archive_column.sql` — `archived_at` column + indexes + backfill
+- Updated `src/hooks/useTasks.ts` — `isTaskArchived()`, `getArchivedTasks()`, `archiveTask()`, `unarchiveTask()`
+- Updated `src/hooks/useTasksManager.tsx` — `handleArchiveTask`, `handleUnarchiveTask`, `archivedTasks`
+- Updated `src/pages/Tasks.tsx` — `showArchived` state, archive callbacks
+- Updated `src/components/modals/TaskDetailsDialog.tsx` — Archive/Unarchive buttons in footer
 
-  No schema change needed.
+---
 
-  ### 5D. Company Timeline — Task Events
+### PR4: Tasks Page Workspace Layout — ✅ COMPLETED
 
-  **Already exists:** `src/hooks/useCompanyTimeline.ts` merges task_created/task_completed into the timeline.
+**What was done:**
+- Created `src/components/tasks/TasksSummaryPanel.tsx` — sticky left sidebar with search, stat chips, filters, view controls
+- Refactored `src/pages/Tasks.tsx` — 2-column grid layout, search filtering, mobile responsive
+- Triage section renamed from "Inbox" in UI
+- Triage section is toggle-able via `showTriage` switch
+- Search input filters tasks by content text
 
-  **No change needed** — task events already flow into the timeline when `company_id` or `pipeline_company_id` is set.
+---
 
-  ---
+### PR5: Task Detail Slide-Over + Activity — ✅ COMPLETED
 
-  ## 6. Aging Logic Proposal
+**What was done:**
+- Converted `TaskDetailsDialog` from `GlassModal` to `Sheet` (right slide-over panel)
+- Added `TaskLinksSection.tsx` — source email link, company link display
+- Added `TaskActivitySection.tsx` — created/updated timestamps
+- Added `Float` button for floating note editor
+- Structured into sections: Properties, Links, Notes, Attachments, Activity
+- Footer: Delete, Archive/Unarchive, Cancel, Save Changes
 
-  ### Default Behavior
+---
 
-  1. **Completed tasks older than 14 days** are hidden from the main tasks list and kanban by default.
-  2. They remain in the database and are queryable.
-  3. A "Show completed" toggle in the command bar reveals them.
-  4. Tasks with `archived_at IS NOT NULL` are hidden from all default views.
+### PR6: Email + Calendar Task Integration — ❌ NOT STARTED
 
-  ### Query Logic
+**Goal:** Show linked tasks in email detail pane; add "Create Follow-Up" to calendar events.
 
-  **Current query (non-inbox tasks):**
-  ```sql
-  SELECT * FROM tasks
-  WHERE created_by = auth.uid()
-    AND is_quick_task IS NOT TRUE
-  ORDER BY created_at DESC;
-  ```
+**Files to modify:**
+- `src/components/dashboard/InboxDetailDrawer.tsx` — add "Linked Tasks" section below "Create Task" button
+- `src/hooks/useEmailTasks.ts` — **new**: `useEmailTasks(inboxItemId)` hook
+- Calendar event detail modal — add "Create Follow-Up Task" button
 
-  **V2 query:**
-  ```sql
-  SELECT * FROM tasks
-  WHERE created_by = auth.uid()
-    AND is_quick_task IS NOT TRUE
-    AND archived_at IS NULL
-    AND (
-      completed IS NOT TRUE
-      OR completed_at > now() - interval '14 days'
-    )
-  ORDER BY created_at DESC;
-  ```
+**Manual test checklist:**
+- [ ] Open email detail that has linked tasks → see task list
+- [ ] Toggle complete on linked task from email detail → verify status updates
+- [ ] Open calendar event → click "Create Follow-Up Task" → verify dialog opens with correct prefill
+- [ ] Save follow-up task → verify it appears in main tasks list with correct due date
 
-  ### UI Toggles
+---
 
-  In the command bar filters area:
+### PR7: Focus Queue Integration — ✅ COMPLETED
 
-  - **"Show completed"** toggle (default: ON for last 14 days, OFF for older)
-  - **"Show archived"** toggle (default: OFF)
+**What was done (beyond original plan):**
+- Migration `20260130100000_focus_queue_tables.sql` — `work_items`, `entity_links`, `item_extracts` tables
+- Created `src/pages/FocusQueue.tsx` — 3-column layout: Filters | Queue + Review | Context Rail
+- Created `src/hooks/useWorkQueue.ts` — fetch and filter work items
+- Created `src/hooks/useWorkItemDetail.ts` — detailed work item info
+- Created `src/hooks/useWorkItemActions.ts` — link, create task, save note, snooze, ignore, trust
+- Created `src/hooks/useBackfillWorkItems.ts` — backfill from existing records
+- Created `src/hooks/useEnsureWorkItem.ts` — ensure work item exists
+- Created `src/components/focus/FocusFiltersPanel.tsx` — filter sidebar
+- Created `src/components/focus/WorkQueueList.tsx` — work item list
+- Created `src/components/focus/WorkItemReviewCard.tsx` — review card with actions
+- Created `src/components/focus/WorkItemContextRail.tsx` — context rail
+- Created `src/components/focus/TaskSuggestionEditor.tsx` — task suggestion editor
 
-  When "Show completed" is toggled ON, all completed tasks appear (including old ones). When toggled OFF, only incomplete tasks show.
+---
 
-  ### Auto-Archive (Optional, Phase 2)
+### PR8 (Future): Remaining Enhancements
 
-  A Supabase Edge Function or pg_cron job that runs daily:
+**Deferred items:**
+- `description` column for inline task description
+- `importance_rank` column + Eisenhower matrix view
+- Full activity log (track status changes, priority changes via `task_activity` table)
+- Auto-archive cron job via Supabase Edge Function
+- Company filter in task filters/summary panel
+- Search in mobile (currently desktop-only)
+- Linked tasks in email detail pane (PR6)
+- Calendar event follow-up task creation (PR6)
+- Rename `is_quick_task` → `is_triage` in schema (low priority)
+- Persist filter state across navigation
 
-  ```sql
-  UPDATE tasks
-  SET archived_at = now()
-  WHERE completed = true
-    AND completed_at < now() - interval '30 days'
-    AND archived_at IS NULL;
-  ```
+---
 
-  This is optional. The query-level filtering already handles hiding old completed tasks. Auto-archive just sets an explicit flag for long-term management.
+## Summary
 
-  ### Backfill
+| PR | Scope | Status | Schema Change |
+|----|-------|--------|---------------|
+| PR1 | Description column | **Skipped** (notes system sufficient) | — |
+| PR2 | Company selector in task modals | **✅ Completed** | None |
+| PR3 | Aging/archive logic | **✅ Completed** | Add column + backfill |
+| PR4 | Workspace layout + summary panel | **✅ Completed** | None |
+| PR5 | Slide-over detail panel + activity | **✅ Completed** | None |
+| PR6 | Email/calendar integration | **❌ Not started** | None |
+| PR7 | Focus Queue system | **✅ Completed** | New tables |
+| PR8 | Remaining enhancements (future) | **Deferred** | Various |
 
-  ```sql
-  -- Archive completed tasks older than 30 days
-  UPDATE tasks
-  SET archived_at = completed_at
-  WHERE completed = true
-    AND completed_at < now() - interval '30 days'
-    AND archived_at IS NULL;
-  ```
+**Completed:** PRs 2, 3, 4, 5, 7 — Major UX overhaul, archive system, company linking, workspace layout, focus queue
+**Remaining:** PR6 (email/calendar integration) and PR8 (future enhancements)
 
-  ---
+---
 
-  ## 7. Implementation Plan (PR Sequence)
-
-  ### PR1: Fix Quick-Add Note Persistence + Add Description Column
-
-  **Goal:** Fix the most immediate bug — notes/description entered in AddTaskDialog are not saved.
-
-  **Schema migration:**
-  ```sql
-  ALTER TABLE tasks ADD COLUMN description text;
-  ```
-
-  **Files to modify:**
-  - `supabase/migrations/YYYYMMDD_add_task_description.sql` — migration
-  - `src/integrations/supabase/types.ts` — regenerate types (add `description` to tasks Row/Insert/Update)
-  - `src/hooks/useTasks.ts` — add `description` to `Task` interface and both transform functions
-  - `src/components/modals/AddTaskDialog.tsx` — **fix line 54**: include `description: taskDescription` in `taskData` when non-empty
-  - `src/hooks/useTasksManager.tsx` — update `handleAddTask` to accept `TaskCreateData` instead of just `content` string
-  - `src/pages/Tasks.tsx` — update `handleAddTask_click` to pass through `TaskCreateData`
-  - `src/components/tasks/QuickTaskInput.tsx` — no change (quick-add stays content-only; description is for the modal)
-  - `src/components/modals/TaskDetailsDialog.tsx` — add description textarea to the form
-  - `src/hooks/useTaskDetails.ts` — add `description` state field
-
-  **Manual test checklist:**
-  - [ ] Open AddTaskDialog, enter title + description, save → verify `description` column is populated in DB
-  - [ ] Open TaskDetailsDialog, verify description field shows existing value
-  - [ ] Edit description in TaskDetailsDialog, save → verify update persists
-  - [ ] Quick-add via QuickTaskInput → verify task created (no description, that's fine)
-  - [ ] Create task from email (InboxDetailDrawer) → verify `source_inbox_item_id` and description prefill work
-
-  ---
-
-  ### PR2: Add Company Selector to Task Modals
-
-  **Goal:** Allow linking tasks to companies from both AddTaskDialog and TaskDetailsDialog.
-
-  **No schema migration** (columns `company_id` and `pipeline_company_id` already exist).
-
-  **Files to create:**
-  - `src/components/modals/task-details/CompanySelector.tsx` — new component: search input + dropdown listing portfolio + pipeline companies. Returns `{ companyId, companyType }`.
-
-  **Files to modify:**
-  - `src/hooks/useTaskDetails.ts` — add `companyId`, `companyType`, `companyName` state; populate from task on load
-  - `src/components/modals/task-details/TaskDetailsForm.tsx` — add `CompanySelector` below project selector
-  - `src/components/modals/AddTaskDialog.tsx` — add `CompanySelector`; populate from prefill if available, allow manual selection otherwise
-  - `src/hooks/useTasksManager.tsx` — ensure `handleUpdateTask` passes through `company_id` / `pipeline_company_id`
-  - `src/hooks/useTasks.ts` — ensure `transformTaskForDatabase` handles `company_id` / `pipeline_company_id`
-
-  **Manual test checklist:**
-  - [ ] Open AddTaskDialog → search for and select a portfolio company → save → verify `company_id` in DB
-  - [ ] Open AddTaskDialog → search for and select a pipeline company → save → verify `pipeline_company_id` in DB
-  - [ ] Open TaskDetailsDialog for a task with company → verify company shown
-  - [ ] Change company in TaskDetailsDialog → save → verify FK updated
-  - [ ] Clear company in TaskDetailsDialog → save → verify FK nulled
-  - [ ] Go to company detail pane → verify task appears in company tasks tab
-
-  ---
-
-  ### PR3: Aging Logic + Archive Column
-
-  **Goal:** Stop completed tasks from cluttering the default view.
-
-  **Schema migration:**
-  ```sql
-  ALTER TABLE tasks ADD COLUMN archived_at timestamptz;
-  CREATE INDEX idx_tasks_archived ON tasks (created_by, archived_at) WHERE archived_at IS NOT NULL;
-  CREATE INDEX idx_tasks_completed_aging ON tasks (created_by, completed_at) WHERE completed_at IS NOT NULL;
-
-  -- Backfill: archive tasks completed more than 30 days ago
-  UPDATE tasks SET archived_at = completed_at
-  WHERE completed = true AND completed_at < now() - interval '30 days' AND archived_at IS NULL;
-  ```
-
-  **Files to modify:**
-  - `src/integrations/supabase/types.ts` — add `archived_at` to types
-  - `src/hooks/useTasks.ts` — update fetch query to exclude `archived_at IS NOT NULL` and tasks completed > 14 days by default; add parameter to include archived
-  - `src/hooks/useTaskFiltering.ts` — add `showArchived` and `showOldCompleted` filter options
-  - `src/pages/Tasks.tsx` — add "Show archived" toggle to state and pass to filtering
-  - `src/components/tasks/TasksFilters.tsx` — add "Show archived" toggle switch
-  - `src/components/modals/TaskDetailsDialog.tsx` — add "Archive" button alongside Delete
-
-  **Manual test checklist:**
-  - [ ] Complete a task → verify it remains visible (within 14-day window)
-  - [ ] Backfilled tasks completed > 30 days ago → verify `archived_at` is set
-  - [ ] Default task list → verify old completed tasks are hidden
-  - [ ] Toggle "Show archived" → verify old tasks reappear
-  - [ ] Click "Archive" on a task → verify `archived_at` is set and task hides
-
-  ---
-
-  ### PR4: Tasks Page Command Bar + Workspace Layout
-
-  **Goal:** Improve task page density and add company/search filtering.
-
-  **Files to modify:**
-  - `src/pages/Tasks.tsx` — restructure layout: two-column (main + Now rail on desktop), merge quick-add and filters into a command bar
-  - `src/components/tasks/TasksFilters.tsx` — refactor to horizontal command bar style; add search input and company filter
-  - `src/components/tasks/TasksCommandBar.tsx` — **new**: unified bar with search, filters, view toggle, archive toggle
-  - `src/components/tasks/NowRail.tsx` — **new**: right sidebar showing overdue tasks, due-soon tasks, quick stats
-  - `src/components/tasks/ViewModeToggle.tsx` — integrate into command bar (may remove standalone component)
-  - `src/components/tasks/InboxSection.tsx` — rename UI labels from "Inbox" to "Triage", make section collapsible with default state from user preference
-  - `src/components/tasks/kanban/InboxColumn.tsx` — rename to "Triage"
-
-  **Manual test checklist:**
-  - [ ] Tasks page renders with command bar, main content, and Now rail
-  - [ ] Search filters tasks in real-time
-  - [ ] Company filter shows matching tasks
-  - [ ] All existing filters (status, priority, project, category, sort) still work
-  - [ ] Now rail shows overdue and due-soon counts
-  - [ ] Triage section collapses/expands
-  - [ ] Mobile: Now rail hides, command bar wraps gracefully
-
-  ---
-
-  ### PR5: Task Detail Slide-Over + Activity Stub
-
-  **Goal:** Convert task detail modal to a slide-over panel with richer layout.
-
-  **Files to modify:**
-  - `src/components/modals/TaskDetailsDialog.tsx` — convert from `GlassModal` to a slide-over drawer (reuse pattern from `InboxDetailDrawer` or create a `TaskDetailDrawer`)
-  - `src/components/modals/task-details/TaskDetailsForm.tsx` — restructure into sections: Properties, Links, Notes, Attachments, Activity
-  - `src/components/modals/task-details/TaskLinksSection.tsx` — **new**: shows source email link, company link as clickable chips
-  - `src/components/modals/task-details/TaskActivitySection.tsx` — **new**: stub section showing "Created on X" and "Last updated on Y" (full audit trail is Phase 2)
-
-  **Manual test checklist:**
-  - [ ] Click task → slide-over panel opens from right
-  - [ ] All existing fields (content, description, status, priority, date, project, category, company) editable
-  - [ ] Notes section works (add/edit/delete notes)
-  - [ ] Attachments section shows for email-sourced tasks
-  - [ ] Links section shows source email and company
-  - [ ] Activity section shows created/updated timestamps
-  - [ ] Ctrl+S saves, Esc closes
-  - [ ] Panel doesn't block interaction with main page (optional: click outside to close)
-
-  ---
-
-  ### PR6: Email + Calendar Task Integration
-
-  **Goal:** Show linked tasks in email detail pane; add "Create Follow-Up" to calendar events.
-
-  **Files to modify:**
-  - `src/components/dashboard/InboxDetailDrawer.tsx` — add "Linked Tasks" section below "Create Task" button; query tasks by `source_inbox_item_id`
-  - `src/hooks/useEmailTasks.ts` — **new**: `useEmailTasks(inboxItemId)` hook fetching tasks linked to an email
-  - `src/components/modals/EventDetailsModal.tsx` (or equivalent) — add "Create Follow-Up Task" button that opens `AddTaskDialog` with prefill
-  - `src/components/dashboard/InboxDetailDrawer.tsx` — show completion toggles on linked tasks
-
-  **Manual test checklist:**
-  - [ ] Open email detail that has linked tasks → see task list
-  - [ ] Toggle complete on linked task from email detail → verify status updates
-  - [ ] Open calendar event → click "Create Follow-Up Task" → verify dialog opens with correct prefill
-  - [ ] Save follow-up task → verify it appears in main tasks list with correct due date
-
-  ---
-
-  ### PR7 (Future): Full Activity Log + Auto-Archive + Importance UX
-
-  **Deferred enhancements:**
-  - Full activity log (track status changes, priority changes, due date changes via a `task_activity` table or reuse `snooze_log` pattern)
-  - Auto-archive cron job via Supabase Edge Function
-  - `importance_rank` column + Eisenhower matrix view
-  - Category/company-type filtering in command bar
-
-  These are documented here for roadmap completeness but not part of the initial V2 rollout.
-
-  ---
-
-  ## Summary
-
-  | PR | Scope | Risk | Schema Change |
-  |----|-------|------|---------------|
-  | PR1 | Fix note persistence + description field | Low | Add column |
-  | PR2 | Company selector in task modals | Low | None |
-  | PR3 | Aging/archive logic | Low-Med | Add column + backfill |
-  | PR4 | Workspace layout + command bar | Medium | None |
-  | PR5 | Slide-over detail panel | Medium | None |
-  | PR6 | Email/calendar integration | Low | None |
-  | PR7 | Activity log + auto-archive (future) | Medium | New table |
-
-  PRs 1-3 are safe, isolated changes that can ship independently. PR4-5 are the larger UX changes. PR6 is additive integration. Each PR is independently mergeable and testable.
+*Document updated: January 2026*
+*Covers codebase as of commit `784e2ae` (focus queue hooks update)*
