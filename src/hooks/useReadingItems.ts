@@ -1,9 +1,13 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ReadingItem, ReadingItemInsert, ReadingItemRow } from '@/types/readingItem';
+import { ReadingItem, ReadingItemInsert, ReadingItemRow, ProcessingStatus } from '@/types/readingItem';
 import { transformReadingItem, transformReadingItemForDatabase } from '@/utils/readingItemTransforms';
 import { fetchLinkMetadata } from '@/services/linkMetadataService';
+import { classifyContentType, inferSavedFrom } from '@/utils/readingContentClassifier';
+import { normalizeUrl } from '@/utils/urlNormalization';
+import { ensureWorkItem } from './useEnsureWorkItem';
+import { toast } from 'sonner';
 
 export function useReadingItems() {
   const [readingItems, setReadingItems] = useState<ReadingItem[]>([]);
@@ -41,19 +45,64 @@ export function useReadingItems() {
     // Transform camelCase to snake_case
     const dbItemData = transformReadingItemForDatabase(itemData);
 
+    // Normalize URL and check for duplicates
+    const normalized = normalizeUrl(dbItemData.url || itemData.url);
+    const { data: existing } = await supabase
+      .from('reading_items')
+      .select('id, title, processing_status')
+      .eq('created_by', user.id)
+      .eq('url', normalized)
+      .maybeSingle();
+
+    if (existing) {
+      toast.warning(`Already saved: "${existing.title}"`);
+      // Return the existing item transformed
+      const { data: fullExisting } = await supabase
+        .from('reading_items')
+        .select('*')
+        .eq('id', existing.id)
+        .single();
+      if (fullExisting) return transformReadingItem(fullExisting);
+      return null;
+    }
+
+    // Classify content type and saved_from
+    const hostname = dbItemData.hostname || null;
+    const contentType = classifyContentType(dbItemData.url || itemData.url, hostname);
+    const savedFrom = inferSavedFrom(dbItemData.url || itemData.url, hostname);
+
+    // Determine processing status: skip Focus if project is assigned
+    const hasProject = !!(dbItemData.project_id || itemData.project_id);
+    const processingStatus: ProcessingStatus = hasProject ? 'queued' : 'unprocessed';
+
+    const insertData = {
+      ...dbItemData,
+      url: normalized,
+      created_by: user.id,
+      content_type: contentType,
+      saved_from: savedFrom,
+      processing_status: processingStatus,
+      processed_at: hasProject ? new Date().toISOString() : null,
+    };
+
     const { data, error } = await supabase
       .from('reading_items')
-      .insert({
-        ...dbItemData,
-        created_by: user.id
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) throw error;
-    
+
     const transformedItem = transformReadingItem(data);
     setReadingItems(prev => [transformedItem, ...prev]);
+
+    // If unprocessed, create work item for Focus queue
+    if (processingStatus === 'unprocessed') {
+      ensureWorkItem('reading', data.id, user.id).catch(err => {
+        console.error('Failed to create work item for reading:', err);
+      });
+    }
+
     return transformedItem;
   };
 
@@ -88,7 +137,7 @@ export function useReadingItems() {
 
   // Function to update existing items with metadata
   const updateExistingItemsWithMetadata = async () => {
-    const itemsNeedingMetadata = readingItems.filter(item => 
+    const itemsNeedingMetadata = readingItems.filter(item =>
       item.title === item.url || // Title is just the URL
       item.title === item.hostname || // Title is just the hostname
       !item.description // No description
@@ -100,7 +149,7 @@ export function useReadingItems() {
       try {
         console.log(`Updating metadata for item: ${item.id}`);
         const metadata = await fetchLinkMetadata(item.url);
-        
+
         // Only update if we got better metadata
         if (metadata.title !== item.title || metadata.description || metadata.image) {
           await updateReadingItem(item.id, {
@@ -118,12 +167,12 @@ export function useReadingItems() {
     }
   };
 
-  return { 
-    readingItems, 
-    loading, 
-    error, 
-    createReadingItem, 
-    updateReadingItem, 
+  return {
+    readingItems,
+    loading,
+    error,
+    createReadingItem,
+    updateReadingItem,
     deleteReadingItem,
     updateExistingItemsWithMetadata
   };

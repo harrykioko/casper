@@ -423,7 +423,7 @@ function computeItemScore(sourceType: string, scoreData: any): number {
     case "note":
       return 0.2;
     case "reading":
-      return 0.15;
+      return 0.25;
     default:
       return 0.3;
   }

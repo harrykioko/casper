@@ -113,21 +113,20 @@ async function backfill(userId: string): Promise<number> {
     }
   }
 
-  // Backfill reading items without project_id
+  // Backfill reading items that are unprocessed (need triage in Focus)
   const { data: readingItems } = await supabase
     .from("reading_items")
-    .select("id, project_id")
+    .select("id, processing_status")
     .eq("created_by", userId)
+    .eq("processing_status", "unprocessed")
     .order("created_at", { ascending: false })
     .limit(50);
 
   if (readingItems) {
     for (const item of readingItems) {
       if (existingKeys.has(`reading:${item.id}`)) continue;
-      if (!item.project_id) {
-        const result = await ensureWorkItem("reading", item.id, userId);
-        if (result?.isNew) created++;
-      }
+      const result = await ensureWorkItem("reading", item.id, userId);
+      if (result?.isNew) created++;
     }
   }
 

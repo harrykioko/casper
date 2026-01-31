@@ -79,6 +79,7 @@ const REASON_ITEMS: Array<{
   icon: typeof AlertCircle;
   colorClass: string;
 }> = [
+  { value: "unprocessed", label: "Unprocessed", icon: BookOpen, colorClass: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400" },
   { value: "unlinked_company", label: "Unlinked", icon: Unlink, colorClass: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
   { value: "no_next_action", label: "No Next Action", icon: AlertCircle, colorClass: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" },
   { value: "stale", label: "Stale", icon: Timer, colorClass: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400" },

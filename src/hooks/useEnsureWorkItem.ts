@@ -271,7 +271,7 @@ async function runDeterministicEnrichment(
     case 'reading': {
       const { data: reading } = await supabase
         .from("reading_items")
-        .select("project_id")
+        .select("project_id, processing_status, one_liner, content_type")
         .eq("id", sourceId)
         .single();
 
@@ -283,10 +283,19 @@ async function runDeterministicEnrichment(
             reason: 'direct_link',
             confidence: 1.0,
           });
-        } else {
-          reasonCodes.push('unlinked_company');
         }
-        priority = 1;
+
+        // Primary reason: needs triage
+        if (reading.processing_status === 'unprocessed') {
+          reasonCodes.push('unprocessed');
+        }
+
+        // Secondary: missing enrichment
+        if (!reading.one_liner) {
+          reasonCodes.push('missing_summary');
+        }
+
+        priority = 2;
       }
       break;
     }

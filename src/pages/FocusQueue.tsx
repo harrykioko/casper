@@ -15,6 +15,7 @@ import { FocusInboxDrawer } from "@/components/focus/FocusInboxDrawer";
 import { FocusTaskDrawer } from "@/components/focus/FocusTaskDrawer";
 import { FocusEventModal } from "@/components/focus/FocusEventModal";
 import { FocusGenericSheet } from "@/components/focus/FocusGenericSheet";
+import { FocusReadingSheet } from "@/components/focus/FocusReadingSheet";
 import { cn } from "@/lib/utils";
 import type { InboxItem } from "@/types/inbox";
 import type { Task } from "@/hooks/useTasks";
@@ -48,6 +49,7 @@ export default function FocusQueue() {
   const [taskDrawerItem, setTaskDrawerItem] = useState<Task | null>(null);
   const [eventModalItem, setEventModalItem] = useState<any>(null);
   const [genericSheetItem, setGenericSheetItem] = useState<FocusQueueItem | null>(null);
+  const [readingSheetItem, setReadingSheetItem] = useState<FocusQueueItem | null>(null);
 
   // Auto-advance to next item after triage
   const advanceToNext = useCallback(() => {
@@ -84,8 +86,10 @@ export default function FocusQueue() {
           }
           break;
         }
-        case "note":
         case "reading":
+          setReadingSheetItem(item);
+          break;
+        case "note":
           setGenericSheetItem(item);
           break;
         default:
@@ -100,6 +104,7 @@ export default function FocusQueue() {
     setTaskDrawerItem(null);
     setEventModalItem(null);
     setGenericSheetItem(null);
+    setReadingSheetItem(null);
   }, []);
 
   // Triage handlers that close drawer + advance
@@ -277,6 +282,14 @@ export default function FocusQueue() {
         onSnooze={handleSnooze}
         onNoAction={handleNoAction}
         showLink={showLink}
+      />
+
+      <FocusReadingSheet
+        open={!!readingSheetItem}
+        onClose={closeAllDrawers}
+        item={readingSheetItem}
+        onAdvance={advanceToNext}
+        onSnooze={handleSnooze}
       />
 
       <FocusGenericSheet

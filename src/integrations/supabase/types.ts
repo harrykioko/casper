@@ -1524,6 +1524,17 @@ export type Database = {
           title: string
           updated_at: string
           url: string
+          processing_status: string
+          processed_at: string | null
+          archived_at: string | null
+          content_type: string | null
+          priority: string
+          read_later_bucket: string | null
+          one_liner: string | null
+          topics: string[]
+          actionability: string
+          saved_from: string | null
+          entities: any[]
         }
         Insert: {
           created_at?: string
@@ -1541,6 +1552,17 @@ export type Database = {
           title: string
           updated_at?: string
           url: string
+          processing_status?: string
+          processed_at?: string | null
+          archived_at?: string | null
+          content_type?: string | null
+          priority?: string
+          read_later_bucket?: string | null
+          one_liner?: string | null
+          topics?: string[]
+          actionability?: string
+          saved_from?: string | null
+          entities?: any[]
         }
         Update: {
           created_at?: string
@@ -1558,6 +1580,17 @@ export type Database = {
           title?: string
           updated_at?: string
           url?: string
+          processing_status?: string
+          processed_at?: string | null
+          archived_at?: string | null
+          content_type?: string | null
+          priority?: string
+          read_later_bucket?: string | null
+          one_liner?: string | null
+          topics?: string[]
+          actionability?: string
+          saved_from?: string | null
+          entities?: any[]
         }
         Relationships: [
           {
