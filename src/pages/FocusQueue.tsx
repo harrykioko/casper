@@ -37,6 +37,7 @@ export default function FocusQueue() {
     filters,
     toggleSourceType,
     toggleReasonCode,
+    setEffortFilter,
     clearFilters,
   } = useFocusQueue();
 
@@ -322,6 +323,7 @@ export default function FocusQueue() {
               filters={filters}
               onToggleSourceType={toggleSourceType}
               onToggleReasonCode={toggleReasonCode}
+              onSetEffortFilter={setEffortFilter}
               onClearFilters={clearFilters}
             />
           )}

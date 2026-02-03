@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export type WorkItemSourceType = 'email' | 'calendar_event' | 'task' | 'note' | 'reading' | 'commitment';
 export type WorkItemStatus = 'needs_review' | 'enriched_pending' | 'trusted' | 'snoozed' | 'ignored';
+export type EffortEstimate = 'quick' | 'medium' | 'long';
 
 export interface WorkQueueItem {
   id: string;

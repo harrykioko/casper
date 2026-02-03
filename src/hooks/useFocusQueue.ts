@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBackfillWorkItems } from "./useBackfillWorkItems";
-import type { WorkItemSourceType, WorkItemStatus, WorkQueueItem } from "./useWorkQueue";
+import type { WorkItemSourceType, WorkItemStatus, WorkQueueItem, EffortEstimate } from "./useWorkQueue";
 import {
   computePriorityScoreV1,
   computeTaskUrgencyScore,
@@ -19,17 +19,20 @@ import {
 export interface FocusFilters {
   sourceTypes: WorkItemSourceType[];
   reasonCodes: string[];
+  effortFilter: EffortEstimate | null;
 }
 
 export interface FocusCounts {
   total: number;
   bySource: Record<WorkItemSourceType, number>;
   byReason: Record<string, number>;
+  byEffort: Record<EffortEstimate, number>;
 }
 
 export interface FocusQueueItem extends WorkQueueItem {
   priorityScore: number;
   source_url?: string; // URL for reading items
+  effortEstimate: EffortEstimate;
 }
 
 export function useFocusQueue() {
@@ -43,6 +46,7 @@ export function useFocusQueue() {
   const [filters, setFilters] = useState<FocusFilters>({
     sourceTypes: [],
     reasonCodes: [],
+    effortFilter: null,
   });
 
   const toggleSourceType = useCallback((type: WorkItemSourceType) => {
@@ -63,8 +67,15 @@ export function useFocusQueue() {
     }));
   }, []);
 
+  const setEffortFilter = useCallback((effort: EffortEstimate | null) => {
+    setFilters(prev => ({
+      ...prev,
+      effortFilter: prev.effortFilter === effort ? null : effort,
+    }));
+  }, []);
+
   const clearFilters = useCallback(() => {
-    setFilters({ sourceTypes: [], reasonCodes: [] });
+    setFilters({ sourceTypes: [], reasonCodes: [], effortFilter: null });
   }, []);
 
   // Use both query keys so invalidation from backfill works
@@ -202,6 +213,7 @@ export function useFocusQueue() {
           primary_link: entityLinks[key] || null,
           one_liner: extracts[key] || null,
           priorityScore,
+          effortEstimate: sd?.effortEstimate || 'medium',
         });
       }
 
@@ -240,6 +252,9 @@ export function useFocusQueue() {
         filters.reasonCodes.some(code => item.reason_codes.includes(code))
       );
     }
+    if (filters.effortFilter) {
+      result = result.filter(item => item.effortEstimate === filters.effortFilter);
+    }
 
     return result;
   }, [data?.items, filters]);
@@ -255,6 +270,7 @@ export function useFocusQueue() {
     filters,
     toggleSourceType,
     toggleReasonCode,
+    setEffortFilter,
     clearFilters,
     refetch,
   };
@@ -265,21 +281,24 @@ function emptyCounts(): FocusCounts {
     total: 0,
     bySource: { email: 0, calendar_event: 0, task: 0, note: 0, reading: 0, commitment: 0 },
     byReason: {},
+    byEffort: { quick: 0, medium: 0, long: 0 },
   };
 }
 
 function computeCounts(items: FocusQueueItem[]): FocusCounts {
   const bySource: Record<WorkItemSourceType, number> = { email: 0, calendar_event: 0, task: 0, note: 0, reading: 0, commitment: 0 };
   const byReason: Record<string, number> = {};
+  const byEffort: Record<EffortEstimate, number> = { quick: 0, medium: 0, long: 0 };
 
   for (const item of items) {
     bySource[item.source_type] = (bySource[item.source_type] || 0) + 1;
     for (const code of item.reason_codes) {
       byReason[code] = (byReason[code] || 0) + 1;
     }
+    byEffort[item.effortEstimate] = (byEffort[item.effortEstimate] || 0) + 1;
   }
 
-  return { total: items.length, bySource, byReason };
+  return { total: items.length, bySource, byReason, byEffort };
 }
 
 interface SourceDataEntry {
@@ -289,6 +308,7 @@ interface SourceDataEntry {
   scoreData?: any;
   /** True if the source record itself has a company/project link (e.g. inbox_items.related_company_id) */
   hasSourceLink?: boolean;
+  effortEstimate?: EffortEstimate;
 }
 
 async function fetchSourceData(
@@ -311,12 +331,37 @@ async function fetchSourceData(
         .from("inbox_items")
         .select("id, subject, snippet, display_subject, display_snippet, received_at, is_read, related_company_id")
         .in("id", byType["email"]);
+
+      // Batch-fetch inbox_suggestions for effort_bucket
+      const { data: suggestions } = await supabase
+        .from("inbox_suggestions")
+        .select("inbox_item_id, result")
+        .in("inbox_item_id", byType["email"])
+        .eq("is_dismissed", false);
+
+      const effortOrder: Record<string, number> = { quick: 0, medium: 1, long: 2 };
+      const effortByEmail: Record<string, EffortEstimate> = {};
+      for (const sug of suggestions || []) {
+        const sugResult = sug.result as any;
+        const sugList = sugResult?.suggestions || [];
+        for (const s of sugList) {
+          const bucket = s.effort_bucket as EffortEstimate | undefined;
+          if (bucket && effortOrder[bucket] !== undefined) {
+            const current = effortByEmail[sug.inbox_item_id];
+            if (!current || effortOrder[bucket] > effortOrder[current]) {
+              effortByEmail[sug.inbox_item_id] = bucket;
+            }
+          }
+        }
+      }
+
       for (const row of data || []) {
         result[`email:${row.id}`] = {
           title: row.display_subject || row.subject || "No subject",
           snippet: row.display_snippet || row.snippet || undefined,
           scoreData: { receivedAt: row.received_at, isRead: row.is_read },
           hasSourceLink: !!row.related_company_id,
+          effortEstimate: effortByEmail[row.id] || 'quick',
         };
       }
     });
@@ -344,6 +389,7 @@ async function fetchSourceData(
           title: row.title || "No title",
           scoreData: { startTime: row.start_time },
           hasSourceLink: linkedEventIds.has(row.id),
+          effortEstimate: 'medium',
         };
       }
     });
@@ -353,13 +399,16 @@ async function fetchSourceData(
     fetches.push(async () => {
       const { data } = await supabase
         .from("tasks")
-        .select("id, content, scheduled_for, priority, project_id, company_id, pipeline_company_id")
+        .select("id, content, scheduled_for, priority, project_id, company_id, pipeline_company_id, is_quick_task")
         .in("id", byType["task"]);
       for (const row of data || []) {
+        let taskEffort: EffortEstimate = 'medium';
+        if ((row as any).is_quick_task) taskEffort = 'quick';
         result[`task:${row.id}`] = {
           title: row.content || "Untitled task",
           scoreData: { scheduledFor: row.scheduled_for, priority: row.priority },
           hasSourceLink: !!(row.project_id || row.company_id || row.pipeline_company_id),
+          effortEstimate: taskEffort,
         };
       }
     });
@@ -377,6 +426,7 @@ async function fetchSourceData(
           snippet: row.content?.substring(0, 120) || undefined,
           scoreData: {},
           hasSourceLink: !!row.project_id,
+          effortEstimate: 'quick',
         };
       }
     });
@@ -386,7 +436,7 @@ async function fetchSourceData(
     fetches.push(async () => {
       const { data } = await supabase
         .from("reading_items")
-        .select("id, title, url, project_id, one_liner")
+        .select("id, title, url, project_id, one_liner, processing_status")
         .in("id", byType["reading"]);
       for (const row of data || []) {
         result[`reading:${row.id}`] = {
@@ -395,6 +445,7 @@ async function fetchSourceData(
           snippet: row.one_liner || undefined,
           scoreData: {},
           hasSourceLink: !!row.project_id,
+          effortEstimate: (row as any).processing_status === 'unprocessed' ? 'long' : 'medium',
         };
       }
     });
@@ -421,6 +472,10 @@ async function fetchSourceData(
 
       for (const row of data || []) {
         const isVip = row.person_id ? vipPersonIds.has(row.person_id) : false;
+        let commitEffort: EffortEstimate = 'quick';
+        if (row.direction === 'owed_by_me' && (row.implied_urgency === 'asap' || row.implied_urgency === 'today')) {
+          commitEffort = 'medium';
+        }
         result[`commitment:${row.id}`] = {
           title: row.title || row.content || "Untitled commitment",
           snippet: row.person_name ? `${row.direction === 'owed_to_me' ? 'From' : 'To'}: ${row.person_name}` : undefined,
@@ -433,6 +488,7 @@ async function fetchSourceData(
             status: row.status,
           },
           hasSourceLink: !!row.company_id,
+          effortEstimate: commitEffort,
         };
       }
     });

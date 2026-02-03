@@ -17,6 +17,8 @@ import {
   Archive,
   Check,
   XCircle,
+  Zap,
+  Hourglass,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -378,6 +380,34 @@ export function FocusItemRow({
               >
                 <Clock className="h-2.5 w-2.5 mr-0.5" />
                 Snoozed
+              </Badge>
+            )}
+            {/* Effort badge */}
+            {item.effortEstimate === 'quick' && (
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 text-emerald-400 border-emerald-400/30"
+              >
+                <Zap className="h-2.5 w-2.5 mr-0.5" />
+                ~5m
+              </Badge>
+            )}
+            {item.effortEstimate === 'medium' && (
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 text-amber-400 border-amber-400/30"
+              >
+                <Timer className="h-2.5 w-2.5 mr-0.5" />
+                ~15m
+              </Badge>
+            )}
+            {item.effortEstimate === 'long' && (
+              <Badge
+                variant="outline"
+                className="text-[10px] px-1.5 py-0 text-rose-400 border-rose-400/30"
+              >
+                <Hourglass className="h-2.5 w-2.5 mr-0.5" />
+                30m+
               </Badge>
             )}
             {/* Timestamp */}

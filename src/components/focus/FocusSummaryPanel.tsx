@@ -12,8 +12,10 @@ import {
   Timer,
   Sparkles,
   CheckCircle2,
+  Zap,
+  Hourglass,
 } from "lucide-react";
-import type { WorkItemSourceType } from "@/hooks/useWorkQueue";
+import type { WorkItemSourceType, EffortEstimate } from "@/hooks/useWorkQueue";
 import type { FocusCounts, FocusFilters } from "@/hooks/useFocusQueue";
 
 interface FocusSummaryPanelProps {
@@ -22,6 +24,7 @@ interface FocusSummaryPanelProps {
   filters: FocusFilters;
   onToggleSourceType: (type: WorkItemSourceType) => void;
   onToggleReasonCode: (code: string) => void;
+  onSetEffortFilter: (effort: EffortEstimate | null) => void;
   onClearFilters: () => void;
 }
 
@@ -87,15 +90,27 @@ const REASON_ITEMS: Array<{
   { value: "waiting", label: "Waiting", icon: Clock, colorClass: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400" },
 ];
 
+const EFFORT_ITEMS: Array<{
+  value: EffortEstimate;
+  label: string;
+  icon: typeof Zap;
+  colorClass: string;
+}> = [
+  { value: "quick", label: "Quick (~5 min)", icon: Zap, colorClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" },
+  { value: "medium", label: "Medium (~15 min)", icon: Timer, colorClass: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+  { value: "long", label: "Long (30+ min)", icon: Hourglass, colorClass: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" },
+];
+
 export function FocusSummaryPanel({
   counts,
   isAllClear,
   filters,
   onToggleSourceType,
   onToggleReasonCode,
+  onSetEffortFilter,
   onClearFilters,
 }: FocusSummaryPanelProps) {
-  const hasActiveFilters = filters.sourceTypes.length > 0 || filters.reasonCodes.length > 0;
+  const hasActiveFilters = filters.sourceTypes.length > 0 || filters.reasonCodes.length > 0 || !!filters.effortFilter;
 
   return (
     <div className="sticky top-24 space-y-5">
@@ -170,6 +185,30 @@ export function FocusSummaryPanel({
             })}
           </div>
         )}
+
+        {/* By Effort */}
+        <div className="space-y-1.5 mb-4">
+          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+            By Effort
+          </p>
+          {EFFORT_ITEMS.map(item => {
+            const count = counts.byEffort[item.value] || 0;
+            const isActive = filters.effortFilter === item.value;
+            const Icon = item.icon;
+
+            return (
+              <StatChip
+                key={item.value}
+                label={item.label}
+                count={count}
+                icon={<Icon className="h-4 w-4" />}
+                isActive={isActive}
+                onClick={() => onSetEffortFilter(item.value)}
+                colorClass={item.colorClass}
+              />
+            );
+          })}
+        </div>
 
         {/* Clear filters */}
         {hasActiveFilters && (
