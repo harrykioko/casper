@@ -51,6 +51,10 @@ export function useAddLinkForm() {
       isFlagged: false,
       isArchived: false,
       project_id: selectedProjectId || projectId,
+      processingStatus: 'unprocessed' as const,
+      priority: 'normal' as const,
+      topics: [] as string[],
+      actionability: 'none' as const,
     };
 
     if (metadata) {

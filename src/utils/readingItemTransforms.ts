@@ -26,10 +26,10 @@ export const transformReadingItem = (row: ReadingItemRow): ReadingItem => {
     priority: (row.priority || 'normal') as ReadingPriority,
     readLaterBucket: (row.read_later_bucket || undefined) as ReadLaterBucket | undefined,
     oneLiner: row.one_liner || undefined,
-    topics: row.topics || [],
+    topics: Array.isArray(row.topics) ? row.topics : [],
     actionability: (row.actionability || 'none') as Actionability,
     savedFrom: (row.saved_from || undefined) as SavedFrom | undefined,
-    entities: row.entities || [],
+    entities: Array.isArray(row.entities) ? row.entities : [],
   };
 };
 

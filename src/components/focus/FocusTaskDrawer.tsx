@@ -16,7 +16,7 @@ interface FocusTaskDrawerProps {
   open: boolean;
   onClose: () => void;
   task: Task | null;
-  onUpdateTask: (task: Task) => void;
+  onUpdateTask: (id: string, updates: Partial<Task>) => void;
   onDeleteTask: (id: string) => void;
   onArchiveTask?: (id: string) => void;
   onUnarchiveTask?: (id: string) => void;
@@ -65,7 +65,7 @@ export function FocusTaskDrawer({
     if (!task) return;
     const updatedTask = createUpdatedTask();
     if (!updatedTask) return;
-    onUpdateTask(updatedTask);
+    onUpdateTask(task.id, updatedTask);
     onClose();
     toast({ title: "Task updated", description: "Your task has been successfully updated." });
   };

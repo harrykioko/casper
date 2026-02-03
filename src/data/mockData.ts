@@ -115,7 +115,11 @@ export const mockReadingItems: ReadingItem[] = [
     favicon: "https://ui.shadcn.com/favicon.ico",
     isRead: false,
     isFlagged: false,
-    isArchived: false
+    isArchived: false,
+    processingStatus: 'unprocessed',
+    priority: 'normal',
+    topics: [],
+    actionability: 'none'
   },
   {
     id: "r2",
@@ -125,7 +129,11 @@ export const mockReadingItems: ReadingItem[] = [
     favicon: "https://tailwindcss.com/favicons/favicon.ico",
     isRead: true,
     isFlagged: false,
-    isArchived: false
+    isArchived: false,
+    processingStatus: 'read',
+    priority: 'normal',
+    topics: [],
+    actionability: 'none'
   },
   {
     id: "r3",
@@ -135,6 +143,10 @@ export const mockReadingItems: ReadingItem[] = [
     favicon: "https://framer.com/favicon.ico",
     isRead: false,
     isFlagged: true,
-    isArchived: false
+    isArchived: false,
+    processingStatus: 'signal',
+    priority: 'high',
+    topics: [],
+    actionability: 'idea'
   }
 ];

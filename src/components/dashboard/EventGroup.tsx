@@ -25,7 +25,7 @@ interface EventGroupProps {
   isToday?: boolean;
   showDate?: boolean;
   onEventClick?: (event: CalendarEvent) => void;
-  linkedCompanyMap?: Map<string, string>;
+  linkedCompanyMap?: Map<string, { name: string; logo: string | null }>;
 }
 
 // Helper: Check if an event has already ended
@@ -117,15 +117,20 @@ export function EventGroup({ title, events, isToday = false, showDate = false, o
                 {formatDate(dateEvents[0].startTime)}
               </p>
               <div className="space-y-2">
-                {dateEvents.map((event, index) => (
-                  <EventCard
-                    key={event.id}
-                    event={event}
-                    delay={index * 0.05}
-                    onClick={onEventClick}
-                    linkedCompanyName={linkedCompanyMap?.get(event.id) || (event.microsoftEventId ? linkedCompanyMap?.get(event.microsoftEventId) : undefined)}
-                  />
-                ))}
+                {dateEvents.map((event, index) => {
+                  const linkedInfo = linkedCompanyMap?.get(event.id) || 
+                    (event.microsoftEventId ? linkedCompanyMap?.get(event.microsoftEventId) : undefined);
+                  return (
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      delay={index * 0.05}
+                      onClick={onEventClick}
+                      linkedCompanyName={linkedInfo?.name}
+                      linkedCompanyLogo={linkedInfo?.logo}
+                    />
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -133,21 +138,26 @@ export function EventGroup({ title, events, isToday = false, showDate = false, o
       ) : (
         // Show events without date grouping (includes Now indicator for today)
         <div className="space-y-2">
-          {sortedEvents.map((event, index) => (
-            <Fragment key={event.id}>
-              {/* Insert Now indicator at the correct position */}
-              {isToday && nowPosition === index && <NowIndicator />}
-              <EventCard
-                event={event}
-                delay={index * 0.05}
-                isToday={isToday}
-                isPast={isToday && isPastEvent(event)}
-                isCurrent={isToday && isCurrentEvent(event)}
-                onClick={onEventClick}
-                linkedCompanyName={linkedCompanyMap?.get(event.id) || (event.microsoftEventId ? linkedCompanyMap?.get(event.microsoftEventId) : undefined)}
-              />
-            </Fragment>
-          ))}
+          {sortedEvents.map((event, index) => {
+            const linkedInfo = linkedCompanyMap?.get(event.id) || 
+              (event.microsoftEventId ? linkedCompanyMap?.get(event.microsoftEventId) : undefined);
+            return (
+              <Fragment key={event.id}>
+                {/* Insert Now indicator at the correct position */}
+                {isToday && nowPosition === index && <NowIndicator />}
+                <EventCard
+                  event={event}
+                  delay={index * 0.05}
+                  isToday={isToday}
+                  isPast={isToday && isPastEvent(event)}
+                  isCurrent={isToday && isCurrentEvent(event)}
+                  onClick={onEventClick}
+                  linkedCompanyName={linkedInfo?.name}
+                  linkedCompanyLogo={linkedInfo?.logo}
+                />
+              </Fragment>
+            );
+          })}
           {/* Now indicator at the end if all events have passed */}
           {isToday && nowPosition === sortedEvents.length && <NowIndicator />}
         </div>
