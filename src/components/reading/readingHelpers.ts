@@ -1,4 +1,4 @@
-import Fuse from 'fuse.js';
+import Fuse, { IFuseOptions } from 'fuse.js';
 import { ReadingItem, ProcessingStatus } from '@/types/readingItem';
 import { startOfWeek } from 'date-fns';
 
@@ -12,7 +12,7 @@ const CONTENT_TYPE_SEARCH_TERMS: Record<string, string[]> = {
 };
 
 // Fuse.js configuration for fuzzy search
-const FUSE_OPTIONS: Fuse.IFuseOptions<ReadingItem> = {
+const FUSE_OPTIONS: IFuseOptions<ReadingItem> = {
   keys: [
     { name: 'title', weight: 0.3 },
     { name: 'oneLiner', weight: 0.25 },

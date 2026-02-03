@@ -1,12 +1,13 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-type AccentColor = "amber" | "sky" | "emerald";
+type AccentColor = "amber" | "sky" | "emerald" | "rose";
 
 const gradientColors: Record<AccentColor, string> = {
   amber: "rgba(251,191,36,0.65)",
   sky: "rgba(56,189,248,0.65)",
   emerald: "rgba(52,211,153,0.65)",
+  rose: "rgba(244,63,94,0.65)",
 };
 
 // ============ ActionPanel (Container) ============
@@ -56,6 +57,7 @@ const iconChipStyles: Record<AccentColor, string> = {
   amber: "bg-amber-50 text-amber-500 dark:bg-amber-500/10 dark:text-amber-300",
   sky: "bg-sky-50 text-sky-500 dark:bg-sky-500/10 dark:text-sky-300",
   emerald: "bg-emerald-50 text-emerald-500 dark:bg-emerald-500/10 dark:text-emerald-300",
+  rose: "bg-rose-50 text-rose-500 dark:bg-rose-500/10 dark:text-rose-300",
 };
 
 export function ActionPanelHeader({
@@ -106,6 +108,7 @@ const listAreaTints: Record<AccentColor, string> = {
   amber: "bg-amber-50/20 dark:bg-amber-950/10",
   sky: "bg-sky-50/20 dark:bg-sky-950/10",
   emerald: "bg-emerald-50/16 dark:bg-emerald-950/10",
+  rose: "bg-rose-50/20 dark:bg-rose-950/10",
 };
 
 export function ActionPanelListArea({
@@ -190,6 +193,7 @@ const badgeDotColors: Record<AccentColor, string> = {
   amber: "bg-amber-500",
   sky: "bg-sky-500",
   emerald: "bg-emerald-500",
+  rose: "bg-rose-500",
 };
 
 export function LiveBadge({ accentColor = "amber" }: LiveBadgeProps) {
