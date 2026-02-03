@@ -1509,9 +1509,13 @@ export type Database = {
       }
       reading_items: {
         Row: {
+          actionability: string
+          archived_at: string | null
+          content_type: string | null
           created_at: string
           created_by: string | null
           description: string | null
+          entities: Json | null
           favicon: string | null
           hostname: string | null
           id: string
@@ -1519,27 +1523,27 @@ export type Database = {
           is_archived: boolean
           is_flagged: boolean
           is_read: boolean | null
+          one_liner: string | null
+          priority: string
+          processed_at: string | null
+          processing_status: string
           project_id: string | null
           read_at: string | null
+          read_later_bucket: string | null
+          saved_from: string | null
           title: string
+          topics: string[] | null
           updated_at: string
           url: string
-          processing_status: string
-          processed_at: string | null
-          archived_at: string | null
-          content_type: string | null
-          priority: string
-          read_later_bucket: string | null
-          one_liner: string | null
-          topics: string[]
-          actionability: string
-          saved_from: string | null
-          entities: any[]
         }
         Insert: {
+          actionability?: string
+          archived_at?: string | null
+          content_type?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
+          entities?: Json | null
           favicon?: string | null
           hostname?: string | null
           id?: string
@@ -1547,27 +1551,27 @@ export type Database = {
           is_archived?: boolean
           is_flagged?: boolean
           is_read?: boolean | null
+          one_liner?: string | null
+          priority?: string
+          processed_at?: string | null
+          processing_status?: string
           project_id?: string | null
           read_at?: string | null
+          read_later_bucket?: string | null
+          saved_from?: string | null
           title: string
+          topics?: string[] | null
           updated_at?: string
           url: string
-          processing_status?: string
-          processed_at?: string | null
-          archived_at?: string | null
-          content_type?: string | null
-          priority?: string
-          read_later_bucket?: string | null
-          one_liner?: string | null
-          topics?: string[]
-          actionability?: string
-          saved_from?: string | null
-          entities?: any[]
         }
         Update: {
+          actionability?: string
+          archived_at?: string | null
+          content_type?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
+          entities?: Json | null
           favicon?: string | null
           hostname?: string | null
           id?: string
@@ -1575,22 +1579,18 @@ export type Database = {
           is_archived?: boolean
           is_flagged?: boolean
           is_read?: boolean | null
+          one_liner?: string | null
+          priority?: string
+          processed_at?: string | null
+          processing_status?: string
           project_id?: string | null
           read_at?: string | null
+          read_later_bucket?: string | null
+          saved_from?: string | null
           title?: string
+          topics?: string[] | null
           updated_at?: string
           url?: string
-          processing_status?: string
-          processed_at?: string | null
-          archived_at?: string | null
-          content_type?: string | null
-          priority?: string
-          read_later_bucket?: string | null
-          one_liner?: string | null
-          topics?: string[]
-          actionability?: string
-          saved_from?: string | null
-          entities?: any[]
         }
         Relationships: [
           {
@@ -1752,11 +1752,13 @@ export type Database = {
           id: string
           last_touched_at: string | null
           priority: number
+          priority_score: number | null
           reason_codes: string[]
           reviewed_at: string | null
           snooze_until: string | null
           source_id: string
           source_type: string
+          stale_since: string | null
           status: string
           trusted_at: string | null
           updated_at: string
@@ -1767,11 +1769,13 @@ export type Database = {
           id?: string
           last_touched_at?: string | null
           priority?: number
+          priority_score?: number | null
           reason_codes?: string[]
           reviewed_at?: string | null
           snooze_until?: string | null
           source_id: string
           source_type: string
+          stale_since?: string | null
           status?: string
           trusted_at?: string | null
           updated_at?: string
@@ -1782,11 +1786,13 @@ export type Database = {
           id?: string
           last_touched_at?: string | null
           priority?: number
+          priority_score?: number | null
           reason_codes?: string[]
           reviewed_at?: string | null
           snooze_until?: string | null
           source_id?: string
           source_type?: string
+          stale_since?: string | null
           status?: string
           trusted_at?: string | null
           updated_at?: string
@@ -1998,7 +2004,7 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      mark_stale_work_items: { Args: { p_user_id: string }; Returns: number }
     }
     Enums: {
       commitment_source: "call" | "email" | "meeting" | "message" | "manual"
