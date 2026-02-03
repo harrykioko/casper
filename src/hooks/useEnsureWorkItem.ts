@@ -313,6 +313,36 @@ async function runDeterministicEnrichment(
       }
       break;
     }
+
+    case 'commitment': {
+      const { data: commitment } = await supabase
+        .from("commitments")
+        .select("company_id, company_type, direction, person_id")
+        .eq("id", sourceId)
+        .single();
+
+      if (commitment) {
+        // If company is linked, create entity link
+        if (commitment.company_id) {
+          links.push({
+            targetType: 'company',
+            targetId: commitment.company_id,
+            reason: 'direct_link',
+            confidence: 1.0,
+          });
+        } else {
+          reasonCodes.push('unlinked_company');
+        }
+
+        // If no direction set, flag it
+        if (!commitment.direction) {
+          reasonCodes.push('missing_direction');
+        }
+
+        priority = 4; // Between email (5) and calendar (3)
+      }
+      break;
+    }
   }
 
   return { reasonCodes, priority, links };

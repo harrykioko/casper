@@ -1,12 +1,13 @@
 
 import { useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { 
+import {
   LayoutDashboard,
   Crosshair,
   Inbox,
   List,
   FolderKanban,
+  Handshake,
   MessageSquareText,
   Sparkles,
   BookOpen,
@@ -58,11 +59,17 @@ export function NavSidebar() {
       label: "Projects",
       active: location.pathname.startsWith("/projects") 
     },
-    { 
-      icon: TrendingUp, 
-      path: "/pipeline", 
+    {
+      icon: Handshake,
+      path: "/obligations",
+      label: "Obligations",
+      active: location.pathname.startsWith("/obligations")
+    },
+    {
+      icon: TrendingUp,
+      path: "/pipeline",
       label: "Pipeline",
-      active: location.pathname.startsWith("/pipeline") 
+      active: location.pathname.startsWith("/pipeline")
     },
     { 
       icon: Briefcase, 

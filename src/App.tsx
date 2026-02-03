@@ -32,6 +32,7 @@ import Inbox from "./pages/Inbox";
 import Settings from "./pages/Settings";
 import Notes from "./pages/Notes";
 import FocusQueue from "./pages/FocusQueue";
+import ObligationsPage from "./pages/ObligationsPage";
 import NotFound from "./pages/NotFound";
 import OAuthCallback from "./pages/OAuthCallback";
 
@@ -123,6 +124,7 @@ const MainContent = () => {
           <Route path="/priority" element={<Navigate to="/focus" replace />} />
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/focus" element={<FocusQueue />} />
+          <Route path="/obligations" element={<ObligationsPage />} />
           <Route path="/notes" element={<Notes />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<NotFound />} />

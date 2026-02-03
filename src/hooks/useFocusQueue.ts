@@ -12,6 +12,8 @@ import {
   computeInboxImportanceScore,
   computeCalendarUrgencyScore,
   computeCalendarImportanceScore,
+  computeCommitmentUrgencyScore,
+  computeCommitmentImportanceScore,
 } from "@/lib/priority/priorityScoringV1";
 
 export interface FocusFilters {
@@ -261,13 +263,13 @@ export function useFocusQueue() {
 function emptyCounts(): FocusCounts {
   return {
     total: 0,
-    bySource: { email: 0, calendar_event: 0, task: 0, note: 0, reading: 0 },
+    bySource: { email: 0, calendar_event: 0, task: 0, note: 0, reading: 0, commitment: 0 },
     byReason: {},
   };
 }
 
 function computeCounts(items: FocusQueueItem[]): FocusCounts {
-  const bySource: Record<WorkItemSourceType, number> = { email: 0, calendar_event: 0, task: 0, note: 0, reading: 0 };
+  const bySource: Record<WorkItemSourceType, number> = { email: 0, calendar_event: 0, task: 0, note: 0, reading: 0, commitment: 0 };
   const byReason: Record<string, number> = {};
 
   for (const item of items) {
@@ -398,6 +400,44 @@ async function fetchSourceData(
     });
   }
 
+  if (byType["commitment"]?.length) {
+    fetches.push(async () => {
+      const { data } = await supabase
+        .from("commitments")
+        .select("id, title, content, person_name, person_id, company_id, direction, due_at, expected_by, implied_urgency, status")
+        .in("id", byType["commitment"]);
+
+      // Batch check VIP status for people linked to commitments
+      const personIds = (data || []).map(r => r.person_id).filter(Boolean) as string[];
+      let vipPersonIds = new Set<string>();
+      if (personIds.length > 0) {
+        const { data: people } = await supabase
+          .from("people")
+          .select("id, is_vip")
+          .in("id", personIds)
+          .eq("is_vip", true);
+        vipPersonIds = new Set((people || []).map(p => p.id));
+      }
+
+      for (const row of data || []) {
+        const isVip = row.person_id ? vipPersonIds.has(row.person_id) : false;
+        result[`commitment:${row.id}`] = {
+          title: row.title || row.content || "Untitled commitment",
+          snippet: row.person_name ? `${row.direction === 'owed_to_me' ? 'From' : 'To'}: ${row.person_name}` : undefined,
+          scoreData: {
+            direction: row.direction,
+            dueAt: row.due_at,
+            expectedBy: row.expected_by,
+            impliedUrgency: row.implied_urgency,
+            isVip,
+            status: row.status,
+          },
+          hasSourceLink: !!row.company_id,
+        };
+      }
+    });
+  }
+
   await Promise.all(fetches.map(fn => fn()));
   return result;
 }
@@ -423,6 +463,20 @@ function computeItemScore(sourceType: string, scoreData: any): number {
         ? computeCalendarUrgencyScore(scoreData.startTime)
         : 0.5;
       const importance = computeCalendarImportanceScore();
+      return computePriorityScoreV1(urgency, importance);
+    }
+    case "commitment": {
+      const urgency = computeCommitmentUrgencyScore(
+        scoreData.direction,
+        scoreData.dueAt,
+        scoreData.expectedBy,
+        scoreData.impliedUrgency
+      );
+      const importance = computeCommitmentImportanceScore(
+        scoreData.direction,
+        scoreData.isVip,
+        scoreData.impliedUrgency
+      );
       return computePriorityScoreV1(urgency, importance);
     }
     case "note":

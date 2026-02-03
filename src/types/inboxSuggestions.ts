@@ -15,6 +15,7 @@ export type SuggestionType =
   | "CREATE_FOLLOW_UP_TASK"
   | "CREATE_PERSONAL_TASK"
   | "CREATE_INTRO_TASK"
+  | "CREATE_WAITING_ON"
   | "SET_STATUS"
   | "EXTRACT_UPDATE_HIGHLIGHTS";
 
@@ -71,6 +72,7 @@ export const SUGGESTION_TYPE_LABELS: Record<SuggestionType, string> = {
   CREATE_FOLLOW_UP_TASK: "Follow-up Task",
   CREATE_PERSONAL_TASK: "Personal Task",
   CREATE_INTRO_TASK: "Intro Task",
+  CREATE_WAITING_ON: "Track Obligation",
   SET_STATUS: "Update Status",
   EXTRACT_UPDATE_HIGHLIGHTS: "Extract Highlights",
 };
@@ -80,6 +82,15 @@ export const EFFORT_LABELS: Record<string, string> = {
   medium: "~15 min",
   long: "30+ min",
 };
+
+// Metadata for CREATE_WAITING_ON suggestions
+export interface CreateWaitingOnMetadata {
+  commitment_title: string;
+  commitment_content: string;
+  person_name: string;
+  expected_by_hint: string | null;
+  context: string;
+}
 
 // Metadata for CREATE_PIPELINE_COMPANY suggestions
 export interface CreatePipelineCompanyMetadata {

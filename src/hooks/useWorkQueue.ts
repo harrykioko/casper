@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
-export type WorkItemSourceType = 'email' | 'calendar_event' | 'task' | 'note' | 'reading';
+export type WorkItemSourceType = 'email' | 'calendar_event' | 'task' | 'note' | 'reading' | 'commitment';
 export type WorkItemStatus = 'needs_review' | 'enriched_pending' | 'trusted' | 'snoozed' | 'ignored';
 
 export interface WorkQueueItem {
@@ -278,6 +278,21 @@ async function fetchSourceTitles(
       for (const row of data || []) {
         result[`reading:${row.id}`] = {
           title: row.title || row.url || 'Untitled',
+        };
+      }
+    });
+  }
+
+  if (byType['commitment']?.length) {
+    fetches.push(async () => {
+      const { data } = await supabase
+        .from("commitments")
+        .select("id, title, content, person_name")
+        .in("id", byType['commitment']);
+      for (const row of data || []) {
+        result[`commitment:${row.id}`] = {
+          title: row.title || row.content || 'Untitled commitment',
+          snippet: row.person_name ? `To: ${row.person_name}` : undefined,
         };
       }
     });

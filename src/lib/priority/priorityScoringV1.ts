@@ -193,6 +193,106 @@ export function computeCalendarImportanceScore(): number {
 }
 
 /**
+ * Compute urgency score for a commitment based on direction and date proximity
+ *
+ * - owed_by_me: uses dueAt proximity (reuses task urgency scoring)
+ * - owed_to_me: uses expectedBy proximity
+ * - Multiplied by urgency factor: high=1.2, medium=1.0, low=0.8
+ */
+export function computeCommitmentUrgencyScore(
+  direction: string | null | undefined,
+  dueAt: string | null | undefined,
+  expectedBy: string | null | undefined,
+  impliedUrgency: string | null | undefined
+): number {
+  const dateToUse = direction === 'owed_to_me' ? expectedBy : dueAt;
+  const baseUrgency = computeTaskUrgencyScore(dateToUse);
+
+  // Apply urgency multiplier
+  let urgencyFactor = 1.0;
+  if (impliedUrgency === 'asap' || impliedUrgency === 'today') {
+    urgencyFactor = 1.2;
+  } else if (impliedUrgency === 'when_possible') {
+    urgencyFactor = 0.8;
+  }
+
+  return Math.min(1.0, baseUrgency * urgencyFactor);
+}
+
+/**
+ * Compute importance score for a commitment based on direction and VIP status
+ *
+ * Base scores:
+ * - owed_by_me: 0.7 (my promises are high importance)
+ * - owed_to_me: 0.5 (tracking what others owe)
+ * - waiting_on: 0.6 (need follow-up)
+ *
+ * Boosts:
+ * - VIP person: +0.15
+ * - High urgency: +0.1
+ * - Low urgency: -0.05
+ */
+export function computeCommitmentImportanceScore(
+  direction: string | null | undefined,
+  isVip: boolean = false,
+  impliedUrgency: string | null | undefined
+): number {
+  let base = 0.6; // default
+
+  if (direction === 'owed_by_me') {
+    base = 0.7;
+  } else if (direction === 'owed_to_me') {
+    base = 0.5;
+  }
+
+  if (isVip) base += 0.15;
+
+  if (impliedUrgency === 'asap' || impliedUrgency === 'today') {
+    base += 0.1;
+  } else if (impliedUrgency === 'when_possible') {
+    base -= 0.05;
+  }
+
+  return Math.max(0, Math.min(1, base));
+}
+
+/**
+ * Generate reasoning string for commitment items
+ */
+export function generateCommitmentReasoning(
+  direction: string | null | undefined,
+  dueAt: string | null | undefined,
+  expectedBy: string | null | undefined,
+  personName: string | null | undefined
+): string {
+  const parts: string[] = [];
+
+  if (direction === 'owed_by_me') {
+    parts.push("You owe this");
+  } else if (direction === 'owed_to_me') {
+    parts.push("Owed to you");
+  }
+
+  const dateToCheck = direction === 'owed_to_me' ? expectedBy : dueAt;
+  if (dateToCheck) {
+    const daysUntil = differenceInDays(parseISO(dateToCheck), new Date());
+    if (daysUntil < 0) {
+      parts.push(`Overdue by ${Math.abs(daysUntil)} day${Math.abs(daysUntil) === 1 ? '' : 's'}`);
+    } else if (daysUntil === 0 || isToday(parseISO(dateToCheck))) {
+      parts.push("Due today");
+    } else if (daysUntil <= 3) {
+      parts.push(`Due in ${daysUntil} days`);
+    }
+  }
+
+  if (personName) {
+    parts.push(`With ${personName}`);
+  }
+
+  return parts.length > 0 ? parts.join(". ") + "." : "Commitment needs attention.";
+}
+
+/**
  * Compute recency score based on last update timestamp
  *
  * Logic:

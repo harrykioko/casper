@@ -27,6 +27,7 @@ const SUGGESTION_TYPES = [
   "CREATE_FOLLOW_UP_TASK",
   "CREATE_PERSONAL_TASK",
   "CREATE_INTRO_TASK",
+  "CREATE_WAITING_ON",
   "SET_STATUS",
   "EXTRACT_UPDATE_HIGHLIGHTS",
 ] as const;
@@ -202,6 +203,7 @@ Suggest actions using these types:
 - CREATE_FOLLOW_UP_TASK: Create a follow-up task (can link to company)
 - CREATE_PERSONAL_TASK: Create personal task (no company link)
 - CREATE_INTRO_TASK: Create task to make an introduction
+- CREATE_WAITING_ON: Track an obligation someone else owes you (e.g., they promised to send materials, schedule a meeting, follow up)
 - SET_STATUS: Update pipeline stage
 - EXTRACT_UPDATE_HIGHLIGHTS: Extract key metrics/updates from portfolio email
 
@@ -218,6 +220,19 @@ When suggesting CREATE_PIPELINE_COMPANY (for intro emails with no existing compa
   - notes_summary: Context about the intro (who made it, any traction/background mentioned, relevant links)
   - suggested_tags: Array of relevant tags (e.g., "fintech", "AI", "healthcare", "seed")
   - intro_source: Who made the introduction (e.g., "Warm Intro from John Smith")
+
+## CREATE_WAITING_ON Rules
+
+When suggesting CREATE_WAITING_ON (for emails where someone promises to do something for you):
+- Use when the sender explicitly commits to an action: "I'll send you...", "We'll get back to you...", "Let me schedule..."
+- Include in metadata:
+  - commitment_title: Short title (e.g., "Send deck by Friday")
+  - commitment_content: Full description of what was promised
+  - person_name: Name of the person who made the promise
+  - expected_by_hint: When they said they'd do it (e.g., "end of week", "tomorrow", null if unspecified)
+  - context: Brief context about the conversation
+- Do NOT suggest for vague language like "we should catch up" or "let's connect sometime"
+- This creates an obligation tracker, not a task - use for tracking what others owe you
 
 ## Quality Rules
 
@@ -315,7 +330,7 @@ function buildToolSchema() {
                 metadata: {
                   type: "object",
                   nullable: true,
-                  description: "Additional data for specific suggestion types. For CREATE_PIPELINE_COMPANY, include: extracted_company_name, extracted_domain, primary_contact_name, primary_contact_email, description_oneliner, notes_summary, suggested_tags (array), intro_source",
+                  description: "Additional data for specific suggestion types. For CREATE_PIPELINE_COMPANY: extracted_company_name, extracted_domain, primary_contact_name, primary_contact_email, description_oneliner, notes_summary, suggested_tags, intro_source. For CREATE_WAITING_ON: commitment_title, commitment_content, person_name, expected_by_hint, context",
                   properties: {
                     extracted_company_name: { type: "string" },
                     extracted_domain: { type: "string", nullable: true },
@@ -325,6 +340,11 @@ function buildToolSchema() {
                     notes_summary: { type: "string" },
                     suggested_tags: { type: "array", items: { type: "string" } },
                     intro_source: { type: "string" },
+                    commitment_title: { type: "string" },
+                    commitment_content: { type: "string" },
+                    person_name: { type: "string" },
+                    expected_by_hint: { type: "string", nullable: true },
+                    context: { type: "string" },
                   },
                 },
               },

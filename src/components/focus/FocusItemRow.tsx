@@ -6,6 +6,7 @@ import {
   ListTodo,
   StickyNote,
   BookOpen,
+  Handshake,
   AlertCircle,
   Clock,
   Link2,
@@ -42,6 +43,8 @@ interface FocusItemRowProps {
   // Email quick action handlers
   onEmailTrusted?: (workItemId: string) => void;
   onEmailNoAction?: (workItemId: string, sourceId: string) => void;
+  // Commitment quick action handlers
+  onCommitmentComplete?: (workItemId: string, sourceId: string) => void;
   // Shared
   onSnooze?: (workItemId: string, until: Date) => void;
 }
@@ -52,6 +55,7 @@ const SOURCE_ICONS: Record<WorkItemSourceType, typeof Mail> = {
   task: ListTodo,
   note: StickyNote,
   reading: BookOpen,
+  commitment: Handshake,
 };
 
 const SOURCE_COLORS: Record<WorkItemSourceType, string> = {
@@ -60,6 +64,7 @@ const SOURCE_COLORS: Record<WorkItemSourceType, string> = {
   task: "text-amber-400",
   note: "text-green-400",
   reading: "text-cyan-400",
+  commitment: "text-rose-400",
 };
 
 const SCORE_BORDER_COLORS: Record<string, string> = {
@@ -85,6 +90,7 @@ export function FocusItemRow({
   onReadingOpenLink,
   onEmailTrusted,
   onEmailNoAction,
+  onCommitmentComplete,
   onSnooze,
 }: FocusItemRowProps) {
   const Icon = SOURCE_ICONS[item.source_type] || Mail;
@@ -94,6 +100,7 @@ export function FocusItemRow({
 
   const isReading = item.source_type === "reading";
   const isEmail = item.source_type === "email";
+  const isCommitment = item.source_type === "commitment";
 
   const handleOpenLink = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -120,6 +127,12 @@ export function FocusItemRow({
   const handleSnooze = (until: Date, e: React.MouseEvent) => {
     e.stopPropagation();
     onSnooze?.(item.id, until);
+  };
+
+  // Commitment handlers
+  const handleCommitmentComplete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onCommitmentComplete?.(item.id, item.source_id);
   };
 
   // Email handlers
@@ -273,6 +286,47 @@ export function FocusItemRow({
                 >
                   <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
                 </Button>
+              </div>
+            )}
+
+            {/* Commitment Quick Actions - visible on hover */}
+            {isCommitment && (
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 rounded-full"
+                  onClick={handleCommitmentComplete}
+                  title="Mark complete"
+                >
+                  <Check className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 rounded-full"
+                      title="Snooze"
+                    >
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem onClick={(e) => handleSnooze(addHours(new Date(), 3), e as any)}>
+                      3 hours
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => handleSnooze(startOfTomorrow(), e as any)}>
+                      Tomorrow
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => handleSnooze(nextMonday(new Date()), e as any)}>
+                      Next week
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => handleSnooze(addDays(new Date(), 30), e as any)}>
+                      30 days
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             )}
           </div>

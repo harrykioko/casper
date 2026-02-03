@@ -16,6 +16,9 @@ import {
   Handshake,
   Forward,
   X,
+  ArrowRight,
+  ArrowLeft,
+  Hourglass,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -70,7 +73,26 @@ export function CommitmentCard({
     if (isOverdue) return "border-red-500 bg-red-500/5";
     if (isDueToday) return "border-orange-500 bg-orange-500/5";
     if (isDueSoon) return "border-yellow-500 bg-yellow-500/5";
+    if (commitment.direction === "owed_by_me") return "border-l-amber-400 border-muted/30";
+    if (commitment.direction === "owed_to_me") return "border-l-blue-400 border-muted/30";
     return "border-muted/30";
+  };
+
+  const getDirectionBadge = () => {
+    if (commitment.direction === "owed_to_me") {
+      return (
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-blue-400 border-blue-400/30">
+          <ArrowLeft className="h-2.5 w-2.5 mr-0.5" />
+          Owed to me
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-amber-400 border-amber-400/30">
+        <ArrowRight className="h-2.5 w-2.5 mr-0.5" />
+        I owe
+      </Badge>
+    );
   };
 
   const getUrgencyBadge = () => {
@@ -142,14 +164,21 @@ export function CommitmentCard({
         </TooltipProvider>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm truncate">{commitment.content}</p>
+          <p className="text-sm truncate">{commitment.title || commitment.content}</p>
           {commitment.personName && (
             <p className="text-xs text-muted-foreground truncate">
-              To: {commitment.personName}
+              {commitment.direction === "owed_to_me" ? "From" : "To"}: {commitment.personName}
             </p>
           )}
         </div>
 
+        {getDirectionBadge()}
+        {commitment.status === "waiting_on" && (
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-cyan-400 border-cyan-400/30">
+            <Hourglass className="h-2.5 w-2.5 mr-0.5" />
+            Waiting
+          </Badge>
+        )}
         {getUrgencyBadge()}
       </div>
     );
@@ -189,13 +218,32 @@ export function CommitmentCard({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className={cn(
-            "font-medium",
-            isOverdue && "text-red-600 dark:text-red-400"
-          )}>
-            {commitment.content}
-          </p>
-          {getUrgencyBadge()}
+          <div className="flex-1 min-w-0">
+            {commitment.title && (
+              <p className={cn(
+                "font-medium",
+                isOverdue && "text-red-600 dark:text-red-400"
+              )}>
+                {commitment.title}
+              </p>
+            )}
+            <p className={cn(
+              commitment.title ? "text-sm text-muted-foreground" : "font-medium",
+              isOverdue && !commitment.title && "text-red-600 dark:text-red-400"
+            )}>
+              {commitment.content}
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {getDirectionBadge()}
+            {commitment.status === "waiting_on" && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-cyan-400 border-cyan-400/30">
+                <Hourglass className="h-2.5 w-2.5 mr-0.5" />
+                Waiting
+              </Badge>
+            )}
+            {getUrgencyBadge()}
+          </div>
         </div>
 
         {/* Context */}
@@ -219,10 +267,15 @@ export function CommitmentCard({
               {commitment.companyName}
             </span>
           )}
-          {commitment.dueAt && (
+          {(commitment.dueAt || commitment.expectedBy) && (
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
-              {format(parseISO(commitment.dueAt), "MMM d")}
+              {commitment.direction === "owed_to_me" && commitment.expectedBy
+                ? `Expected ${format(parseISO(commitment.expectedBy), "MMM d")}`
+                : commitment.dueAt
+                ? `Due ${format(parseISO(commitment.dueAt), "MMM d")}`
+                : null
+              }
             </span>
           )}
           {commitment.sourceType !== "manual" && (

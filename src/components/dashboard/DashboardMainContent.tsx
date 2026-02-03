@@ -25,6 +25,7 @@ import {
   ActionPanelFooter,
 } from "@/components/ui/action-panel";
 import { CommitmentsPanel } from "@/components/commitments/CommitmentsPanel";
+import { ObligationsPanel } from "@/components/dashboard/ObligationsPanel";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePriorityItems } from "@/hooks/usePriorityItems";
@@ -158,20 +159,25 @@ export function DashboardMainContent({
       {/* Main Content Area - Responsive Grid */}
       <div className="px-4 sm:px-6 lg:px-8 pb-8">
         
+        {/* Row 0: At-Risk Obligations */}
+        <div className="mb-6">
+          <ObligationsPanel />
+        </div>
+
         {/* Row 1: Action Panels - dynamic columns based on content */}
         <div className={cn(
           "grid gap-6 mb-6",
-          hasOpenTasks 
-            ? "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3" 
+          hasOpenTasks
+            ? "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3"
             : "grid-cols-1 lg:grid-cols-2"
         )}>
           <div className="w-full min-w-[260px]">
-            <DashboardPrioritySection 
+            <DashboardPrioritySection
               onCompanyClick={openCommandPaneByEntityType}
               onOpenTaskCreate={handleOpenTaskCreate}
             />
           </div>
-          
+
           <div className="w-full min-w-[260px]">
             <InboxPanel onOpenTaskCreate={handleOpenTaskCreate} />
           </div>

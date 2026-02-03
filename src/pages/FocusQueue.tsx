@@ -14,12 +14,15 @@ import { FocusItemRow } from "@/components/focus/FocusItemRow";
 import { FocusEmptyState } from "@/components/focus/FocusEmptyState";
 import { FocusInboxDrawer } from "@/components/focus/FocusInboxDrawer";
 import { FocusTaskDrawer } from "@/components/focus/FocusTaskDrawer";
+import { FocusCommitmentDrawer } from "@/components/focus/FocusCommitmentDrawer";
 import { FocusEventModal } from "@/components/focus/FocusEventModal";
 import { FocusGenericSheet } from "@/components/focus/FocusGenericSheet";
 import { FocusReadingSheet } from "@/components/focus/FocusReadingSheet";
+import { useCommitments } from "@/hooks/useCommitments";
 import { cn } from "@/lib/utils";
 import type { InboxItem } from "@/types/inbox";
 import type { Task } from "@/hooks/useTasks";
+import type { Commitment } from "@/types/commitment";
 
 export default function FocusQueue() {
   const navigate = useNavigate();
@@ -44,11 +47,13 @@ export default function FocusQueue() {
   const { tasks, updateTask, deleteTask, archiveTask, unarchiveTask } = useTasks();
   const { inboxItems, markComplete, archive: archiveInbox } = useInboxItems();
   const { events } = useOutlookCalendar();
+  const { commitments } = useCommitments({ status: ['open', 'waiting_on', 'delegated'] });
 
   // Drawer state
   const [selectedItem, setSelectedItem] = useState<FocusQueueItem | null>(null);
   const [inboxDrawerItem, setInboxDrawerItem] = useState<InboxItem | null>(null);
   const [taskDrawerItem, setTaskDrawerItem] = useState<Task | null>(null);
+  const [commitmentDrawerItem, setCommitmentDrawerItem] = useState<Commitment | null>(null);
   const [eventModalItem, setEventModalItem] = useState<any>(null);
   const [genericSheetItem, setGenericSheetItem] = useState<FocusQueueItem | null>(null);
   const [readingSheetItem, setReadingSheetItem] = useState<FocusQueueItem | null>(null);
@@ -88,6 +93,13 @@ export default function FocusQueue() {
           }
           break;
         }
+        case "commitment": {
+          const commitment = commitments.find(c => c.id === item.source_id);
+          if (commitment) {
+            setCommitmentDrawerItem(commitment);
+          }
+          break;
+        }
         case "reading":
           setReadingSheetItem(item);
           break;
@@ -98,12 +110,13 @@ export default function FocusQueue() {
           break;
       }
     },
-    [inboxItems, tasks, events]
+    [inboxItems, tasks, events, commitments]
   );
 
   const closeAllDrawers = useCallback(() => {
     setInboxDrawerItem(null);
     setTaskDrawerItem(null);
+    setCommitmentDrawerItem(null);
     setEventModalItem(null);
     setGenericSheetItem(null);
     setReadingSheetItem(null);
@@ -207,6 +220,59 @@ export default function FocusQueue() {
     [triageActions, markComplete, advanceToNext]
   );
 
+  // Commitment triage action handlers
+  const handleCommitmentComplete = useCallback(() => {
+    if (!selectedItem || !commitmentDrawerItem) return;
+    triageActions.completeCommitment(commitmentDrawerItem.id, selectedItem.id);
+    closeAllDrawers();
+    advanceToNext();
+  }, [selectedItem, commitmentDrawerItem, triageActions, closeAllDrawers, advanceToNext]);
+
+  const handleCommitmentDelegate = useCallback(() => {
+    // For now, just mark as delegated with a placeholder
+    if (!selectedItem || !commitmentDrawerItem) return;
+    triageActions.delegateCommitment(commitmentDrawerItem.id, selectedItem.id, "", "Delegated");
+    closeAllDrawers();
+    advanceToNext();
+  }, [selectedItem, commitmentDrawerItem, triageActions, closeAllDrawers, advanceToNext]);
+
+  const handleCommitmentWaitingOn = useCallback(() => {
+    if (!commitmentDrawerItem) return;
+    triageActions.markWaitingOn(commitmentDrawerItem.id);
+    closeAllDrawers();
+    advanceToNext();
+  }, [commitmentDrawerItem, triageActions, closeAllDrawers, advanceToNext]);
+
+  const handleCommitmentFollowUp = useCallback(() => {
+    // Navigate to create a follow-up task
+    if (!commitmentDrawerItem) return;
+    navigate("/tasks");
+    closeAllDrawers();
+  }, [commitmentDrawerItem, navigate, closeAllDrawers]);
+
+  const handleCommitmentBroken = useCallback(() => {
+    if (!selectedItem || !commitmentDrawerItem) return;
+    triageActions.breakCommitment(commitmentDrawerItem.id, selectedItem.id);
+    closeAllDrawers();
+    advanceToNext();
+  }, [selectedItem, commitmentDrawerItem, triageActions, closeAllDrawers, advanceToNext]);
+
+  const handleCommitmentCancel = useCallback(() => {
+    if (!selectedItem || !commitmentDrawerItem) return;
+    triageActions.cancelCommitment(commitmentDrawerItem.id, selectedItem.id);
+    closeAllDrawers();
+    advanceToNext();
+  }, [selectedItem, commitmentDrawerItem, triageActions, closeAllDrawers, advanceToNext]);
+
+  // Commitment quick action from FocusItemRow
+  const handleCommitmentQuickComplete = useCallback(
+    (workItemId: string, sourceId: string) => {
+      triageActions.completeCommitment(sourceId, workItemId);
+      advanceToNext();
+    },
+    [triageActions, advanceToNext]
+  );
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -293,6 +359,7 @@ export default function FocusQueue() {
                     onReadingOpenLink={handleReadingOpenLink}
                     onEmailTrusted={handleEmailTrusted}
                     onEmailNoAction={handleEmailNoAction}
+                    onCommitmentComplete={handleCommitmentQuickComplete}
                     onSnooze={(id, until) => triageActions.snooze(id, until)}
                   />
                 ))}
@@ -328,6 +395,19 @@ export default function FocusQueue() {
         onSnooze={handleSnooze}
         onNoAction={handleNoAction}
         showLink={showLink}
+      />
+
+      <FocusCommitmentDrawer
+        open={!!commitmentDrawerItem}
+        onClose={closeAllDrawers}
+        commitment={commitmentDrawerItem}
+        onComplete={handleCommitmentComplete}
+        onSnooze={handleSnooze}
+        onDelegate={handleCommitmentDelegate}
+        onMarkWaitingOn={handleCommitmentWaitingOn}
+        onFollowUp={handleCommitmentFollowUp}
+        onMarkBroken={handleCommitmentBroken}
+        onCancel={handleCommitmentCancel}
       />
 
       <FocusEventModal

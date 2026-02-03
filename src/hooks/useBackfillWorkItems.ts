@@ -130,6 +130,23 @@ async function backfill(userId: string): Promise<number> {
     }
   }
 
+  // Backfill commitments: open, waiting_on, or delegated
+  const { data: commitmentItems } = await supabase
+    .from("commitments")
+    .select("id, status")
+    .eq("created_by", userId)
+    .in("status", ["open", "waiting_on", "delegated"])
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  if (commitmentItems) {
+    for (const item of commitmentItems) {
+      if (existingKeys.has(`commitment:${item.id}`)) continue;
+      const result = await ensureWorkItem("commitment", item.id, userId);
+      if (result?.isNew) created++;
+    }
+  }
+
   console.log(`[Focus Queue] Backfilled ${created} work items`);
   return created;
 }

@@ -25,7 +25,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { CommitmentInsert, CommitmentUpdate, ImpliedUrgency } from "@/types/commitment";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { CommitmentInsert, CommitmentUpdate, CommitmentDirection, ImpliedUrgency } from "@/types/commitment";
 
 interface CommitmentFormProps {
   initialValues?: Partial<CommitmentInsert>;
@@ -55,8 +57,12 @@ export function CommitmentForm({
   people = [],
   companies = [],
 }: CommitmentFormProps) {
+  const [title, setTitle] = useState(initialValues?.title || "");
   const [content, setContent] = useState(initialValues?.content || "");
   const [context, setContext] = useState(initialValues?.context || "");
+  const [direction, setDirection] = useState<CommitmentDirection>(
+    initialValues?.direction || "owed_by_me"
+  );
   const [personId, setPersonId] = useState(initialValues?.personId || "");
   const [personName, setPersonName] = useState(initialValues?.personName || "");
   const [companyId, setCompanyId] = useState(initialValues?.companyId || "");
@@ -67,9 +73,13 @@ export function CommitmentForm({
   const [dueAt, setDueAt] = useState<Date | undefined>(
     initialValues?.dueAt ? new Date(initialValues.dueAt) : undefined
   );
+  const [expectedBy, setExpectedBy] = useState<Date | undefined>(
+    initialValues?.expectedBy ? new Date(initialValues.expectedBy) : undefined
+  );
   const [impliedUrgency, setImpliedUrgency] = useState<ImpliedUrgency | undefined>(
     initialValues?.impliedUrgency
   );
+  const [alsoCreateTask, setAlsoCreateTask] = useState(false);
   const [useCustomPerson, setUseCustomPerson] = useState(!initialValues?.personId && !!initialValues?.personName);
 
   // Update person name when person is selected
@@ -108,15 +118,19 @@ export function CommitmentForm({
     if (!content.trim()) return;
 
     const data: CommitmentInsert = {
+      title: title.trim() || undefined,
       content: content.trim(),
       context: context.trim() || undefined,
+      direction,
       personId: personId || undefined,
       personName: personName || undefined,
       companyId: companyId || undefined,
       companyType: companyType,
       companyName: companyName || undefined,
-      dueAt: dueAt?.toISOString(),
+      dueAt: direction === "owed_by_me" ? dueAt?.toISOString() : undefined,
+      expectedBy: direction === "owed_to_me" ? expectedBy?.toISOString() : undefined,
       impliedUrgency: impliedUrgency,
+      alsoCreateTask,
     };
 
     await onSubmit(data);
@@ -124,12 +138,52 @@ export function CommitmentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Direction */}
+      <div className="space-y-2">
+        <Label>Direction</Label>
+        <RadioGroup
+          value={direction}
+          onValueChange={(v) => setDirection(v as CommitmentDirection)}
+          className="flex gap-4"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="owed_by_me" id="owed_by_me" />
+            <Label htmlFor="owed_by_me" className="text-sm font-normal cursor-pointer">
+              I owe
+            </Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="owed_to_me" id="owed_to_me" />
+            <Label htmlFor="owed_to_me" className="text-sm font-normal cursor-pointer">
+              Owed to me
+            </Label>
+          </div>
+        </RadioGroup>
+      </div>
+
+      {/* Title */}
+      <div className="space-y-2">
+        <Label htmlFor="title">Title (optional)</Label>
+        <Input
+          id="title"
+          placeholder="Send deck to investor..."
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+      </div>
+
       {/* Content */}
       <div className="space-y-2">
-        <Label htmlFor="content">What did you promise?</Label>
+        <Label htmlFor="content">
+          {direction === "owed_by_me" ? "What did you promise?" : "What are they supposed to do?"}
+        </Label>
         <Textarea
           id="content"
-          placeholder="I will send the deck by Friday..."
+          placeholder={
+            direction === "owed_by_me"
+              ? "I will send the deck by Friday..."
+              : "They will send the term sheet..."
+          }
           value={content}
           onChange={(e) => setContent(e.target.value)}
           className="min-h-[80px]"
@@ -226,28 +280,31 @@ export function CommitmentForm({
         </div>
       )}
 
-      {/* Due date and urgency */}
+      {/* Date and urgency */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Due date</Label>
+          <Label>{direction === "owed_to_me" ? "Expected by" : "Due date"}</Label>
           <Popover>
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
                 className={cn(
                   "w-full justify-start text-left font-normal",
-                  !dueAt && "text-muted-foreground"
+                  !(direction === "owed_to_me" ? expectedBy : dueAt) && "text-muted-foreground"
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {dueAt ? format(dueAt, "PPP") : "Pick a date"}
+                {direction === "owed_to_me"
+                  ? expectedBy ? format(expectedBy, "PPP") : "Pick a date"
+                  : dueAt ? format(dueAt, "PPP") : "Pick a date"
+                }
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
                 mode="single"
-                selected={dueAt}
-                onSelect={setDueAt}
+                selected={direction === "owed_to_me" ? expectedBy : dueAt}
+                onSelect={direction === "owed_to_me" ? setExpectedBy : setDueAt}
                 initialFocus
               />
             </PopoverContent>
@@ -274,6 +331,20 @@ export function CommitmentForm({
           </Select>
         </div>
       </div>
+
+      {/* Also create task toggle */}
+      {!isEditing && (
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="alsoCreateTask"
+            checked={alsoCreateTask}
+            onCheckedChange={(checked) => setAlsoCreateTask(checked === true)}
+          />
+          <Label htmlFor="alsoCreateTask" className="text-sm font-normal cursor-pointer">
+            Also create a task for this
+          </Label>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex justify-end gap-2 pt-4">
