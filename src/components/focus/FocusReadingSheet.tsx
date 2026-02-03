@@ -328,6 +328,45 @@ export function FocusReadingSheet({
             </div>
           </div>
 
+          {/* AI Suggestion Pills */}
+          {detail.actionability && detail.actionability !== "none" && detail.one_liner && (
+            <div className="space-y-2 pt-2 border-t border-border">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3" />
+                AI Suggests
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {detail.actionability === "diligence" && (
+                  <button
+                    onClick={() => handleAction(() => actions.markUpNext(detail.id, item.id, "today"))}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
+                  >
+                    <ArrowUpRight className="w-3 h-3" />
+                    Up Next Today — diligence detected
+                  </button>
+                )}
+                {detail.actionability === "follow_up" && (
+                  <button
+                    onClick={() => handleAction(() => actions.markUpNext(detail.id, item.id))}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20"
+                  >
+                    <ArrowUpRight className="w-3 h-3" />
+                    Up Next — follow-up needed
+                  </button>
+                )}
+                {detail.actionability === "idea" && (
+                  <button
+                    onClick={() => handleAction(() => actions.markSignal(detail.id, item.id))}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20"
+                  >
+                    <Radio className="w-3 h-3" />
+                    Keep as Signal — sparks an idea
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Primary Actions */}
           <div className="space-y-3 pt-2 border-t border-border">
             <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">

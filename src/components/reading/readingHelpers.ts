@@ -1,5 +1,30 @@
+import Fuse from 'fuse.js';
 import { ReadingItem, ProcessingStatus } from '@/types/readingItem';
 import { startOfWeek } from 'date-fns';
+
+// Content type display names for search matching
+const CONTENT_TYPE_SEARCH_TERMS: Record<string, string[]> = {
+  article: ['article', 'articles'],
+  x_post: ['x post', 'x posts', 'tweet', 'tweets', 'twitter'],
+  blog_post: ['blog', 'blogs', 'blog post', 'blog posts'],
+  newsletter: ['newsletter', 'newsletters'],
+  tool: ['tool', 'tools', 'product', 'products'],
+};
+
+// Fuse.js configuration for fuzzy search
+const FUSE_OPTIONS: Fuse.IFuseOptions<ReadingItem> = {
+  keys: [
+    { name: 'title', weight: 0.3 },
+    { name: 'oneLiner', weight: 0.25 },
+    { name: 'topics', weight: 0.2 },
+    { name: 'description', weight: 0.1 },
+    { name: 'hostname', weight: 0.1 },
+    { name: 'url', weight: 0.05 },
+  ],
+  threshold: 0.4,
+  ignoreLocation: true,
+  useExtendedSearch: false,
+};
 
 export type ReadingPrimaryView =
   | 'library'
@@ -119,17 +144,35 @@ export function applyReadingFilter(
     result = result.filter(i => i.contentType && filter.contentTypes.includes(i.contentType));
   }
 
-  // Apply search filter
+  // Apply search filter (fuzzy with fuse.js)
   if (searchQuery) {
-    const query = searchQuery.toLowerCase();
-    result = result.filter(i =>
-      i.title.toLowerCase().includes(query) ||
-      (i.description && i.description.toLowerCase().includes(query)) ||
-      i.url.toLowerCase().includes(query) ||
-      (i.hostname && i.hostname.toLowerCase().includes(query)) ||
-      (i.oneLiner && i.oneLiner.toLowerCase().includes(query)) ||
-      (i.topics && i.topics.some(t => t.toLowerCase().includes(query)))
-    );
+    const query = searchQuery.toLowerCase().trim();
+
+    // Check if query matches a content type name — filter by type directly
+    const matchedContentTypes: string[] = [];
+    for (const [type, terms] of Object.entries(CONTENT_TYPE_SEARCH_TERMS)) {
+      if (terms.some(t => t.includes(query) || query.includes(t))) {
+        matchedContentTypes.push(type);
+      }
+    }
+
+    if (matchedContentTypes.length > 0) {
+      // Combine: items matching content type OR fuzzy text match
+      const typeMatches = new Set(
+        result.filter(i => i.contentType && matchedContentTypes.includes(i.contentType)).map(i => i.id)
+      );
+
+      const fuse = new Fuse(result, FUSE_OPTIONS);
+      const fuseResults = fuse.search(searchQuery);
+      const fuseIds = new Set(fuseResults.map(r => r.item.id));
+
+      result = result.filter(i => typeMatches.has(i.id) || fuseIds.has(i.id));
+    } else {
+      // Pure fuzzy search
+      const fuse = new Fuse(result, FUSE_OPTIONS);
+      const fuseResults = fuse.search(searchQuery);
+      result = fuseResults.map(r => r.item);
+    }
   }
 
   // Apply view-specific sorting
