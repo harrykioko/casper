@@ -314,14 +314,14 @@ export function CommitmentForm({
         <div className="space-y-2">
           <Label>Implied urgency</Label>
           <Select
-            value={impliedUrgency || ""}
-            onValueChange={(v) => setImpliedUrgency(v as ImpliedUrgency || undefined)}
+            value={impliedUrgency || "none"}
+            onValueChange={(v) => setImpliedUrgency(v === "none" ? undefined : v as ImpliedUrgency)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select urgency" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No urgency set</SelectItem>
+              <SelectItem value="none">No urgency set</SelectItem>
               {URGENCY_OPTIONS.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
