@@ -10,6 +10,7 @@ import {
   AlertCircle,
   Clock,
   Link2,
+  Handshake,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
@@ -29,6 +30,7 @@ const SOURCE_ICONS: Record<WorkItemSourceType, typeof Mail> = {
   task: ListTodo,
   note: StickyNote,
   reading: BookOpen,
+  commitment: Handshake,
 };
 
 const SOURCE_COLORS: Record<WorkItemSourceType, string> = {
@@ -37,6 +39,7 @@ const SOURCE_COLORS: Record<WorkItemSourceType, string> = {
   task: "text-amber-400",
   note: "text-green-400",
   reading: "text-cyan-400",
+  commitment: "text-rose-400",
 };
 
 export function WorkQueueList({

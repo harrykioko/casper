@@ -10,7 +10,8 @@ import {
   Sparkles,
   X,
   Pencil,
-  Clock
+  Clock,
+  Handshake
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,11 @@ const TYPE_CONFIG: Record<
     icon: Users,
     label: "Intro",
     accent: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  },
+  CREATE_WAITING_ON: {
+    icon: Handshake,
+    label: "Obligation",
+    accent: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400",
   },
   SET_STATUS: {
     icon: Flag,
