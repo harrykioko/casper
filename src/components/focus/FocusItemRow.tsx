@@ -14,6 +14,8 @@ import {
   ListPlus,
   ArrowUpRight,
   Archive,
+  Check,
+  XCircle,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -37,6 +39,10 @@ interface FocusItemRowProps {
   onReadingUpNext?: (workItemId: string, sourceId: string) => void;
   onReadingArchive?: (workItemId: string, sourceId: string) => void;
   onReadingOpenLink?: (url: string) => void;
+  // Email quick action handlers
+  onEmailTrusted?: (workItemId: string) => void;
+  onEmailNoAction?: (workItemId: string, sourceId: string) => void;
+  // Shared
   onSnooze?: (workItemId: string, until: Date) => void;
 }
 
@@ -77,6 +83,8 @@ export function FocusItemRow({
   onReadingUpNext,
   onReadingArchive,
   onReadingOpenLink,
+  onEmailTrusted,
+  onEmailNoAction,
   onSnooze,
 }: FocusItemRowProps) {
   const Icon = SOURCE_ICONS[item.source_type] || Mail;
@@ -85,6 +93,7 @@ export function FocusItemRow({
   const borderColor = SCORE_BORDER_COLORS[scoreTier];
 
   const isReading = item.source_type === "reading";
+  const isEmail = item.source_type === "email";
 
   const handleOpenLink = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -111,6 +120,17 @@ export function FocusItemRow({
   const handleSnooze = (until: Date, e: React.MouseEvent) => {
     e.stopPropagation();
     onSnooze?.(item.id, until);
+  };
+
+  // Email handlers
+  const handleEmailTrusted = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEmailTrusted?.(item.id);
+  };
+
+  const handleEmailNoAction = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onEmailNoAction?.(item.id, item.source_id);
   };
 
   return (
@@ -203,6 +223,56 @@ export function FocusItemRow({
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+              </div>
+            )}
+
+            {/* Email Quick Actions - visible on hover */}
+            {isEmail && (
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 rounded-full"
+                  onClick={handleEmailTrusted}
+                  title="Mark trusted"
+                >
+                  <Check className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 rounded-full"
+                      title="Snooze"
+                    >
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem onClick={(e) => handleSnooze(addHours(new Date(), 3), e as any)}>
+                      3 hours
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => handleSnooze(startOfTomorrow(), e as any)}>
+                      Tomorrow
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => handleSnooze(nextMonday(new Date()), e as any)}>
+                      Next week
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => handleSnooze(addDays(new Date(), 30), e as any)}>
+                      30 days
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 rounded-full"
+                  onClick={handleEmailNoAction}
+                  title="No action (removes from inbox)"
+                >
+                  <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
               </div>
             )}
           </div>
