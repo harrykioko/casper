@@ -1,36 +1,74 @@
 
-## Fix: Empty Select Value Error in Obligation Form
+
+## Fix: Obligations Not Saving
 
 ### Problem
-When creating a new obligation, the app crashes with:
-```
-Error: A <Select.Item /> must have a value prop that is not an empty string.
-```
-
-This is caused by the "Implied urgency" dropdown in `CommitmentForm.tsx` at line 324, which uses an empty string as a value for the "No urgency set" option. Radix UI's Select component reserves the empty string for indicating "no selection" (to show the placeholder), so it cannot be used as an item value.
+When you create a new obligation and click "Add Commitment," nothing happens. The obligation is not saved to the database and doesn't appear in the list.
 
 ### Root Cause
-In `src/components/commitments/CommitmentForm.tsx`:
-- **Line 324**: `<SelectItem value="">No urgency set</SelectItem>` - Uses empty string as value
-- **Line 317**: `value={impliedUrgency || ""}` - Falls back to empty string
+The `CommitmentModal` component in `ObligationsPage.tsx` is **missing the `onSave` callback**. The modal form calls `onSave?.(data)` when submitted, but since `onSave` is not passed as a prop, nothing happens:
+
+```tsx
+// Current code (line 244-251) - MISSING onSave!
+<CommitmentModal
+  open={showCreate}
+  onOpenChange={setShowCreate}
+  mode="create"
+/>
+```
+
+Additionally, the view/action modal is missing handlers for complete, snooze, and delegate actions.
 
 ### Solution
-Replace the empty string with a placeholder value like `"none"`, and update the state management accordingly.
+Wire up the `createCommitment` function from `useCommitments` hook to the modal's `onSave` prop, and ensure the `useObligations` query is refreshed after mutation.
 
 ### Changes Required
 
-**File: `src/components/commitments/CommitmentForm.tsx`**
+**File: `src/pages/ObligationsPage.tsx`**
 
-1. Update the Select value fallback (line 317):
-   - Change `value={impliedUrgency || ""}` to `value={impliedUrgency || "none"}`
+1. Create an `onSave` handler that calls `createCommitment` and then refreshes the obligations list:
+   ```tsx
+   const handleSave = async (data: CommitmentInsert) => {
+     await createCommitment(data);
+     refetch(); // Refresh the React Query cache
+   };
+   ```
 
-2. Update the onValueChange handler (line 318):
-   - Change `onValueChange={(v) => setImpliedUrgency(v as ImpliedUrgency || undefined)}`
-   - To: `onValueChange={(v) => setImpliedUrgency(v === "none" ? undefined : v as ImpliedUrgency)}`
+2. Pass `onSave` to the create modal:
+   ```tsx
+   <CommitmentModal
+     open={showCreate}
+     onOpenChange={setShowCreate}
+     mode="create"
+     onSave={handleSave}
+   />
+   ```
 
-3. Update the SelectItem value (line 324):
-   - Change `<SelectItem value="">No urgency set</SelectItem>`
-   - To: `<SelectItem value="none">No urgency set</SelectItem>`
+3. Pass handlers to the view/action modal for complete, snooze, and delegate:
+   ```tsx
+   <CommitmentModal
+     open={!!selectedCommitment}
+     onOpenChange={(open) => { if (!open) setSelectedCommitment(null); }}
+     mode={modalMode}
+     commitment={selectedCommitment}
+     onComplete={async (id, via, notes) => {
+       await completeCommitment(id, via, notes);
+       refetch();
+     }}
+     onSnooze={async (id, until) => {
+       await snoozeCommitment(id, until);
+       refetch();
+     }}
+     onDelegate={async (id, personId, name) => {
+       await delegateCommitment(id, personId, name);
+       refetch();
+     }}
+   />
+   ```
 
 ### Technical Details
-The fix uses `"none"` as a sentinel value that gets converted to `undefined` when setting state. This matches the pattern already used in the company selector (line 101-104, line 259) which correctly uses `value="none"` and handles it appropriately.
+- The `useObligations` hook uses React Query for data fetching
+- The `useCommitments` hook handles mutations (create/update/delete)
+- After each mutation, `refetch()` must be called to invalidate the React Query cache and refresh the list
+- The `CommitmentInsert` type should be imported for proper TypeScript typing
+
