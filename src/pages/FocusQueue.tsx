@@ -189,6 +189,24 @@ export default function FocusQueue() {
     window.open(url, "_blank", "noopener,noreferrer");
   }, []);
 
+  // Email quick action handlers
+  const handleEmailTrusted = useCallback(
+    (workItemId: string) => {
+      triageActions.markTrusted(workItemId);
+      advanceToNext();
+    },
+    [triageActions, advanceToNext]
+  );
+
+  const handleEmailNoAction = useCallback(
+    (workItemId: string, sourceId: string) => {
+      triageActions.noAction(workItemId);
+      markComplete(sourceId);
+      advanceToNext();
+    },
+    [triageActions, markComplete, advanceToNext]
+  );
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -273,6 +291,8 @@ export default function FocusQueue() {
                     onReadingUpNext={handleReadingUpNext}
                     onReadingArchive={handleReadingArchive}
                     onReadingOpenLink={handleReadingOpenLink}
+                    onEmailTrusted={handleEmailTrusted}
+                    onEmailNoAction={handleEmailNoAction}
                     onSnooze={(id, until) => triageActions.snooze(id, until)}
                   />
                 ))}
