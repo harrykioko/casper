@@ -27,6 +27,7 @@ export interface FocusCounts {
 
 export interface FocusQueueItem extends WorkQueueItem {
   priorityScore: number;
+  source_url?: string; // URL for reading items
 }
 
 export function useFocusQueue() {
@@ -195,6 +196,7 @@ export function useFocusQueue() {
           reason_codes: reasonCodes,
           source_title: sd?.title || "Untitled",
           source_snippet: sd?.snippet || undefined,
+          source_url: sd?.url || undefined,
           primary_link: entityLinks[key] || null,
           one_liner: extracts[key] || null,
           priorityScore,
@@ -281,6 +283,7 @@ function computeCounts(items: FocusQueueItem[]): FocusCounts {
 interface SourceDataEntry {
   title: string;
   snippet?: string;
+  url?: string; // URL for reading items
   scoreData?: any;
   /** True if the source record itself has a company/project link (e.g. inbox_items.related_company_id) */
   hasSourceLink?: boolean;
@@ -381,11 +384,13 @@ async function fetchSourceData(
     fetches.push(async () => {
       const { data } = await supabase
         .from("reading_items")
-        .select("id, title, url, project_id")
+        .select("id, title, url, project_id, one_liner")
         .in("id", byType["reading"]);
       for (const row of data || []) {
         result[`reading:${row.id}`] = {
           title: row.title || row.url || "Untitled",
+          url: row.url,
+          snippet: row.one_liner || undefined,
           scoreData: {},
           hasSourceLink: !!row.project_id,
         };
