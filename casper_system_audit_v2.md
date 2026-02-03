@@ -1,32 +1,37 @@
-# Casper System Audit v2
+# Casper System Audit v2.1
 
 **Date:** February 2026
 **Scope:** Full system evaluation against the Casper north star
 **Audience:** Product owner / sole operator
+**Delta from v2:** Obligations Engine v1 implemented (commitments integrated into Focus Queue, Dashboard, Inbox, and dedicated /obligations page)
 
 ---
 
 ## 1. Executive Summary
 
-Casper has evolved materially since v1. The system now has a real data backbone: inbox items ingest from email, AI-generated suggestions are typed and actionable, context linking (email ↔ company) works, and a Focus Queue attempts to unify all loose ends into a single triage surface. Notes are polymorphically linked. Commitments exist as a first-class schema object. The entity model is no longer skeletal.
+Casper has crossed a meaningful threshold since v2. The Obligations Engine v1 closes the largest structural gap identified in the previous audit: commitments are no longer a disconnected schema object. They now flow through the same backfill → enrichment → priority scoring → triage pipeline as emails, tasks, calendar events, notes, and reading items. The system can now answer "what promises am I at risk of breaking?" from multiple surfaces.
 
 **What's working:**
-- Inbox ingestion captures forwarded emails with cleaned content, forwarding detection, thread/disclaimer stripping, and attachment support.
-- AI suggestions (v2) are intent-typed (intro, pipeline follow-up, portfolio update, etc.) and produce structured, executable actions (link company, create pipeline entry, create follow-up task, extract highlights).
-- Company linking from inbox is functional — domain matching runs deterministically, and manual linking is smooth.
-- Focus Queue (`/focus`) provides a unified triage surface spanning emails, tasks, calendar events, notes, and reading items, with priority scoring and auto-resolution of fully-linked items.
-- Commitments table has a rich schema (delegation, snooze tracking, implied urgency, source linking).
-- Notes are polymorphically linked via `note_links` to tasks, companies, projects, reading items, and calendar events.
+- Everything from v2 (inbox ingestion, AI suggestions, company linking, Focus Queue, polymorphic notes, people graph).
+- **Commitments are bidirectional.** `owed_by_me` and `owed_to_me` directions are tracked with direction-aware scoring, badges, and date semantics (`due_at` for obligations I owe, `expected_by` for things owed to me).
+- **Commitments flow through Focus Queue.** Open commitments create work items via backfill, receive priority scoring (urgency from date proximity, importance from direction + VIP status), and appear alongside emails and tasks in the unified triage surface.
+- **Focus Queue has commitment-specific triage.** 8 actions: Complete, Add Note, Snooze, Delegate (owed_by_me only), Mark Waiting On (owed_by_me + open), Follow Up (owed_to_me or waiting_on), Mark Broken, Cancel. State-aware visibility ensures only relevant actions appear.
+- **Counterparty context panel** shows person details, VIP status, company context, and recent commitments with that counterparty — directly in the Focus Queue drawer.
+- **Dashboard surfaces at-risk obligations.** Overdue commitments, stale waiting-on items, high-urgency obligations, and items due today appear in a dedicated panel above the main grid.
+- **Dedicated /obligations page** with direction tabs, status filtering, search, and creation.
+- **Inbox → commitment path exists.** `CREATE_WAITING_ON` suggestion type enables AI-powered commitment creation from email. `CREATE_FOLLOW_UP_TASK` can also create commitments via the form's "Also create task" toggle.
+- **Inbox activity logging.** Actions taken on inbox items are recorded in the `inbox_activity` table, providing the resolution audit trail that was missing in v2.
+- **Stale commitment detection.** `mark_stale_commitments` RPC uses implied_urgency thresholds (high=1d, medium=3d, low=7d) to auto-flag commitments as broken.
 
 **What's not working yet:**
-- The system still cannot reliably answer "what's the most important thing right now?" The priority scoring is v1 (urgency × importance only), with no commitment weight, no person/relationship signal, and no effort estimation.
-- Commitments exist in the database but have no visible integration into Inbox triage, Focus Queue, or Dashboard. They are a disconnected object.
-- The Dashboard does not reflect the Focus Queue, commitments, or overdue items. It shows tasks, reading list, and calendar — a v1 surface.
-- There is no "waiting-on" tracking. When the user sends a reply or delegates, there is no mechanism to track that a response is expected.
-- Snooze exists on inbox items, tasks, and commitments independently — but there is no unified "snoozed items" view or resurface mechanism that crosses object types.
-- The system still relies on the user opening the Focus Queue page to trigger backfill. There is no background processing or push-based notification of items needing attention.
+- **No outbound email tracking.** The system still cannot see what the user sends — commitments made in email replies remain invisible unless manually created.
+- **No effort estimation on Focus Queue items.** The user cannot filter by "what can I do in 15 minutes."
+- **No start-of-day briefing.** The user must manually check Dashboard + Focus Queue + Inbox to understand their situation.
+- **No unified snooze surface.** Snoozed items across inbox, tasks, commitments, and work items are independent.
+- **Backfill still runs on page load.** No background processing or push-based notifications.
+- **Pipeline companies don't surface proactively.** `is_top_of_mind` flag exists but pipeline items don't enter Focus Queue.
 
-**Net assessment:** Casper has crossed the threshold from "organized bookmark list" to "intake + triage system." The foundations for context preservation are solid. But the system does not yet deliver on the core promise — **confidence that nothing is slipping** — because commitments, follow-ups, and waiting-on states are structurally disconnected from the surfaces the user actually looks at.
+**Net assessment:** Casper now delivers on the core promise for tracked obligations — the user can see what's at risk, triage commitments alongside other work, and trust that overdue items will escalate. The remaining gaps are in capture breadth (outbound, non-email), time-aware planning (effort, daily briefing), and proactive surfacing (background processing, pipeline).
 
 ---
 
@@ -36,39 +41,43 @@ Casper has evolved materially since v1. The system now has a real data backbone:
 
 | Object | Table | Created By | Links To | Resolved By | Participates in Prioritization |
 |--------|-------|-----------|----------|-------------|-------------------------------|
-| **Inbox Item** | `inbox_items` | Email ingestion (edge function `email-inbox-ingest`) | Company (direct FK), Tasks (via `source_inbox_item_id`), Suggestions, Attachments, Work Items | `is_resolved`, `is_deleted` (archive) | Yes — Focus Queue via `work_items` |
+| **Inbox Item** | `inbox_items` | Email ingestion (edge function `email-inbox-ingest`) | Company (direct FK), Tasks (via `source_inbox_item_id`), Suggestions, Attachments, Work Items, Activity Log | `is_resolved`, `is_deleted` (archive) | Yes — Focus Queue via `work_items` |
 | **Task** | `tasks` | Manual, from inbox suggestion, from Focus triage | Project, Category, Company (portfolio), Pipeline Company, Source Inbox Item | `completed`, `archived_at` | Yes — Focus Queue, priority scoring |
 | **Project** | `projects` | Manual | Tasks, Notes, Assets, Prompts, Reading Items, Nonnegotiables | `status` field (no formal lifecycle) | No |
 | **Company (Portfolio)** | `companies` | Manual | Contacts, Interactions, Tasks, Calendar Links, Inbox Items, People, Commitments | `status` enum (active/watching/exited/archived) | No |
 | **Pipeline Company** | `pipeline_companies` | Manual, from inbox suggestion | Contacts, Interactions, Notes, Attachments, Enrichments, Tasks | `status` string | No |
-| **Commitment** | `commitments` | Manual, from interaction | Person, Company, Source (call/email/meeting) | `status` enum (completed/broken/delegated/cancelled) | **No** — not in Focus Queue |
-| **Person** | `people` | Manual | Company roles, Interactions, Commitments | N/A (reference entity) | No |
-| **Note** | `project_notes` + `note_links` | Manual, floating note (Cmd+Shift+N) | Any target via `note_links` (task, company, project, reading_item, calendar_event) | N/A (persistent) | Only if orphaned (Focus Queue backfill) |
+| **Commitment** | `commitments` | Manual, from inbox suggestion (CREATE_WAITING_ON), from interaction | Person, Company, Source (call/email/meeting), Direction (owed_by_me/owed_to_me) | `status` enum + `resolved_at` | **Yes** — Focus Queue via `work_items`, priority scoring, Dashboard |
+| **Person** | `people` | Manual | Company roles, Interactions, Commitments | N/A (reference entity) | Indirectly (VIP status boosts commitment importance) |
+| **Note** | `project_notes` + `note_links` | Manual, floating note (Cmd+Shift+N), from commitment triage | Any target via `note_links` (task, company, project, reading_item, calendar_event) | N/A (persistent) | Only if orphaned (Focus Queue backfill) |
 | **Calendar Event** | `calendar_events` | Outlook sync | Company links, Link suggestions, Work Items | N/A (time-bound) | Yes — Focus Queue |
 | **Reading Item** | `reading_items` | Manual (URL paste) | Project, Topics, Entities | `is_read`, `is_archived` | Yes — Focus Queue (if unprocessed) |
 | **Inbox Suggestion** | `inbox_suggestions` | AI (edge function `inbox-suggest-v2`) | Inbox Item (1:1) | Dismissed or acted upon | Indirectly (drives inbox actions) |
-| **Work Item** | `work_items` | Backfill (`useBackfillWorkItems`) + `ensureWorkItem` | Source (polymorphic: email, task, calendar_event, note, reading), Entity Links | `status` (trusted/ignored) | **Yes** — this IS the prioritization layer |
+| **Work Item** | `work_items` | Backfill (`useBackfillWorkItems`) + `ensureWorkItem` | Source (polymorphic: email, task, calendar_event, note, reading, **commitment**), Entity Links | `status` (trusted/ignored) | **Yes** — this IS the prioritization layer |
+| **Inbox Activity** | `inbox_activity` | Action handlers (task creation, linking, resolution) | Inbox Item, Target (polymorphic) | N/A (audit log) | No |
 | **Entity Link** | `entity_links` | Deterministic enrichment, manual linking | Source ↔ Target (polymorphic) | N/A (graph edge) | Indirectly (resolves reason codes) |
 | **Inbox Attachment** | `inbox_attachments` | Email ingestion | Inbox Item | N/A | No |
 | **Item Extract** | `item_extracts` | AI enrichment (`focus-enrich`) | Source (polymorphic) | N/A (metadata) | Indirectly (provides one-liners) |
 
 ### 2.2 Key Enums
 
-- **Commitment Status:** open, completed, broken, delegated, cancelled
+- **Commitment Status:** open, **waiting_on**, completed, broken, delegated, cancelled
+- **Commitment Direction:** owed_by_me, owed_to_me
 - **Commitment Source:** call, email, meeting, message, manual
 - **Company Kind:** portfolio, pipeline, other
 - **Interaction Type:** note, call, meeting, email, update
 - **Note Target Type:** task, company, project, reading_item, calendar_event
 - **Email Intent (AI):** intro_first_touch, pipeline_follow_up, portfolio_update, intro_request, scheduling, personal_todo, fyi_informational
-- **Suggestion Type (AI):** LINK_COMPANY, CREATE_PIPELINE_COMPANY, CREATE_FOLLOW_UP_TASK, CREATE_PERSONAL_TASK, CREATE_INTRO_TASK, SET_STATUS, EXTRACT_UPDATE_HIGHLIGHTS
+- **Suggestion Type (AI):** LINK_COMPANY, CREATE_PIPELINE_COMPANY, CREATE_FOLLOW_UP_TASK, CREATE_PERSONAL_TASK, CREATE_INTRO_TASK, SET_STATUS, EXTRACT_UPDATE_HIGHLIGHTS, **CREATE_WAITING_ON**
+- **Work Item Source Type:** email, task, calendar_event, note, reading, **commitment**
 - **Work Item Status:** needs_review, enriched_pending, trusted, snoozed, ignored
+- **Inbox Activity Action Type:** task_created, commitment_created, company_linked, resolved, archived, snoozed, suggestion_acted, suggestion_dismissed
 
 ### 2.3 Edge Functions
 
 | Function | Purpose |
 |----------|---------|
 | `email-inbox-ingest` | Receives forwarded emails, parses, cleans, stores as inbox_items |
-| `inbox-suggest-v2` | AI-powered intent classification and structured action suggestions |
+| `inbox-suggest-v2` | AI-powered intent classification and structured action suggestions (now includes CREATE_WAITING_ON) |
 | `inbox-suggest` | Legacy v1 suggestions (still present) |
 | `focus-enrich` | AI enrichment for work items (one-liners, summaries) |
 | `reading-enrich` | AI enrichment for reading items (summaries, topics, entities) |
@@ -85,9 +94,10 @@ Casper has evolved materially since v1. The system now has a real data backbone:
 
 | Route | Surface | Role |
 |-------|---------|------|
-| `/dashboard` | Main dashboard | Tasks, reading list, calendar sidebar, nonnegotiables |
-| `/inbox` | Email inbox | Primary intake surface, triage, suggestions |
-| `/focus` | Focus Queue | Unified triage across all object types |
+| `/dashboard` | Main dashboard | Priority items, inbox panel, tasks, obligations (at-risk), companies, commitments, reading list |
+| `/inbox` | Email inbox | Primary intake surface, triage, suggestions, commitment creation |
+| `/focus` | Focus Queue | Unified triage across all object types including commitments |
+| `/obligations` | Obligations page | Dedicated bidirectional commitment management with filtering |
 | `/tasks` | Task management | Full task list with filtering |
 | `/projects` | Project list | Project organization |
 | `/projects/:id` | Project detail | Tasks, notes, assets for a project |
@@ -101,23 +111,23 @@ Casper has evolved materially since v1. The system now has a real data backbone:
 | `/prompt-builder` | Prompt builder | AI-assisted prompt generation |
 | `/settings` | Settings | User and connection settings |
 
-### 2.5 What Materially Improved Since v1
+### 2.5 What Materially Improved Since v2
 
-1. **Inbox ingestion is real.** Emails flow in via `email-inbox-ingest`, with content cleaning (thread stripping, disclaimer removal, forwarding detection), and the system distinguishes the original sender from the forwarder.
+1. **Commitments are integrated into the workflow.** Open commitments create work items via backfill, receive direction-aware priority scoring, and appear in the Focus Queue with a dedicated FocusCommitmentDrawer.
 
-2. **AI suggestions are typed and actionable.** V2 suggestions classify email intent (7 types) and produce structured actions (7 types) with confidence scores, effort estimates, and rationale. This is a genuine step beyond "create a task from this."
+2. **Bidirectional tracking.** The `direction` field distinguishes "I owe this" from "someone owes me this." Scoring, badges, date semantics, and triage actions all adapt to direction.
 
-3. **Company linking works end-to-end.** Domain matching runs deterministically on ingestion. Manual linking is available. Links propagate to work items and auto-resolve Focus Queue items.
+3. **Commitment-specific triage in Focus Queue.** 8 state-aware actions (Complete, Note, Snooze, Delegate, Waiting On, Follow Up, Broken, Cancel) with visibility rules based on direction and status.
 
-4. **Focus Queue exists as a unified triage surface.** `work_items` table acts as a meta-layer that wraps emails, tasks, calendar events, notes, and reading items into a single prioritized queue with reason codes, priority scoring, and entity linking.
+4. **Counterparty context.** When triaging a commitment in Focus Queue, the user sees the person's details, VIP status, company, and recent commitment history — enabling informed decisions.
 
-5. **Notes are polymorphically linked.** The `note_links` table enables a note to be linked to any entity type, and the floating note (Cmd+Shift+N) provides quick capture.
+5. **Dashboard surfaces at-risk obligations.** Overdue, stale, high-urgency, and due-today commitments appear in a dedicated panel at the top of the dashboard.
 
-6. **Commitments schema is comprehensive.** The `commitments` table includes delegation, snooze tracking, implied urgency, source linking, and person/company associations. Views exist for open and overdue commitments.
+6. **Inbox → commitment path.** `CREATE_WAITING_ON` AI suggestion type enables commitment creation from email. The CommitmentForm supports direction, title, expected_by, and "also create task" toggle.
 
-7. **Attachment support.** Inbox attachments are stored, viewable, and can be copied to pipeline companies.
+7. **Inbox activity logging.** Actions taken on inbox items are recorded, providing the resolution audit trail that was missing.
 
-8. **People as first-class objects.** The `people` table with `person_company_roles` provides a proper contact graph with VIP flagging and relationship tiers.
+8. **Stale detection.** `mark_stale_commitments` RPC auto-flags overdue commitments based on implied_urgency thresholds.
 
 ---
 
@@ -125,97 +135,87 @@ Casper has evolved materially since v1. The system now has a real data backbone:
 
 ### 3.1 Does Inbox reliably capture everything that matters?
 
-**Partially.** Inbox captures forwarded emails well — the ingestion pipeline handles parsing, cleaning, and metadata extraction. But:
+**Partially.** Inbox captures forwarded emails well. But:
 
-- **Only email.** Slack messages, WhatsApp, text threads, verbal commitments, and in-person meeting takeaways do not flow into the inbox. The user must manually create tasks or notes for these.
-- **No auto-forward.** The user must actively forward emails to the ingestion endpoint. Emails that the user reads and acts on in Outlook but forgets to forward are invisible to Casper.
-- **No sent-mail tracking.** When the user sends a reply making a commitment or asking for something, Casper has no visibility into it. This is the single largest gap — outbound obligations are completely untracked.
+- **Only email.** Slack messages, WhatsApp, text threads, verbal commitments, and in-person meeting takeaways do not flow into the inbox.
+- **No auto-forward.** The user must actively forward emails to the ingestion endpoint.
+- **No sent-mail tracking.** When the user sends a reply making a commitment, Casper has no visibility. This remains the single largest capture gap.
 
 ### 3.2 Are suggested actions typed, correct, and executable?
 
-**Yes, this is meaningfully improved.** The V2 suggestion system:
+**Yes, improved from v2.** The V2 suggestion system now includes 8 action types:
 
-- Classifies intent into 7 VC-relevant categories (intro, pipeline follow-up, portfolio update, etc.)
-- Produces typed actions: LINK_COMPANY, CREATE_PIPELINE_COMPANY, CREATE_FOLLOW_UP_TASK, CREATE_PERSONAL_TASK, CREATE_INTRO_TASK, SET_STATUS, EXTRACT_UPDATE_HIGHLIGHTS
-- Includes confidence scores, effort estimates, and rationale
-- Auto-generates on first open if no cached suggestions exist
-- Supports dismissal (persisted to DB)
+- LINK_COMPANY, CREATE_PIPELINE_COMPANY, CREATE_FOLLOW_UP_TASK, CREATE_PERSONAL_TASK, CREATE_INTRO_TASK, SET_STATUS, EXTRACT_UPDATE_HIGHLIGHTS, **CREATE_WAITING_ON**
+
+The new CREATE_WAITING_ON type enables tracking obligations owed to the user (e.g., "founder promised to send the data room link by Friday").
 
 **Remaining gaps:**
-- "Add note" from inbox is still a toast placeholder (`toast.info("Add note feature coming soon")` — `Inbox.tsx:57`)
-- CREATE_INTRO_TASK and CREATE_FOLLOW_UP_TASK create generic tasks — they don't create commitments, even though these are definitionally commitments
-- EXTRACT_UPDATE_HIGHLIGHTS exists as a suggestion type but the execution path for saving highlights as structured notes against a company is unclear
-- No suggestion type for "reply needed" or "schedule meeting" — two of the most common email responses
+- "Add note" from inbox is still a toast placeholder
+- EXTRACT_UPDATE_HIGHLIGHTS execution path for saving structured highlights is unclear
+- No suggestion type for "reply needed" or "schedule meeting"
 
 ### 3.3 Is context preserved when actions are taken?
 
-**Mostly yes, with gaps.**
+**Mostly yes, improved from v2.**
 
-- **Email → Task:** Tasks created from inbox suggestions carry `source_inbox_item_id`, preserving the link back to the email. Company context is passed through.
-- **Email → Company link:** Direct FK on `inbox_items.related_company_id` with company name, type, and logo. Solid.
-- **Email → Pipeline company:** CREATE_PIPELINE_COMPANY suggestion includes extracted metadata (company name, domain, contact, description). Context is well-preserved.
-- **Email → Note:** Not yet functional. When it works, the polymorphic `note_links` system should preserve the inbox item link.
-- **Email → Commitment:** No path exists. This is a structural gap.
+- **Email → Task:** Tasks carry `source_inbox_item_id`. Solid.
+- **Email → Company link:** Direct FK with company metadata. Solid.
+- **Email → Pipeline company:** Extracted metadata preserved. Solid.
+- **Email → Commitment:** Now functional via CREATE_WAITING_ON. Person name, expected date, and context are extracted by AI and passed to the commitment form.
+- **Email → Note:** Still not functional.
+- **Action audit trail:** Inbox activity logging now records what action was taken on each item.
 
 ### 3.4 Can the user confidently clear Inbox knowing the work has been converted?
 
-**Not yet.** The user can:
+**Improving.** The user can now:
 - Mark as complete (sets `is_resolved`)
 - Archive (sets `is_deleted`)
 - Snooze (sets `snoozed_until`)
 - Create a task from a suggestion
+- **Create a commitment from a suggestion (new)**
+- **Actions are logged in `inbox_activity` (new)**
 
-But there is no "I've handled this, here's what I did" flow. The user marks complete and the email disappears. There's no record of what action was taken — no activity log, no "resolved via task X" annotation. This means:
-
-- If the user archives an email after creating a task, there's a `source_inbox_item_id` link, but nothing on the inbox item itself records that a task was created.
-- If the user replies in Outlook and then archives in Casper, there's no record that a reply was sent.
-- The mental model is still "process and forget" rather than "process and track."
+The activity log means the user can later verify what was done with an email. The remaining gap is that replies sent in Outlook are still invisible — the user has no way to record "I replied to this" without manual action.
 
 ---
 
 ## 4. Action & Execution Evaluation
 
-### 4.1 How well does Casper distinguish linking, noting, tasking, and status updates?
+### 4.1 How well does Casper distinguish linking, noting, tasking, committing, and status updates?
 
-**The type system is there; the execution is uneven.**
+**The type system is comprehensive; execution is mostly complete.**
 
-- **Linking (LINK_COMPANY):** Works well. Domain matching is deterministic. Manual linking via modal is functional. Links propagate to work items.
-- **Tasking (CREATE_*_TASK):** Creates tasks with proper metadata. Tasks link to projects, companies, and pipeline companies. Task completion triggers `completed_at` timestamps.
-- **Noting:** Notes are first-class with polymorphic links. The floating note overlay (Cmd+Shift+N) provides quick capture with optional target context. However, notes from inbox are not yet wired up.
-- **Status updates (SET_STATUS):** Exists as a suggestion type but the execution path for updating pipeline company status from an inbox action is not clearly implemented.
+- **Linking (LINK_COMPANY):** Works well. Domain matching + manual linking.
+- **Tasking (CREATE_*_TASK):** Creates tasks with proper metadata and source linking.
+- **Committing:** Now functional. Direction-aware creation from inbox or manual. Commitments carry person, company, source, urgency, and date context.
+- **Noting:** Notes are first-class with polymorphic links. Floating note overlay works. Commitment triage "Add Note" action opens the floating note with commitment context pre-filled.
+- **Status updates (SET_STATUS):** Exists but execution path for pipeline company status updates from inbox is still unclear.
 
-### 4.2 Are tasks only created when they should be?
+### 4.2 Are commitments tracked end-to-end?
 
-**Mostly.** The V2 suggestion system is better at distinguishing FYI emails from actionable ones. The intent classification helps — `fyi_informational` intent doesn't generate task suggestions. However:
+**Yes, for commitments the system knows about.**
 
-- There is no mechanism to distinguish "I need to do something" from "I need to track that someone else does something." Both become tasks.
-- Quick tasks (`is_quick_task`) exist as a concept but are underused — they're essentially inbox-captured tasks without project or priority assignment.
+The lifecycle is:
+1. **Creation:** Manual, from inbox suggestion (CREATE_WAITING_ON), or from interaction
+2. **Backfill:** Open commitments automatically create work items
+3. **Enrichment:** Company linking, direction validation, reason code assignment
+4. **Scoring:** Direction-aware urgency (date proximity) and importance (direction + VIP + urgency)
+5. **Triage:** 8-action triage bar in Focus Queue with state-aware visibility
+6. **Resolution:** Complete, delegate, break, or cancel — sets `resolved_at` and marks work item as trusted
+7. **Escalation:** `mark_stale_commitments` auto-flags overdue items based on urgency thresholds
+8. **Dashboard:** At-risk items surface in the ObligationsPanel
 
-### 4.3 Are notes/highlights first-class?
+The gap is creation — the system only tracks commitments that are explicitly created. Outbound email commitments and verbal commitments are invisible unless the user manually enters them.
 
-**Structurally yes, practically incomplete.**
-
-The `project_notes` + `note_links` system is well-designed:
-- Notes have title, content, note_type, and polymorphic links
-- Notes can link to multiple targets (primary + secondary contexts)
-- A dedicated `/notes` page exists with search and filtering
-- Floating note overlay provides quick capture from anywhere
-
-But:
-- Notes from inbox suggestions (EXTRACT_UPDATE_HIGHLIGHTS) are not implemented end-to-end
-- No quick highlight-and-save from email body
-- No structured note templates (meeting notes, portfolio update summaries)
-- Notes don't surface in company timelines or task detail views consistently
-
-### 4.4 Missing action types
+### 4.3 Missing action types
 
 | Action | Status | Impact |
 |--------|--------|--------|
-| **Create commitment** | Schema exists, no inbox integration | High — commitments are the primary slip-through vector |
-| **Waiting-on / expecting reply** | Not implemented | High — no way to track outbound obligations |
-| **Schedule follow-up** | Partially via task with due date | Medium — no true follow-up with auto-resurface |
-| **Delegate** | Commitment delegation exists, task delegation does not | Medium |
+| ~~Create commitment~~ | **Implemented** — manual + inbox suggestion | ~~High~~ Resolved |
+| ~~Waiting-on tracking~~ | **Implemented** — `waiting_on` status + `owed_to_me` direction | ~~High~~ Resolved |
 | **Mark as replied** | Not implemented | Medium — can't track what was already handled in email |
+| **Schedule follow-up** | Partially via task with due date | Medium — no true follow-up with auto-resurface |
+| **Delegate task** | Commitment delegation exists, task delegation does not | Medium |
 | **Create reminder (without task)** | Snooze is the closest analog | Low |
 
 ---
@@ -224,34 +224,34 @@ But:
 
 ### 5.1 Can the system answer "What's the most important thing right now?"
 
-**No.** The Focus Queue attempts this but falls short:
+**Partially — significantly improved from v2.**
 
-**What it has:**
-- A unified queue of work items across 5 source types
+**What it now has:**
+- A unified queue of work items across **6 source types** (email, task, calendar, note, reading, **commitment**)
 - Priority scoring: `0.6 * urgency + 0.4 * importance`
-- Urgency based on time proximity (email age, task due date, calendar start time)
-- Importance based on explicit priority (high/medium/low) and read status
-- Reason codes for why items need review (unlinked_company, missing_summary, unprocessed)
-- Auto-resolution when all reason codes clear
+- **Commitment-specific urgency scoring** based on direction, date proximity, and implied_urgency multiplier (high=1.2, medium=1.0, low=0.8)
+- **Commitment-specific importance scoring** with direction-aware base scores (owed_by_me=0.7, owed_to_me=0.5), VIP boost (+0.15), and urgency boost
+- **Person/VIP signal** integrated into commitment scoring
+- Reason codes + auto-resolution
+- Dashboard at-risk panel for overdue/urgent obligations
 
-**What it lacks:**
-- **No commitment signal.** Open commitments with approaching deadlines don't appear in Focus Queue.
-- **No person weight.** An email from a portfolio CEO and a newsletter both score on the same axis.
-- **No relationship context.** The system has `people.is_vip` and `people.relationship_tier` but doesn't use them in scoring.
-- **No "what can I do in 15 minutes?" filtering.** Effort estimation exists on suggestions (`effort_bucket`: quick/medium/long) but not on the Focus Queue items themselves.
-- **No decay/escalation.** Items snoozed 3 times don't escalate. Overdue commitments don't surface. The system is stateless with respect to repeated deferrals.
+**What it still lacks:**
+- **No effort estimation.** Can't filter by "what can I do in 15 minutes?"
+- **No person weight on non-commitment items.** An email from a portfolio CEO and a newsletter still score similarly (VIP signal only flows through commitments, not emails directly).
+- **No decay/escalation for non-commitments.** Items snoozed 3 times don't escalate (commitments do escalate via `mark_stale_commitments`, but other types don't).
+- **No pipeline company signal.** `is_top_of_mind` pipeline companies don't enter Focus Queue.
 
-### 5.2 Can the system answer "What can I do in the next 15–30 minutes?"
+### 5.2 Can the system answer "What can I do in the next 15-30 minutes?"
 
-**No.** There is no effort-aware filtering. The Focus Queue shows items sorted by priority score but doesn't distinguish between "reply to this email" (2 min) and "write investment memo" (2 hours). The `effort_bucket` field on suggestions is the right seed for this but it stops at the suggestion layer — it doesn't propagate to work items or tasks.
+**No.** There is no effort-aware filtering. The `effort_bucket` concept exists on suggestions but doesn't propagate to work items or Focus Queue items.
 
 ### 5.3 Where does the user still rely on memory?
 
-1. **Outbound commitments.** "I told the founder I'd make an intro by Friday" — nowhere in the system unless manually created as a commitment.
-2. **Pending replies.** "I asked the LP for the data room access" — no tracking.
-3. **Cross-day continuity.** Opening Casper on Monday morning, there is no "here's what carried over from last week" briefing.
-4. **Slack/WhatsApp threads.** Obligations from non-email channels are invisible.
-5. **Meeting takeaways.** Post-meeting, the user must manually create tasks/notes. `calendar-followup-processor` exists but its output doesn't clearly flow into the user's workflow.
+1. **Outbound commitments.** "I told the founder I'd make an intro by Friday" — still invisible unless manually created.
+2. ~~Pending replies / waiting-on.~~ **Resolved** — waiting_on status + owed_to_me direction now track this.
+3. **Cross-day continuity.** No "here's what carried over from last week" briefing.
+4. **Slack/WhatsApp threads.** Non-email channels are invisible.
+5. **Meeting takeaways.** Post-meeting actions are still manual.
 
 ---
 
@@ -270,8 +270,8 @@ But:
 
 | Failure Mode | Severity | Description |
 |-------------|----------|-------------|
-| No resolution audit trail | High | When inbox item is resolved, no record of what action was taken |
-| Commitments disconnected from workflow | High | Commitments exist in schema but don't appear in any active surface |
+| ~~Commitments disconnected from workflow~~ | ~~High~~ **Resolved** | Commitments now flow through Focus Queue, Dashboard, and /obligations |
+| ~~No resolution audit trail~~ | ~~High~~ **Resolved** | `inbox_activity` table logs actions taken on inbox items |
 | Cross-object timeline gaps | Medium | Company timelines show interactions but may miss inbox-linked activity |
 | Note-to-source links not visible from source | Medium | Can see notes linked to a company, but can't easily see notes linked to an inbox item |
 
@@ -280,109 +280,133 @@ But:
 | Failure Mode | Severity | Description |
 |-------------|----------|-------------|
 | No "start of day" briefing | High | User must manually check multiple surfaces to understand state |
-| Snooze fragmentation | Medium | Snoozed items on inbox, tasks, commitments, and work items are independent — no unified view |
+| Snooze fragmentation | Medium | Snoozed items across types are independent — no unified view |
 | No follow-up chains | Medium | Creating a follow-up task doesn't link it to the prior interaction |
-| Stale items don't escalate | Medium | `mark_stale_work_items` RPC exists but items don't gain urgency from age alone |
+| ~~Stale items don't escalate~~ | ~~Medium~~ **Partially resolved** | `mark_stale_commitments` handles commitment escalation; other types still don't escalate |
 
 ### 6.4 Orchestration Failures
 
 | Failure Mode | Severity | Description |
 |-------------|----------|-------------|
-| Dashboard doesn't reflect Focus Queue | High | Dashboard shows legacy task/reading surfaces, not the unified priority view |
-| Commitments not in priority scoring | High | `commitment_status`, `due_at`, and `implied_urgency` are not inputs to the scoring function |
-| No daily planning surface | Medium | No "plan my day" flow that considers calendar, tasks, commitments, and inbox together |
-| Pipeline items don't surface proactively | Medium | `is_top_of_mind` flag exists but pipeline companies don't appear in Focus Queue |
+| ~~Dashboard doesn't reflect obligations~~ | ~~High~~ **Resolved** | ObligationsPanel shows at-risk items at top of dashboard |
+| ~~Commitments not in priority scoring~~ | ~~High~~ **Resolved** | Direction-aware urgency + importance scoring integrated |
+| No daily planning surface | Medium | No "plan my day" flow combining calendar, tasks, commitments, inbox |
+| Pipeline items don't surface proactively | Medium | `is_top_of_mind` exists but pipeline companies don't enter Focus Queue |
+| No background processing | Medium | Backfill runs on page load only — no push-based processing |
 
 ---
 
 ## 7. Readiness Assessment
 
-### 7.1 Before vs After (v1 → v2)
+### 7.1 Before vs After (v1 → v2 → v2.1)
 
-| Dimension | v1 | v2 | Delta |
-|-----------|----|----|-------|
-| **Inbox Ingestion** | Manual task creation from email | Automated email parsing with AI intent + typed suggestions | Major improvement |
-| **Company Linking** | Manual only | Deterministic domain matching + AI candidate suggestions | Major improvement |
-| **Context Preservation** | Tasks had no source tracking | Tasks link to source inbox items; entity_links provide polymorphic graph | Significant improvement |
-| **Unified Triage** | None — separate pages for each domain | Focus Queue with work_items meta-layer | New capability |
-| **Notes** | Project-scoped only | Polymorphic links, floating note overlay, dedicated /notes page | Significant improvement |
-| **Commitments** | Did not exist | Full schema with delegation, snooze, urgency | New capability (schema only) |
-| **People** | Company contacts only | Standalone people table with VIP, relationship tiers, company roles | Significant improvement |
-| **Priority Scoring** | None | V1 scoring (urgency × importance) with auto-resolution | New capability |
-| **Attachments** | None | Inbox attachments with pipeline company copy | New capability |
+| Dimension | v1 | v2 | v2.1 (Current) | Delta v2→v2.1 |
+|-----------|----|----|----------------|---------------|
+| **Inbox Ingestion** | Manual task creation | AI intent + typed suggestions | + CREATE_WAITING_ON + activity logging | Incremental |
+| **Company Linking** | Manual only | Deterministic domain matching + AI | Unchanged | — |
+| **Context Preservation** | No source tracking | Task→inbox links, entity_links | + inbox activity audit trail | Incremental |
+| **Unified Triage** | None | Focus Queue (5 source types) | Focus Queue (6 source types, commitment triage) | Significant |
+| **Notes** | Project-scoped | Polymorphic links, floating note | + Commitment triage note action | Minor |
+| **Commitments** | Did not exist | Schema only (disconnected) | **Full integration** — bidirectional, scored, triaged, dashboarded | **Major** |
+| **People** | Contacts only | VIP, relationship tiers | VIP signal used in commitment scoring | Incremental |
+| **Priority Scoring** | None | V1 (urgency × importance) | + Commitment-specific scoring (direction, VIP, urgency multiplier) | Significant |
+| **Dashboard** | Tasks + reading | Tasks + reading + calendar | + At-risk obligations panel | Significant |
 
 ### 7.2 Qualitative Readiness Scores
 
-| Dimension | Score | Assessment |
-|-----------|-------|------------|
-| **Capture** | 5/10 | Email capture is solid. Everything else (outbound, non-email, verbal) is missing. |
-| **Context Preservation** | 6/10 | Entity links work. Source tracking on tasks works. But resolution audit trail is absent and cross-object navigation is inconsistent. |
-| **Actionability** | 6/10 | AI suggestions are good. Executable actions work for linking and tasking. But commitments, notes-from-inbox, and status updates are incomplete. |
-| **Trust / Peace of Mind** | 3/10 | The user cannot look at one surface and know nothing is slipping. Commitments are invisible in active workflows. No outbound tracking. Dashboard is stale. |
-| **Scalability** | 5/10 | The data model scales well. The backfill approach (run on page load) does not. Priority scoring is simplistic. No background processing. |
+| Dimension | v2 Score | v2.1 Score | Assessment |
+|-----------|----------|------------|------------|
+| **Capture** | 5/10 | **5/10** | Unchanged — email capture is solid, outbound + non-email still missing |
+| **Context Preservation** | 6/10 | **7/10** | Activity logging adds audit trail. Commitment context flows through triage. |
+| **Actionability** | 6/10 | **8/10** | Commitments are now fully actionable. 8-action triage bar. Inbox→commitment path works. |
+| **Trust / Peace of Mind** | 3/10 | **6/10** | User can now see at-risk obligations from Dashboard and Focus Queue. Stale detection provides safety net. Still missing outbound tracking and daily briefing. |
+| **Scalability** | 5/10 | **5/10** | Unchanged — backfill still runs on page load, no background processing |
 
 ### 7.3 Execution Readiness for Next Layer
 
 The system is **ready** for:
-- Wiring commitments into Focus Queue and Dashboard
-- Building a "resolved via" audit trail on inbox items
+- Effort estimation on Focus Queue items
+- Start-of-day briefing (obligation data is now trustworthy)
+- Person-weighted scoring on emails (VIP infrastructure exists, needs extension beyond commitments)
+- Pipeline company Focus Queue integration
 - Unified snooze surface
-- Dashboard refresh to reflect Focus Queue state
 
 The system is **not yet ready** for:
-- Daily planning / agenda generation (needs commitment integration first)
-- Next-best-action orchestration (needs effort estimation and person-weighted scoring)
-- Outbound tracking (requires architectural decision on email access model)
+- Outbound tracking (requires architectural decision on email access model — Graph API read scope vs. sent-mail hook)
+- Automated commitment extraction from calendar events (needs meeting transcript/notes pipeline)
 
 ---
 
 ## 8. Sequenced Recommendations
 
-### P0 — Blocking Peace of Mind
+### P0 — Previously Blocking, Now Resolved
 
-**1. Wire commitments into Focus Queue and Dashboard**
+These items from the v2 audit have been implemented:
 
-The `commitments` table has the right schema but zero integration into the surfaces the user actually uses. Open commitments with `due_at` approaching should appear in Focus Queue. Overdue commitments should surface prominently. The `open_commitments_detailed` and `overdue_commitments` views already exist — use them.
+1. ~~Wire commitments into Focus Queue and Dashboard~~ — **Done.** Commitments backfill as work items, receive direction-aware priority scoring, and appear in Focus Queue with 8-action triage. Dashboard shows at-risk obligations.
+
+2. ~~Add "resolved via" tracking on inbox items~~ — **Done.** `inbox_activity` table logs actions with type, target, and metadata.
+
+3. ~~Create inbox → commitment path~~ — **Done.** CREATE_WAITING_ON suggestion type + CommitmentForm with direction, title, expected_by fields.
+
+### P0 — Current Blockers to Peace of Mind
+
+**1. Effort estimation on Focus Queue items**
+
+The user's primary workflow involves fragmented time windows (between meetings, waiting for calls). Without effort estimation, the Focus Queue shows a priority-ranked list but can't answer "what can I knock out in the next 10 minutes?" The `effort_bucket` concept exists on suggestions — propagate it to work items. Heuristic defaults: email reply = quick, task without subtasks = quick/medium, commitment follow-up = quick, pipeline follow-up = medium.
 
 Concretely:
-- Add `commitment` as a `WorkItemSourceType`
-- Create work items for open commitments during backfill
-- Include commitment urgency (based on `due_at` and `implied_urgency`) in priority scoring
-- Show commitment count on Dashboard
+- Add `effort_estimate` column to `work_items` (enum: quick/medium/long)
+- Populate during enrichment: inherit from suggestion `effort_bucket` if available, else heuristic by source type
+- Add effort filter toggle to Focus Queue UI (show all / quick only / medium+quick)
 
-**2. Add "resolved via" tracking on inbox items**
+**2. Person-weighted scoring for emails**
 
-When the user takes an action on an inbox item (creates task, links company, marks complete), record what was done. This doesn't need to be complex — a `resolution_action` or `resolution_note` field on `inbox_items`, or an entry in a lightweight `inbox_activity` log.
+VIP signal currently only affects commitment importance scoring. Extend it to emails: when an inbox item's sender matches a VIP person, boost the importance score. The `people` table with `is_vip` and `relationship_tier` is ready — this is a scoring function change, not a data model change.
 
-Without this, archiving an inbox item is an act of faith. The user has no way to verify later that an email was properly handled.
-
-**3. Create inbox → commitment path**
-
-When an AI suggestion identifies a follow-up or intro request, the action should create a commitment, not just a task. The suggestion types `CREATE_FOLLOW_UP_TASK` and `CREATE_INTRO_TASK` are definitionally commitments — they involve a promise to another person. Route these through the commitment system with person and company context preserved.
+Concretely:
+- In `computeEmailImportanceScore`, look up sender email against `people` table
+- VIP: +0.2 importance boost
+- Tier 1 (inner circle): +0.15, Tier 2: +0.1, Tier 3: +0.05
 
 ### P1 — Meaningfully Compounding
 
-**4. Unify the Dashboard around Focus Queue state**
+**3. Start-of-day briefing**
 
-The current Dashboard shows a task list, reading items, and calendar sidebar — all v1 surfaces. Replace the task list section with a Focus Queue summary: items needing attention by type, overdue commitments, and snoozed items returning today. Let the Dashboard answer "what's my situation right now?" instead of "here are all my tasks."
+The underlying data is now trustworthy enough to generate a morning summary. Show: (a) commitments due today/overdue, (b) snoozed items returning today, (c) calendar events with obligations attached, (d) inbox items still pending triage. This can be a Dashboard section or a modal on first login.
 
-**5. Add effort estimation to Focus Queue items**
+**4. Pipeline companies in Focus Queue**
 
-The `effort_bucket` concept exists on suggestions. Propagate it to work items or compute it heuristically: emails needing reply = quick, tasks without subtasks = quick/medium, pipeline follow-ups = medium. Enable "show me what I can do in 15 minutes" filtering. This directly serves the user's fragmented-time-window workflow.
+Pipeline companies with `is_top_of_mind` or recent interactions should create work items. When a pipeline company hasn't been touched in N days (based on stage), it should surface for review. This extends the Focus Queue to cover deal tracking — currently the only major domain that doesn't participate.
+
+Concretely:
+- Add `pipeline_company` as a `WorkItemSourceType`
+- Backfill: top-of-mind companies + companies with stale last_interaction
+- Enrichment: link to pipeline contacts, compute staleness
+- Scoring: urgency from days-since-last-interaction relative to stage velocity
+
+**5. Unified snooze surface**
+
+Snoozed items across inbox, tasks, commitments, and work items are independent. A "returning today" widget on Dashboard — or a filter in Focus Queue — would prevent snoozed items from silently resurfacing and being missed.
 
 ### P2 — Nice but Deferrable
 
-**6. Unified snooze surface**
+**6. Escalation for non-commitment items**
 
-Snoozed items are scattered across `inbox_items.snoozed_until`, `tasks.snoozed_until`, `commitments.snoozed_until`, and `work_items.snooze_until`. A "snoozed items returning today" widget — or even just a count badge — would prevent snoozed items from silently resurfacing and being missed.
+`mark_stale_commitments` handles commitment escalation. Extend the pattern: items snoozed 3+ times should gain an escalation badge. Tasks overdue by 2x their original estimate should surface. Emails older than 7 days with no action should flag.
 
-**7. Person-weighted priority scoring**
+**7. Follow-up chains**
 
-The `people` table has `is_vip` and `relationship_tier`. When an inbox item or commitment involves a VIP person, the importance score should increase. This is a v2 scoring enhancement that would make the Focus Queue meaningfully smarter without requiring new data collection.
+When a commitment is marked "waiting on" or a follow-up task is created, link it to the original interaction. Enable a "follow-up history" view that shows the chain: email received → commitment created → follow-up sent → response received.
 
-**8. Start-of-day briefing**
+**8. Outbound email visibility**
 
-A lightweight "morning summary" that shows: (a) commitments due today/overdue, (b) snoozed items returning, (c) calendar events with prep needed, (d) inbox items still pending. This can be computed from existing data — it's a read-only aggregation view. Defer until P0 and P1 items are complete so the underlying data is trustworthy.
+This is architecturally significant and should be designed carefully. Options:
+- **Microsoft Graph API read scope on sent mail** — requires additional OAuth permissions, but enables automatic detection of outbound commitments
+- **Manual "I replied" action in inbox** — low-friction, no new permissions, but relies on user discipline
+- **BCC-to-Casper** — user BCCs the ingestion endpoint when sending important emails
+
+Recommendation: Start with the manual "I replied" action (adds a `replied_at` timestamp and optional note to inbox_activity). Evaluate Graph API read scope as a P1 in the next cycle based on user discipline findings.
 
 ---
 
@@ -426,15 +450,24 @@ A lightweight "morning summary" that shows: (a) commitments due today/overdue, (
      │
      │ source_type + source_id
      ▼
-  email | task | calendar_event | note | reading
+  email | task | calendar_event | note | reading | commitment
+                                                       │
+                                                       ▼
+                                              ┌──────────────────┐
+                                              │  Commitments     │
+                                              │  (bidirectional,  │
+                                              │   scored, triaged,│
+                                              │   dashboarded)   │
+                                              └──────────────────┘
 
 ┌──────────────────┐
-│  Commitments     │
-│  (disconnected   │
-│   from workflow) │
+│  Inbox Activity  │
+│  (audit trail)   │
+│  action_type,    │
+│  target_id/type  │
 └──────────────────┘
 ```
 
 ---
 
-*This audit is intended to directly inform the next implementation cycle. The P0 recommendations address the most fundamental gap: commitments and resolution tracking are the difference between "I processed my inbox" and "I know nothing is slipping."*
+*This audit reflects the system state after Obligations Engine v1 implementation. The P0 recommendations address the next highest-impact gaps: effort-aware triage and person-weighted scoring — both of which build on the infrastructure now in place.*
