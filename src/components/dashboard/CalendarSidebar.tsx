@@ -39,7 +39,7 @@ export function CalendarSidebar({ className, events, nonnegotiables, onSync, isS
   const { user } = useAuth();
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [linkedCompanyMap, setLinkedCompanyMap] = useState<Map<string, string>>(new Map());
+  const [linkedCompanyMap, setLinkedCompanyMap] = useState<Map<string, { name: string; logo: string | null }>>(new Map());
 
   // Fetch all calendar_event_links for displayed events (lookup by both UUID and MS ID)
   const eventIds = useMemo(() => events.map(e => e.id), [events]);
@@ -51,22 +51,23 @@ export function CalendarSidebar({ className, events, nonnegotiables, onSync, isS
   useEffect(() => {
     if (!user || events.length === 0) return;
     const fetchLinks = async () => {
-      // Fetch by both UUID and microsoft_event_id
+      // Fetch by both UUID and microsoft_event_id, including logo
       const { data } = await supabase
         .from('calendar_event_links')
-        .select('calendar_event_id, microsoft_event_id, company_name')
+        .select('calendar_event_id, microsoft_event_id, company_name, company_logo_url')
         .eq('created_by', user.id);
       
       if (data) {
-        const map = new Map<string, string>();
+        const map = new Map<string, { name: string; logo: string | null }>();
         // Build lookup map by both IDs
         data.forEach(row => {
           // Only include if the event matches our displayed events
           const matchesUUID = eventIds.includes(row.calendar_event_id);
           const matchesMsId = row.microsoft_event_id && eventMsIds.includes(row.microsoft_event_id);
+          const linkedInfo = { name: row.company_name, logo: row.company_logo_url };
           if (matchesUUID || matchesMsId) {
-            if (row.calendar_event_id) map.set(row.calendar_event_id, row.company_name);
-            if (row.microsoft_event_id) map.set(row.microsoft_event_id, row.company_name);
+            if (row.calendar_event_id) map.set(row.calendar_event_id, linkedInfo);
+            if (row.microsoft_event_id) map.set(row.microsoft_event_id, linkedInfo);
           }
         });
         setLinkedCompanyMap(map);

@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { MapPin, Video, Building2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
 interface CalendarEvent {
@@ -26,9 +27,10 @@ interface EventCardProps {
   isCurrent?: boolean;
   onClick?: (event: CalendarEvent) => void;
   linkedCompanyName?: string;
+  linkedCompanyLogo?: string | null;
 }
 
-export function EventCard({ event, delay = 0, isToday = false, isPast = false, isCurrent = false, onClick, linkedCompanyName }: EventCardProps) {
+export function EventCard({ event, delay = 0, isToday = false, isPast = false, isCurrent = false, onClick, linkedCompanyName, linkedCompanyLogo }: EventCardProps) {
   // Format time to display in a readable format
   const formatTime = (timeString: string) => {
     const date = new Date(timeString);
@@ -121,8 +123,17 @@ export function EventCard({ event, delay = 0, isToday = false, isPast = false, i
 
         {/* Linked Company Pill */}
         {linkedCompanyName && (
-          <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 mb-1.5 inline-flex items-center gap-1">
-            <Building2 className="h-2.5 w-2.5" />
+          <Badge variant="secondary" className="text-[10px] px-1.5 py-0.5 mb-1.5 inline-flex items-center gap-1.5">
+            {linkedCompanyLogo ? (
+              <Avatar className="h-3.5 w-3.5 flex-shrink-0">
+                <AvatarImage src={linkedCompanyLogo} alt={linkedCompanyName} />
+                <AvatarFallback className="text-[6px] bg-muted">
+                  {linkedCompanyName.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            ) : (
+              <Building2 className="h-2.5 w-2.5" />
+            )}
             {linkedCompanyName}
           </Badge>
         )}

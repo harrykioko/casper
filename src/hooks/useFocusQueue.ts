@@ -75,7 +75,7 @@ export function useFocusQueue() {
       const now = new Date().toISOString();
 
       // Try marking stale items (safe to fail if migration not deployed)
-      const rpcResult = await supabase.rpc("mark_stale_work_items", { p_user_id: user.id });
+      const rpcResult = await (supabase.rpc as any)("mark_stale_work_items", { p_user_id: user.id });
       if (rpcResult.error) {
         console.warn("[Focus Queue] mark_stale_work_items RPC not available:", rpcResult.error.message);
       }
