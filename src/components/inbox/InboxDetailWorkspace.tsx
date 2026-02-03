@@ -51,7 +51,7 @@ export function InboxDetailWorkspace({
       </div>
       
       {/* Right: Action Rail (sticky within its container) */}
-      <div className="w-[200px] xl:w-[240px] flex-shrink-0 border-l border-border overflow-y-auto">
+      <div className="w-[240px] xl:w-[280px] flex-shrink-0 border-l border-border overflow-y-auto">
         <InboxActionRail
           item={item}
           onCreateTask={onCreateTask}
