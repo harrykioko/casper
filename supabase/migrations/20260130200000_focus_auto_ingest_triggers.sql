@@ -109,17 +109,27 @@ RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+DECLARE
+  v_reason_codes text[];
 BEGIN
-  INSERT INTO public.work_items (created_by, source_type, source_id, status, reason_codes, priority)
-  VALUES (
-    NEW.created_by,
-    'reading',
-    NEW.id,
-    'needs_review',
-    ARRAY[]::text[],
-    1
-  )
-  ON CONFLICT (source_type, source_id, created_by) DO NOTHING;
+  -- Only create work items for unprocessed reading items (need triage)
+  IF NEW.processing_status = 'unprocessed' THEN
+    v_reason_codes := ARRAY['unprocessed']::text[];
+    IF NEW.one_liner IS NULL OR NEW.one_liner = '' THEN
+      v_reason_codes := v_reason_codes || ARRAY['missing_summary']::text[];
+    END IF;
+
+    INSERT INTO public.work_items (created_by, source_type, source_id, status, reason_codes, priority)
+    VALUES (
+      NEW.created_by,
+      'reading',
+      NEW.id,
+      'needs_review',
+      v_reason_codes,
+      2
+    )
+    ON CONFLICT (source_type, source_id, created_by) DO NOTHING;
+  END IF;
   RETURN NEW;
 END;
 $$;

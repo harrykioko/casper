@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { ReadingCommandPanel } from "@/components/reading/ReadingCommandPanel";
 import { ReadingUpNextSection } from "@/components/reading/ReadingUpNextSection";
 import { ReadingQueueSection } from "@/components/reading/ReadingQueueSection";
+import { ReadingSignalsSection } from "@/components/reading/ReadingSignalsSection";
+import { ReadingInboxSection } from "@/components/reading/ReadingInboxSection";
 import { ReadingItemCard } from "@/components/reading/ReadingItemCard";
 import {
   ReadingFilter,
@@ -208,6 +210,25 @@ export default function ReadingList() {
     }
   };
 
+  const handleBatchAction = async (ids: string[], action: "queue" | "archive") => {
+    try {
+      const updates: any =
+        action === "queue"
+          ? { processing_status: "queued", processed_at: new Date().toISOString() }
+          : { is_archived: true, processing_status: "archived", archived_at: new Date().toISOString() };
+
+      await Promise.all(ids.map((id) => updateReadingItem(id, updates)));
+      toast.success(
+        action === "queue"
+          ? `${ids.length} item${ids.length > 1 ? "s" : ""} queued`
+          : `${ids.length} item${ids.length > 1 ? "s" : ""} archived`
+      );
+    } catch (error) {
+      console.error("Failed to batch update:", error);
+      toast.error("Failed to update items");
+    }
+  };
+
   const openCommandModal = () => setIsCommandModalOpen(true);
   const closeCommandModal = () => setIsCommandModalOpen(false);
 
@@ -368,6 +389,40 @@ export default function ReadingList() {
                     />
                   </>
                 )}
+              </div>
+            ) : filter.primaryView === "signals" ? (
+              /* Signals view: grouped by actionability */
+              <div className="pr-4">
+                <ReadingSignalsSection
+                  items={filteredItems}
+                  projects={availableProjects}
+                  onFavorite={handleFavorite}
+                  onMarkRead={handleMarkRead}
+                  onDelete={handleDelete}
+                  onUpdateProject={handleUpdateProject}
+                />
+                {filteredItems.length === 0 && (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <BookOpen className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                    <p className="text-lg font-medium">No signals yet</p>
+                    <p className="text-sm">
+                      Mark items as signals during Focus triage
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : filter.primaryView === "inbox" ? (
+              /* Inbox view: with batch triage */
+              <div className="pr-4">
+                <ReadingInboxSection
+                  items={filteredItems}
+                  projects={availableProjects}
+                  onFavorite={handleFavorite}
+                  onMarkRead={handleMarkRead}
+                  onDelete={handleDelete}
+                  onUpdateProject={handleUpdateProject}
+                  onBatchAction={handleBatchAction}
+                />
               </div>
             ) : (
               /* Other views: flat grid */

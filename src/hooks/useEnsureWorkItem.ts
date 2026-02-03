@@ -20,13 +20,27 @@ export async function ensureWorkItem(
     // Check if work item already exists
     const { data: existing } = await supabase
       .from("work_items")
-      .select("id, status")
+      .select("id, status, reason_codes")
       .eq("source_type", sourceType)
       .eq("source_id", sourceId)
       .eq("created_by", userId)
       .maybeSingle();
 
     if (existing) {
+      // If the work item exists but has empty reason_codes (e.g. created by DB trigger),
+      // run enrichment and update it with proper reason codes
+      if (existing.status === 'needs_review' && (!existing.reason_codes || existing.reason_codes.length === 0)) {
+        const enrichment = await runDeterministicEnrichment(sourceType, sourceId, userId);
+        if (enrichment.reasonCodes.length > 0) {
+          await supabase
+            .from("work_items")
+            .update({
+              reason_codes: enrichment.reasonCodes,
+              priority: enrichment.priority,
+            })
+            .eq("id", existing.id);
+        }
+      }
       return { workItemId: existing.id, isNew: false, status: existing.status };
     }
 

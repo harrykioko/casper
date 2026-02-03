@@ -19,6 +19,9 @@ import {
   Clock,
   ChevronDown,
   Folder,
+  StickyNote,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,7 +33,9 @@ import { formatDistanceToNow } from "date-fns";
 import { addHours, addDays, startOfTomorrow, nextMonday } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useFocusReadingActions } from "@/hooks/useFocusReadingActions";
+import { useReadingEnrichment } from "@/hooks/useReadingEnrichment";
 import { useProjects } from "@/hooks/useProjects";
+import { ReadingItemNotesSection } from "@/components/notes/ReadingItemNotesSection";
 import { cn } from "@/lib/utils";
 import type { FocusQueueItem } from "@/hooks/useFocusQueue";
 import type { ContentType, ReadingPriority, ReadLaterBucket } from "@/types/readingItem";
@@ -65,6 +70,13 @@ const SNOOZE_OPTIONS = [
   { label: "3 days", getDate: () => addDays(new Date(), 3) },
 ];
 
+const ACTIONABILITY_STYLES: Record<string, { label: string; color: string }> = {
+  diligence: { label: "Diligence", color: "bg-red-500/20 text-red-400 border-red-500/30" },
+  follow_up: { label: "Follow-up", color: "bg-amber-500/20 text-amber-400 border-amber-500/30" },
+  idea: { label: "Idea", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
+  none: { label: "Info only", color: "bg-slate-500/20 text-slate-400 border-slate-500/30" },
+};
+
 interface ReadingItemDetail {
   id: string;
   url: string;
@@ -79,6 +91,7 @@ interface ReadingItemDetail {
   one_liner: string | null;
   project_id: string | null;
   topics: string[];
+  actionability: string | null;
 }
 
 export function FocusReadingSheet({
@@ -89,7 +102,9 @@ export function FocusReadingSheet({
   onSnooze,
 }: FocusReadingSheetProps) {
   const [detail, setDetail] = useState<ReadingItemDetail | null>(null);
+  const [enriching, setEnriching] = useState(false);
   const actions = useFocusReadingActions();
+  const { enrichItem } = useReadingEnrichment();
   const { projects } = useProjects();
 
   // Fetch full reading item detail when sheet opens
@@ -101,11 +116,29 @@ export function FocusReadingSheet({
 
     supabase
       .from("reading_items")
-      .select("id, url, title, description, hostname, favicon, image, content_type, priority, read_later_bucket, one_liner, project_id, topics")
+      .select("id, url, title, description, hostname, favicon, image, content_type, priority, read_later_bucket, one_liner, project_id, topics, actionability")
       .eq("id", item.source_id)
       .single()
       .then(({ data }) => {
-        if (data) setDetail(data as ReadingItemDetail);
+        if (data) {
+          setDetail(data as ReadingItemDetail);
+          // Auto-trigger enrichment if missing
+          if (!data.one_liner && !data.topics?.length) {
+            setEnriching(true);
+            enrichItem(data.id).then(() => {
+              // Re-fetch enriched data
+              supabase
+                .from("reading_items")
+                .select("id, url, title, description, hostname, favicon, image, content_type, priority, read_later_bucket, one_liner, project_id, topics, actionability")
+                .eq("id", data.id)
+                .single()
+                .then(({ data: refreshed }) => {
+                  if (refreshed) setDetail(refreshed as ReadingItemDetail);
+                  setEnriching(false);
+                });
+            }).catch(() => setEnriching(false));
+          }
+        }
       });
   }, [item?.source_id]);
 
@@ -152,10 +185,28 @@ export function FocusReadingSheet({
           <SheetTitle className="text-lg font-semibold text-foreground leading-snug">
             {detail.title || "Untitled"}
           </SheetTitle>
-          {detail.one_liner && (
-            <p className="text-sm text-muted-foreground mt-1">{detail.one_liner}</p>
-          )}
-          {!detail.one_liner && (
+          {enriching ? (
+            <div className="flex items-center gap-2 mt-1">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground/50 italic">Analyzing content...</p>
+            </div>
+          ) : detail.one_liner ? (
+            <div className="mt-1 space-y-1.5">
+              <p className="text-sm text-muted-foreground">{detail.one_liner}</p>
+              {detail.actionability && detail.actionability !== "none" && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-[10px] px-1.5 py-0",
+                    ACTIONABILITY_STYLES[detail.actionability]?.color
+                  )}
+                >
+                  <Sparkles className="w-2.5 h-2.5 mr-1" />
+                  {ACTIONABILITY_STYLES[detail.actionability]?.label}
+                </Badge>
+              )}
+            </div>
+          ) : (
             <p className="text-sm text-muted-foreground/50 mt-1 italic">Needs quick triage</p>
           )}
         </SheetHeader>
@@ -347,6 +398,11 @@ export function FocusReadingSheet({
                 Archive
               </Button>
             </div>
+          </div>
+
+          {/* Notes */}
+          <div className="pt-2 border-t border-border">
+            <ReadingItemNotesSection readingItemId={detail.id} />
           </div>
 
           {/* Secondary Actions */}

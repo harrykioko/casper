@@ -103,6 +103,36 @@ export function useReadingItems() {
       });
     }
 
+    // Background AI enrichment (non-blocking)
+    supabase.functions.invoke('reading-enrich', {
+      body: {
+        reading_item_id: data.id,
+        url: data.url,
+        title: data.title,
+        description: data.description,
+        hostname: data.hostname,
+        content_type: contentType,
+      },
+    }).then(({ data: enrichData }) => {
+      if (enrichData) {
+        // Update local state with enrichment results
+        setReadingItems(prev =>
+          prev.map(item =>
+            item.id === data.id
+              ? {
+                  ...item,
+                  oneLiner: enrichData.one_liner || item.oneLiner,
+                  topics: enrichData.topics || item.topics,
+                  actionability: enrichData.actionability || item.actionability,
+                }
+              : item
+          )
+        );
+      }
+    }).catch(err => {
+      console.error('Failed to enrich reading item:', err);
+    });
+
     return transformedItem;
   };
 

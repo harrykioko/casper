@@ -1,4 +1,5 @@
-import { Star, Folder, Trash, Check, ExternalLink } from "lucide-react";
+import { useState } from "react";
+import { Star, Folder, Trash, Check, ExternalLink, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -8,7 +9,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { ReadingItemNotesSection } from "@/components/notes/ReadingItemNotesSection";
 import type { ReadingItem, ContentType } from "@/types/readingItem";
 
 const CONTENT_TYPE_STYLES: Record<string, { label: string; color: string }> = {
@@ -43,6 +45,7 @@ export function ReadingItemCard({
   onDelete,
   onUpdateProject,
 }: ReadingItemCardProps) {
+  const [showNotes, setShowNotes] = useState(false);
   const contentStyle = item.contentType ? CONTENT_TYPE_STYLES[item.contentType] : null;
   const priorityDot = PRIORITY_DOT[item.priority];
   const isSpotlight = variant === "spotlight";
@@ -219,6 +222,20 @@ export function ReadingItemCard({
             <Button
               size="icon"
               variant="ghost"
+              className={cn(
+                "h-6 w-6 rounded-full",
+                showNotes ? "text-primary" : "text-zinc-500 hover:text-primary"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowNotes(!showNotes);
+              }}
+            >
+              <StickyNote className="h-3 w-3" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
               className="h-6 w-6 rounded-full text-zinc-500 hover:text-rose-500"
               onClick={(e) => {
                 e.stopPropagation();
@@ -279,6 +296,22 @@ export function ReadingItemCard({
             )}
           </div>
         )}
+
+        {/* Inline Notes */}
+        <AnimatePresence>
+          {showNotes && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="mt-3 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ReadingItemNotesSection readingItemId={item.id} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </motion.div>
   );
