@@ -26,7 +26,7 @@ import { useObligations, type ObligationFilters } from "@/hooks/useObligations";
 import { useCommitments } from "@/hooks/useCommitments";
 import { CommitmentCard } from "@/components/commitments/CommitmentCard";
 import { CommitmentModal } from "@/components/commitments/CommitmentModal";
-import type { Commitment, CommitmentDirection, CommitmentStatus } from "@/types/commitment";
+import type { Commitment, CommitmentDirection, CommitmentStatus, CommitmentInsert } from "@/types/commitment";
 import { cn } from "@/lib/utils";
 
 const DIRECTION_TABS: Array<{
@@ -50,7 +50,7 @@ export default function ObligationsPage() {
   const [selectedCommitment, setSelectedCommitment] = useState<Commitment | null>(null);
   const [modalMode, setModalMode] = useState<"create" | "view" | "complete" | "snooze" | "delegate">("create");
 
-  const { obligations, counts, isLoading } = useObligations(filters);
+  const { obligations, counts, isLoading, refetch } = useObligations(filters);
   const {
     completeCommitment,
     snoozeCommitment,
@@ -86,6 +86,11 @@ export default function ObligationsPage() {
   const handleView = (commitment: Commitment) => {
     setSelectedCommitment(commitment);
     setModalMode("view");
+  };
+
+  const handleSave = async (data: CommitmentInsert) => {
+    await createCommitment(data);
+    await refetch();
   };
 
   return (
@@ -247,6 +252,7 @@ export default function ObligationsPage() {
           open={showCreate}
           onOpenChange={setShowCreate}
           mode="create"
+          onSave={handleSave}
         />
       )}
 
@@ -259,6 +265,21 @@ export default function ObligationsPage() {
           }}
           mode={modalMode}
           commitment={selectedCommitment}
+          onComplete={async (id, via, notes) => {
+            await completeCommitment(id, via, notes);
+            await refetch();
+            setSelectedCommitment(null);
+          }}
+          onSnooze={async (id, until) => {
+            await snoozeCommitment(id, until);
+            await refetch();
+            setSelectedCommitment(null);
+          }}
+          onDelegate={async (id, personId, name) => {
+            await delegateCommitment(id, personId, name);
+            await refetch();
+            setSelectedCommitment(null);
+          }}
         />
       )}
     </div>
