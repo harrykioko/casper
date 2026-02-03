@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useIsDesktop } from "@/hooks/use-mobile";
 import { useFocusQueue, type FocusQueueItem } from "@/hooks/useFocusQueue";
 import { useFocusTriageActions } from "@/hooks/useFocusTriageActions";
+import { useFocusReadingActions } from "@/hooks/useFocusReadingActions";
 import { useTasks } from "@/hooks/useTasks";
 import { useInboxItems } from "@/hooks/useInboxItems";
 import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
@@ -37,6 +38,7 @@ export default function FocusQueue() {
   } = useFocusQueue();
 
   const triageActions = useFocusTriageActions();
+  const readingActions = useFocusReadingActions();
 
   // Source data hooks (for fetching full records when opening drawers)
   const { tasks, updateTask, deleteTask, archiveTask, unarchiveTask } = useTasks();
@@ -158,6 +160,35 @@ export default function FocusQueue() {
     [archiveInbox, closeAllDrawers, advanceToNext]
   );
 
+  // Reading quick action handlers
+  const handleReadingQueue = useCallback(
+    (workItemId: string, sourceId: string) => {
+      readingActions.keepAsQueued(sourceId, workItemId);
+      advanceToNext();
+    },
+    [readingActions, advanceToNext]
+  );
+
+  const handleReadingUpNext = useCallback(
+    (workItemId: string, sourceId: string) => {
+      readingActions.markUpNext(sourceId, workItemId);
+      advanceToNext();
+    },
+    [readingActions, advanceToNext]
+  );
+
+  const handleReadingArchive = useCallback(
+    (workItemId: string, sourceId: string) => {
+      readingActions.archiveFromFocus(sourceId, workItemId);
+      advanceToNext();
+    },
+    [readingActions, advanceToNext]
+  );
+
+  const handleReadingOpenLink = useCallback((url: string) => {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }, []);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -238,6 +269,11 @@ export default function FocusQueue() {
                     isSelected={selectedItem?.id === item.id}
                     onClick={() => handleItemClick(item)}
                     index={index}
+                    onReadingQueue={handleReadingQueue}
+                    onReadingUpNext={handleReadingUpNext}
+                    onReadingArchive={handleReadingArchive}
+                    onReadingOpenLink={handleReadingOpenLink}
+                    onSnooze={(id, until) => triageActions.snooze(id, until)}
                   />
                 ))}
               </div>
