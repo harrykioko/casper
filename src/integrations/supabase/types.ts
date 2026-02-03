@@ -245,19 +245,23 @@ export type Database = {
           delegated_at: string | null
           delegated_to_name: string | null
           delegated_to_person_id: string | null
+          direction: string | null
           due_at: string | null
+          expected_by: string | null
           id: string
           implied_urgency: string | null
           last_snoozed_at: string | null
           person_id: string | null
           person_name: string | null
           promised_at: string
+          resolved_at: string | null
           snooze_count: number | null
           snoozed_until: string | null
           source_id: string | null
           source_reference: string | null
           source_type: Database["public"]["Enums"]["commitment_source"]
           status: Database["public"]["Enums"]["commitment_status"]
+          title: string | null
           updated_at: string
         }
         Insert: {
@@ -274,19 +278,23 @@ export type Database = {
           delegated_at?: string | null
           delegated_to_name?: string | null
           delegated_to_person_id?: string | null
+          direction?: string | null
           due_at?: string | null
+          expected_by?: string | null
           id?: string
           implied_urgency?: string | null
           last_snoozed_at?: string | null
           person_id?: string | null
           person_name?: string | null
           promised_at?: string
+          resolved_at?: string | null
           snooze_count?: number | null
           snoozed_until?: string | null
           source_id?: string | null
           source_reference?: string | null
           source_type?: Database["public"]["Enums"]["commitment_source"]
           status?: Database["public"]["Enums"]["commitment_status"]
+          title?: string | null
           updated_at?: string
         }
         Update: {
@@ -303,19 +311,23 @@ export type Database = {
           delegated_at?: string | null
           delegated_to_name?: string | null
           delegated_to_person_id?: string | null
+          direction?: string | null
           due_at?: string | null
+          expected_by?: string | null
           id?: string
           implied_urgency?: string | null
           last_snoozed_at?: string | null
           person_id?: string | null
           person_name?: string | null
           promised_at?: string
+          resolved_at?: string | null
           snooze_count?: number | null
           snoozed_until?: string | null
           source_id?: string | null
           source_reference?: string | null
           source_type?: Database["public"]["Enums"]["commitment_source"]
           status?: Database["public"]["Enums"]["commitment_status"]
+          title?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -560,6 +572,39 @@ export type Database = {
           source_type?: string
           target_id?: string
           target_type?: string
+        }
+        Relationships: []
+      }
+      inbox_activity: {
+        Row: {
+          action_type: string
+          created_at: string
+          created_by: string
+          id: string
+          inbox_item_id: string
+          metadata: Json | null
+          target_id: string | null
+          target_type: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          created_by: string
+          id?: string
+          inbox_item_id: string
+          metadata?: Json | null
+          target_id?: string | null
+          target_type?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          inbox_item_id?: string
+          metadata?: Json | null
+          target_id?: string | null
+          target_type?: string | null
         }
         Relationships: []
       }
@@ -2004,6 +2049,10 @@ export type Database = {
       }
     }
     Functions: {
+      mark_stale_commitments: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
       mark_stale_work_items: { Args: { p_user_id: string }; Returns: number }
     }
     Enums: {
@@ -2014,6 +2063,7 @@ export type Database = {
         | "broken"
         | "delegated"
         | "cancelled"
+        | "waiting_on"
       company_kind: "portfolio" | "pipeline" | "other"
       company_status: "active" | "watching" | "exited" | "archived"
       interaction_type: "note" | "call" | "meeting" | "email" | "update"
@@ -2175,6 +2225,7 @@ export const Constants = {
         "broken",
         "delegated",
         "cancelled",
+        "waiting_on",
       ],
       company_kind: ["portfolio", "pipeline", "other"],
       company_status: ["active", "watching", "exited", "archived"],
