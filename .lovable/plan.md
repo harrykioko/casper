@@ -1,128 +1,101 @@
 
-# Enhance Calendar Event Cards with Company Logos
 
-## Problem Summary
+# Fix Inbox Mark Complete Error
 
-Calendar events linked to companies currently show a `Building2` icon with the company name. The user wants to display the actual company logo when available (e.g., "Capitolis" should show the Capitolis logo).
+## Problem Identified
 
-## Current State Analysis
+When marking an inbox item as complete, the database returns the error:
+```
+record "new" has no field "user_id"
+```
 
-The data flow is partially correct:
-- `CalendarSidebar.tsx` already fetches `company_logo_url` and stores it in a map with structure `{ name: string, logo: string | null }`
-- However, `EventGroup.tsx` has a type mismatch (expects `Map<string, string>` instead of the object)
-- `EventGroup.tsx` only passes the company name, not the logo
-- `EventCard.tsx` only accepts `linkedCompanyName` and shows a static `Building2` icon
+This is caused by two database triggers that reference the wrong column name:
+
+1. **`trigger_auto_exit_inbox_item`** (line 161): References `NEW.user_id` but the `inbox_items` table uses `created_by`
+2. **`trigger_ingest_inbox_item`** (line 25): Same issue - references `NEW.user_id` instead of `NEW.created_by`
+
+Both triggers were created with incorrect column references that do not match the actual `inbox_items` table schema.
+
+---
 
 ## Solution
 
-Fix the data flow through the component chain and update `EventCard` to display company logos.
+Update both trigger functions to use the correct column name `created_by` instead of `user_id`.
 
 ---
 
-## Implementation Plan
+## Database Migration
 
-### Part 1: Fix EventGroup Type Definition
+A single migration will fix both trigger functions:
 
-**File: `src/components/dashboard/EventGroup.tsx`**
+```sql
+-- Fix trigger_auto_exit_inbox_item: change user_id to created_by
+CREATE OR REPLACE FUNCTION public.trigger_auto_exit_inbox_item()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF NEW.is_resolved = true AND (OLD.is_resolved IS NULL OR OLD.is_resolved = false) THEN
+    UPDATE public.work_items
+    SET status = 'trusted',
+        trusted_at = now(),
+        reviewed_at = now(),
+        last_touched_at = now(),
+        updated_at = now()
+    WHERE source_type = 'email'
+      AND source_id = NEW.id
+      AND created_by = NEW.created_by  -- Fixed: was NEW.user_id
+      AND status NOT IN ('trusted', 'ignored');
+  END IF;
+  RETURN NEW;
+END;
+$$;
 
-Update the `linkedCompanyMap` type in the props interface to match what `CalendarSidebar` actually sends:
-
-```text
-// Line 28 - Change from:
-linkedCompanyMap?: Map<string, string>;
-
-// To:
-linkedCompanyMap?: Map<string, { name: string; logo: string | null }>;
-```
-
-Update the linked company extraction logic (lines 126 and 147) to pass both name and logo:
-
-```text
-// Extract the linked info object
-const linkedInfo = linkedCompanyMap?.get(event.id) || 
-  (event.microsoftEventId ? linkedCompanyMap?.get(event.microsoftEventId) : undefined);
-
-// Pass to EventCard
-<EventCard
-  ...
-  linkedCompanyName={linkedInfo?.name}
-  linkedCompanyLogo={linkedInfo?.logo}
-/>
-```
-
-### Part 2: Update EventCard to Display Logos
-
-**File: `src/components/dashboard/EventCard.tsx`**
-
-Add new prop for logo URL:
-
-```text
-interface EventCardProps {
-  ...
-  linkedCompanyName?: string;
-  linkedCompanyLogo?: string | null;  // NEW
-}
-```
-
-Import Avatar components and update the badge rendering:
-
-```text
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-
-// Replace the current Badge content (lines 123-128):
-{linkedCompanyName && (
-  <Badge 
-    variant="secondary" 
-    className="text-[10px] px-1.5 py-0.5 mb-1.5 inline-flex items-center gap-1.5"
-  >
-    {linkedCompanyLogo ? (
-      <Avatar className="h-3.5 w-3.5 flex-shrink-0">
-        <AvatarImage src={linkedCompanyLogo} alt={linkedCompanyName} />
-        <AvatarFallback className="text-[6px] bg-muted">
-          {linkedCompanyName.slice(0, 2).toUpperCase()}
-        </AvatarFallback>
-      </Avatar>
-    ) : (
-      <Building2 className="h-2.5 w-2.5" />
-    )}
-    {linkedCompanyName}
-  </Badge>
-)}
+-- Fix trigger_ingest_inbox_item: change user_id to created_by
+CREATE OR REPLACE FUNCTION public.trigger_ingest_inbox_item()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  INSERT INTO public.work_items (created_by, source_type, source_id, status, reason_codes, priority)
+  VALUES (
+    NEW.created_by,  -- Fixed: was NEW.user_id
+    'email',
+    NEW.id,
+    'needs_review',
+    ARRAY['missing_summary'],
+    5
+  )
+  ON CONFLICT (source_type, source_id, created_by) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
 ```
 
 ---
 
-## Files to Modify
+## Files to Create
 
-| File | Change |
-|------|--------|
-| `src/components/dashboard/EventGroup.tsx` | Fix type definition, pass logo prop |
-| `src/components/dashboard/EventCard.tsx` | Add logo prop, render Avatar with fallback |
+| File | Purpose |
+|------|---------|
+| `supabase/migrations/[timestamp]_fix_inbox_trigger_column_name.sql` | Fix both trigger functions to use correct column |
 
 ---
 
-## Visual Result
+## What This Fixes
 
-**Before:**
-```text
-[Building2 icon] Capitolis
-```
-
-**After (with logo):**
-```text
-[Capitolis logo] Capitolis
-```
-
-**After (no logo available):**
-```text
-[Building2 icon] Company Name
-```
+After applying this migration:
+- Marking inbox items as complete will work correctly
+- The work_items table will be updated when inbox items are resolved
+- New inbox items will properly create work_items entries
 
 ---
 
 ## Technical Notes
 
-1. The `Avatar` component with `AvatarFallback` handles broken image URLs gracefully
-2. The logo size (3.5x3.5 / 14px) is small enough to fit in the compact badge
-3. Fallback shows first 2 characters of company name in uppercase
-4. No database or API changes needed - data is already being fetched
+1. The `inbox_items` table uses `created_by` for the user ID column
+2. The `calendar_events` table uses `user_id` (which is why that trigger works correctly)
+3. This is a pure database fix - no frontend code changes needed
+
