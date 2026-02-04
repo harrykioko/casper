@@ -1,9 +1,11 @@
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 import { createClient as createSupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractBrief } from "../_shared/email-cleaner.ts";
+import { cleanEmailForExtraction, extractStructuredSummary } from "../_shared/email-extraction.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars");
@@ -171,7 +173,7 @@ serve(async (req) => {
         source_type: 'email',
         source_id: inboxItemId,
         status: 'needs_review',
-        reason_codes: ['unlinked_company', 'missing_summary'],
+        reason_codes: ['unlinked_company'],
         priority: 5,
       };
 
@@ -186,6 +188,52 @@ serve(async (req) => {
       }
     } catch (workItemErr) {
       console.error("Work item creation error:", workItemErr);
+    }
+
+    // Automatically extract structured summary (async, non-blocking for response)
+    let extractionSuccess = false;
+    if (OPENAI_API_KEY && cleanedResult.cleanedText) {
+      try {
+        console.log("Starting automatic extraction for inbox item:", inboxItemId);
+        
+        const emailContext = {
+          subject: cleanedResult.displaySubject || smtpSubject,
+          fromName: cleanedResult.displayFromName || senderName || "",
+          fromEmail: cleanedResult.displayFromEmail || senderEmail,
+          toEmail: toEmail,
+          receivedAt: new Date().toISOString(),
+          cleanedText: cleanEmailForExtraction(cleanedResult.cleanedText),
+        };
+
+        const extraction = await extractStructuredSummary(OPENAI_API_KEY, emailContext);
+
+        // Persist extraction to inbox_items
+        const { error: extractError } = await supabaseClient
+          .from("inbox_items")
+          .update({
+            extracted_summary: extraction.summary,
+            extracted_key_points: extraction.key_points,
+            extracted_next_step: extraction.next_step,
+            extracted_entities: extraction.entities,
+            extracted_people: extraction.people,
+            extracted_categories: extraction.categories,
+            extraction_version: "v1",
+            extracted_at: new Date().toISOString(),
+          })
+          .eq("id", inboxItemId);
+
+        if (extractError) {
+          console.error("Failed to persist extraction:", extractError);
+        } else {
+          extractionSuccess = true;
+          console.log("Automatic extraction completed for inbox item:", inboxItemId);
+        }
+      } catch (extractErr) {
+        console.error("Automatic extraction failed:", extractErr);
+        // Non-fatal: email is still ingested, user can manually trigger extraction
+      }
+    } else {
+      console.log("Skipping auto-extraction: missing API key or cleaned text");
     }
 
     // Process attachments
@@ -310,6 +358,7 @@ serve(async (req) => {
       inboxItemId,
       attachmentsProcessed,
       attachmentsFailed,
+      extractionSuccess,
     });
 
     return new Response(
@@ -318,6 +367,7 @@ serve(async (req) => {
         inboxItemId,
         attachmentsProcessed,
         attachmentsFailed,
+        extractionSuccess,
       }),
       {
         status: 200,
