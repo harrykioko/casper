@@ -32,18 +32,18 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { addHours, addDays, startOfTomorrow, nextMonday } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import { useFocusReadingActions } from "@/hooks/useFocusReadingActions";
+import { useTriageReadingActions } from "@/hooks/useTriageReadingActions";
 import { useReadingEnrichment } from "@/hooks/useReadingEnrichment";
 import { useProjects } from "@/hooks/useProjects";
 import { ReadingItemNotesSection } from "@/components/notes/ReadingItemNotesSection";
 import { cn } from "@/lib/utils";
-import type { FocusQueueItem } from "@/hooks/useFocusQueue";
+import type { TriageQueueItem } from "@/hooks/useTriageQueue";
 import type { ContentType, ReadingPriority, ReadLaterBucket } from "@/types/readingItem";
 
-interface FocusReadingSheetProps {
+interface TriageReadingSheetProps {
   open: boolean;
   onClose: () => void;
-  item: FocusQueueItem | null;
+  item: TriageQueueItem | null;
   onAdvance: () => void;
   onSnooze: (until: Date) => void;
 }
@@ -94,16 +94,16 @@ interface ReadingItemDetail {
   actionability: string | null;
 }
 
-export function FocusReadingSheet({
+export function TriageReadingSheet({
   open,
   onClose,
   item,
   onAdvance,
   onSnooze,
-}: FocusReadingSheetProps) {
+}: TriageReadingSheetProps) {
   const [detail, setDetail] = useState<ReadingItemDetail | null>(null);
   const [enriching, setEnriching] = useState(false);
-  const actions = useFocusReadingActions();
+  const actions = useTriageReadingActions();
   const { enrichItem } = useReadingEnrichment();
   const { projects } = useProjects();
 

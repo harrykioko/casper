@@ -3,11 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ProcessingStatus, ContentType, ReadingPriority, ReadLaterBucket } from "@/types/readingItem";
 
-export function useFocusReadingActions() {
+export function useTriageReadingActions() {
   const queryClient = useQueryClient();
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["focus_queue"] });
+    queryClient.invalidateQueries({ queryKey: ["triage_queue"] });
     queryClient.invalidateQueries({ queryKey: ["work_queue"] });
     queryClient.invalidateQueries({ queryKey: ["reading_items"] });
   };

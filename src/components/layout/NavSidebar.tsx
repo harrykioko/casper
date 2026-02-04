@@ -37,9 +37,9 @@ export function NavSidebar() {
     },
     {
       icon: Crosshair,
-      path: "/focus",
-      label: "Focus",
-      active: location.pathname.startsWith("/focus") || location.pathname.startsWith("/priority")
+      path: "/triage",
+      label: "Triage",
+      active: location.pathname.startsWith("/triage") || location.pathname.startsWith("/focus") || location.pathname.startsWith("/priority")
     },
     {
       icon: Inbox,

@@ -3,28 +3,28 @@ import { useNavigate } from "react-router-dom";
 import { Crosshair, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useIsDesktop } from "@/hooks/use-mobile";
-import { useFocusQueue, type FocusQueueItem } from "@/hooks/useFocusQueue";
-import { useFocusTriageActions } from "@/hooks/useFocusTriageActions";
-import { useFocusReadingActions } from "@/hooks/useFocusReadingActions";
+import { useTriageQueue, type TriageQueueItem } from "@/hooks/useTriageQueue";
+import { useTriageActions } from "@/hooks/useTriageActions";
+import { useTriageReadingActions } from "@/hooks/useTriageReadingActions";
 import { useTasks } from "@/hooks/useTasks";
 import { useInboxItems } from "@/hooks/useInboxItems";
 import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
-import { FocusSummaryPanel } from "@/components/focus/FocusSummaryPanel";
-import { FocusItemRow } from "@/components/focus/FocusItemRow";
-import { FocusEmptyState } from "@/components/focus/FocusEmptyState";
-import { FocusInboxDrawer } from "@/components/focus/FocusInboxDrawer";
-import { FocusTaskDrawer } from "@/components/focus/FocusTaskDrawer";
-import { FocusCommitmentDrawer } from "@/components/focus/FocusCommitmentDrawer";
-import { FocusEventModal } from "@/components/focus/FocusEventModal";
-import { FocusGenericSheet } from "@/components/focus/FocusGenericSheet";
-import { FocusReadingSheet } from "@/components/focus/FocusReadingSheet";
+import { TriageSummaryPanel } from "@/components/focus/TriageSummaryPanel";
+import { TriageItemRow } from "@/components/focus/TriageItemRow";
+import { TriageEmptyState } from "@/components/focus/TriageEmptyState";
+import { TriageInboxDrawer } from "@/components/focus/TriageInboxDrawer";
+import { TriageTaskDrawer } from "@/components/focus/TriageTaskDrawer";
+import { TriageCommitmentDrawer } from "@/components/focus/TriageCommitmentDrawer";
+import { TriageEventModal } from "@/components/focus/TriageEventModal";
+import { TriageGenericSheet } from "@/components/focus/TriageGenericSheet";
+import { TriageReadingSheet } from "@/components/focus/TriageReadingSheet";
 import { useCommitments } from "@/hooks/useCommitments";
 import { cn } from "@/lib/utils";
 import type { InboxItem } from "@/types/inbox";
 import type { Task } from "@/hooks/useTasks";
 import type { Commitment } from "@/types/commitment";
 
-export default function FocusQueue() {
+export default function TriageQueue() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
 
@@ -39,10 +39,10 @@ export default function FocusQueue() {
     toggleReasonCode,
     setEffortFilter,
     clearFilters,
-  } = useFocusQueue();
+  } = useTriageQueue();
 
-  const triageActions = useFocusTriageActions();
-  const readingActions = useFocusReadingActions();
+  const triageActions = useTriageActions();
+  const readingActions = useTriageReadingActions();
 
   // Source data hooks (for fetching full records when opening drawers)
   const { tasks, updateTask, deleteTask, archiveTask, unarchiveTask } = useTasks();
@@ -51,13 +51,13 @@ export default function FocusQueue() {
   const { commitments } = useCommitments({ status: ['open', 'waiting_on', 'delegated'] });
 
   // Drawer state
-  const [selectedItem, setSelectedItem] = useState<FocusQueueItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<TriageQueueItem | null>(null);
   const [inboxDrawerItem, setInboxDrawerItem] = useState<InboxItem | null>(null);
   const [taskDrawerItem, setTaskDrawerItem] = useState<Task | null>(null);
   const [commitmentDrawerItem, setCommitmentDrawerItem] = useState<Commitment | null>(null);
   const [eventModalItem, setEventModalItem] = useState<any>(null);
-  const [genericSheetItem, setGenericSheetItem] = useState<FocusQueueItem | null>(null);
-  const [readingSheetItem, setReadingSheetItem] = useState<FocusQueueItem | null>(null);
+  const [genericSheetItem, setGenericSheetItem] = useState<TriageQueueItem | null>(null);
+  const [readingSheetItem, setReadingSheetItem] = useState<TriageQueueItem | null>(null);
 
   // Auto-advance to next item after triage
   const advanceToNext = useCallback(() => {
@@ -69,7 +69,7 @@ export default function FocusQueue() {
 
   // Open the appropriate drawer for a selected item
   const handleItemClick = useCallback(
-    (item: FocusQueueItem) => {
+    (item: TriageQueueItem) => {
       setSelectedItem(item);
 
       switch (item.source_type) {
@@ -293,12 +293,15 @@ export default function FocusQueue() {
                 <Crosshair className="h-5 w-5 text-violet-600 dark:text-violet-400" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-foreground">Focus</h1>
+                <h1 className="text-xl font-semibold text-foreground">Triage</h1>
                 <p className="text-sm text-muted-foreground">
                   {isAllClear
                     ? "All clear"
-                    : `${counts.total} item${counts.total !== 1 ? "s" : ""} need review`}
+                    : `${counts.total} item${counts.total !== 1 ? "s" : ""} awaiting triage`}
                 </p>
+                <span className="text-xs text-muted-foreground">
+                  Review, enrich, and clear incoming items
+                </span>
               </div>
             </div>
           </div>
@@ -317,7 +320,7 @@ export default function FocusQueue() {
         >
           {/* Left: Summary Panel (desktop only) */}
           {isDesktop && (
-            <FocusSummaryPanel
+            <TriageSummaryPanel
               counts={counts}
               isAllClear={isAllClear}
               filters={filters}
@@ -345,11 +348,11 @@ export default function FocusQueue() {
                 ))}
               </div>
             ) : isAllClear ? (
-              <FocusEmptyState />
+              <TriageEmptyState />
             ) : (
               <div className="space-y-1.5">
                 {items.map((item, index) => (
-                  <FocusItemRow
+                  <TriageItemRow
                     key={item.id}
                     item={item}
                     isSelected={selectedItem?.id === item.id}
@@ -372,7 +375,7 @@ export default function FocusQueue() {
       </div>
 
       {/* Drawers / Modals */}
-      <FocusInboxDrawer
+      <TriageInboxDrawer
         open={!!inboxDrawerItem}
         onClose={closeAllDrawers}
         item={inboxDrawerItem}
@@ -385,7 +388,7 @@ export default function FocusQueue() {
         showLink={showLink}
       />
 
-      <FocusTaskDrawer
+      <TriageTaskDrawer
         open={!!taskDrawerItem}
         onClose={closeAllDrawers}
         task={taskDrawerItem}
@@ -399,7 +402,7 @@ export default function FocusQueue() {
         showLink={showLink}
       />
 
-      <FocusCommitmentDrawer
+      <TriageCommitmentDrawer
         open={!!commitmentDrawerItem}
         onClose={closeAllDrawers}
         commitment={commitmentDrawerItem}
@@ -412,7 +415,7 @@ export default function FocusQueue() {
         onCancel={handleCommitmentCancel}
       />
 
-      <FocusEventModal
+      <TriageEventModal
         event={eventModalItem}
         isOpen={!!eventModalItem}
         onClose={closeAllDrawers}
@@ -422,7 +425,7 @@ export default function FocusQueue() {
         showLink={showLink}
       />
 
-      <FocusReadingSheet
+      <TriageReadingSheet
         open={!!readingSheetItem}
         onClose={closeAllDrawers}
         item={readingSheetItem}
@@ -430,7 +433,7 @@ export default function FocusQueue() {
         onSnooze={handleSnooze}
       />
 
-      <FocusGenericSheet
+      <TriageGenericSheet
         open={!!genericSheetItem}
         onClose={closeAllDrawers}
         item={genericSheetItem}

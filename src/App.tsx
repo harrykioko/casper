@@ -31,7 +31,7 @@ import PromptBuilder from "./pages/PromptBuilder";
 import Inbox from "./pages/Inbox";
 import Settings from "./pages/Settings";
 import Notes from "./pages/Notes";
-import FocusQueue from "./pages/FocusQueue";
+import TriageQueue from "./pages/TriageQueue";
 import ObligationsPage from "./pages/ObligationsPage";
 import NotFound from "./pages/NotFound";
 import OAuthCallback from "./pages/OAuthCallback";
@@ -121,9 +121,10 @@ const MainContent = () => {
           <Route path="/pipeline/:companyId" element={<PipelineCompanyDetail />} />
           <Route path="/portfolio" element={<Portfolio />} />
           <Route path="/portfolio/:companyId" element={<PortfolioCompanyDetail />} />
-          <Route path="/priority" element={<Navigate to="/focus" replace />} />
+          <Route path="/priority" element={<Navigate to="/triage" replace />} />
           <Route path="/inbox" element={<Inbox />} />
-          <Route path="/focus" element={<FocusQueue />} />
+          <Route path="/focus" element={<Navigate to="/triage" replace />} />
+          <Route path="/triage" element={<TriageQueue />} />
           <Route path="/obligations" element={<ObligationsPage />} />
           <Route path="/notes" element={<Notes />} />
           <Route path="/settings" element={<Settings />} />
