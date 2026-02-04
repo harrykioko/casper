@@ -14,7 +14,9 @@ export type InboxActivityActionType =
   | 'snooze'
   | 'dismiss_suggestion'
   | 'add_note'
-  | 'save_attachments';
+  | 'save_attachments'
+  | 'accept_suggested_link'
+  | 'reject_suggested_link';
 
 export interface InboxActivity {
   id: string;
