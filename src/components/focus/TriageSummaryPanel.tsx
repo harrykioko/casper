@@ -16,12 +16,12 @@ import {
   Hourglass,
 } from "lucide-react";
 import type { WorkItemSourceType, EffortEstimate } from "@/hooks/useWorkQueue";
-import type { FocusCounts, FocusFilters } from "@/hooks/useFocusQueue";
+import type { TriageCounts, TriageFilters } from "@/hooks/useTriageQueue";
 
-interface FocusSummaryPanelProps {
-  counts: FocusCounts;
+interface TriageSummaryPanelProps {
+  counts: TriageCounts;
   isAllClear: boolean;
-  filters: FocusFilters;
+  filters: TriageFilters;
   onToggleSourceType: (type: WorkItemSourceType) => void;
   onToggleReasonCode: (code: string) => void;
   onSetEffortFilter: (effort: EffortEstimate | null) => void;
@@ -101,7 +101,7 @@ const EFFORT_ITEMS: Array<{
   { value: "long", label: "Long (30+ min)", icon: Hourglass, colorClass: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" },
 ];
 
-export function FocusSummaryPanel({
+export function TriageSummaryPanel({
   counts,
   isAllClear,
   filters,
@@ -109,7 +109,7 @@ export function FocusSummaryPanel({
   onToggleReasonCode,
   onSetEffortFilter,
   onClearFilters,
-}: FocusSummaryPanelProps) {
+}: TriageSummaryPanelProps) {
   const hasActiveFilters = filters.sourceTypes.length > 0 || filters.reasonCodes.length > 0 || !!filters.effortFilter;
 
   return (
@@ -125,11 +125,11 @@ export function FocusSummaryPanel({
             )}
           </div>
           <div>
-            <h2 className="font-semibold text-foreground">Focus Command</h2>
+            <h2 className="font-semibold text-foreground">Triage Queue</h2>
             <p className="text-xs text-muted-foreground">
               {isAllClear
                 ? "Everything is accounted for"
-                : `${counts.total} item${counts.total !== 1 ? "s" : ""} need review`}
+                : `${counts.total} item${counts.total !== 1 ? "s" : ""} awaiting judgment`}
             </p>
           </div>
         </div>

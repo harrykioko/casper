@@ -16,26 +16,26 @@ import {
   computeCommitmentImportanceScore,
 } from "@/lib/priority/priorityScoringV1";
 
-export interface FocusFilters {
+export interface TriageFilters {
   sourceTypes: WorkItemSourceType[];
   reasonCodes: string[];
   effortFilter: EffortEstimate | null;
 }
 
-export interface FocusCounts {
+export interface TriageCounts {
   total: number;
   bySource: Record<WorkItemSourceType, number>;
   byReason: Record<string, number>;
   byEffort: Record<EffortEstimate, number>;
 }
 
-export interface FocusQueueItem extends WorkQueueItem {
+export interface TriageQueueItem extends WorkQueueItem {
   priorityScore: number;
   source_url?: string; // URL for reading items
   effortEstimate: EffortEstimate;
 }
 
-export function useFocusQueue() {
+export function useTriageQueue() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
@@ -43,7 +43,7 @@ export function useFocusQueue() {
   useBackfillWorkItems();
 
   // Filter state
-  const [filters, setFilters] = useState<FocusFilters>({
+  const [filters, setFilters] = useState<TriageFilters>({
     sourceTypes: [],
     reasonCodes: [],
     effortFilter: null,
@@ -79,7 +79,7 @@ export function useFocusQueue() {
   }, []);
 
   // Use both query keys so invalidation from backfill works
-  const queryKey = ["focus_queue", user?.id];
+  const queryKey = ["triage_queue", user?.id];
 
   const { data, isLoading, refetch } = useQuery({
     queryKey,
@@ -175,7 +175,7 @@ export function useFocusQueue() {
       const sourceData = await fetchSourceData(items, user.id);
 
       // Compose items with priority scores, reconciling stale reason codes
-      const composedItems: FocusQueueItem[] = [];
+      const composedItems: TriageQueueItem[] = [];
       const autoResolveIds: string[] = [];
 
       for (const item of items) {
@@ -276,7 +276,7 @@ export function useFocusQueue() {
   };
 }
 
-function emptyCounts(): FocusCounts {
+function emptyCounts(): TriageCounts {
   return {
     total: 0,
     bySource: { email: 0, calendar_event: 0, task: 0, note: 0, reading: 0, commitment: 0 },
@@ -285,7 +285,7 @@ function emptyCounts(): FocusCounts {
   };
 }
 
-function computeCounts(items: FocusQueueItem[]): FocusCounts {
+function computeCounts(items: TriageQueueItem[]): TriageCounts {
   const bySource: Record<WorkItemSourceType, number> = { email: 0, calendar_event: 0, task: 0, note: 0, reading: 0, commitment: 0 };
   const byReason: Record<string, number> = {};
   const byEffort: Record<EffortEstimate, number> = { quick: 0, medium: 0, long: 0 };
@@ -335,15 +335,13 @@ async function fetchSourceData(
       // Batch-fetch inbox_suggestions for effort_bucket
       const { data: suggestions } = await supabase
         .from("inbox_suggestions")
-        .select("inbox_item_id, result")
-        .in("inbox_item_id", byType["email"])
-        .eq("is_dismissed", false);
+        .select("inbox_item_id, suggestions")
+        .in("inbox_item_id", byType["email"]);
 
       const effortOrder: Record<string, number> = { quick: 0, medium: 1, long: 2 };
       const effortByEmail: Record<string, EffortEstimate> = {};
       for (const sug of suggestions || []) {
-        const sugResult = sug.result as any;
-        const sugList = sugResult?.suggestions || [];
+        const sugList = (sug.suggestions as any[]) || [];
         for (const s of sugList) {
           const bucket = s.effort_bucket as EffortEstimate | undefined;
           if (bucket && effortOrder[bucket] !== undefined) {

@@ -1,7 +1,7 @@
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Edit, Trash, Archive, ArchiveRestore, StickyNote } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FocusTriageBar } from "./FocusTriageBar";
+import { TriageActionsBar } from "./TriageActionsBar";
 import { TaskDetailsForm } from "@/components/modals/task-details/TaskDetailsForm";
 import { TaskLinksSection } from "@/components/modals/task-details/TaskLinksSection";
 import { TaskActivitySection } from "@/components/modals/task-details/TaskActivitySection";
@@ -12,7 +12,7 @@ import { useFloatingNote } from "@/contexts/FloatingNoteContext";
 import { toast } from "@/hooks/use-toast";
 import type { Task } from "@/hooks/useTasks";
 
-interface FocusTaskDrawerProps {
+interface TriageTaskDrawerProps {
   open: boolean;
   onClose: () => void;
   task: Task | null;
@@ -28,7 +28,7 @@ interface FocusTaskDrawerProps {
   onLink?: () => void;
 }
 
-export function FocusTaskDrawer({
+export function TriageTaskDrawer({
   open,
   onClose,
   task,
@@ -41,7 +41,7 @@ export function FocusTaskDrawer({
   onNoAction,
   showLink = false,
   onLink,
-}: FocusTaskDrawerProps) {
+}: TriageTaskDrawerProps) {
   const { openFloatingNote } = useFloatingNote();
   const {
     content,
@@ -105,7 +105,7 @@ export function FocusTaskDrawer({
         className="w-full sm:w-[480px] lg:w-[520px] p-0 flex flex-col bg-background border-l border-border"
       >
         {/* Triage bar */}
-        <FocusTriageBar
+        <TriageActionsBar
           onMarkTrusted={onMarkTrusted}
           onSnooze={onSnooze}
           onNoAction={onNoAction}

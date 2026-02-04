@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { addHours, addDays, startOfTomorrow, nextMonday } from "date-fns";
 
-interface FocusTriageBarProps {
+interface TriageActionsBarProps {
   onMarkTrusted: () => void;
   onSnooze: (until: Date) => void;
   onNoAction: () => void;
@@ -25,13 +25,13 @@ const SNOOZE_OPTIONS = [
   { label: "3 days", getDate: () => addDays(new Date(), 3) },
 ];
 
-export function FocusTriageBar({
+export function TriageActionsBar({
   onMarkTrusted,
   onSnooze,
   onNoAction,
   onLink,
   showLink = false,
-}: FocusTriageBarProps) {
+}: TriageActionsBarProps) {
   return (
     <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 border-b border-border rounded-t-lg">
       <Button

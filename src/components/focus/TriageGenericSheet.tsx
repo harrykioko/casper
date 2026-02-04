@@ -3,13 +3,13 @@ import { Badge } from "@/components/ui/badge";
 import { StickyNote, BookOpen, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
-import { FocusTriageBar } from "./FocusTriageBar";
-import type { FocusQueueItem } from "@/hooks/useFocusQueue";
+import { TriageActionsBar } from "./TriageActionsBar";
+import type { TriageQueueItem } from "@/hooks/useTriageQueue";
 
-interface FocusGenericSheetProps {
+interface TriageGenericSheetProps {
   open: boolean;
   onClose: () => void;
-  item: FocusQueueItem | null;
+  item: TriageQueueItem | null;
   onMarkTrusted: () => void;
   onSnooze: (until: Date) => void;
   onNoAction: () => void;
@@ -26,10 +26,10 @@ const REASON_LABELS: Record<string, string> = {
 };
 
 /**
- * Lightweight sheet for notes and reading items in the Focus queue.
+ * Lightweight sheet for notes and reading items in the Triage queue.
  * Shows title, snippet, reason badges, and triage actions.
  */
-export function FocusGenericSheet({
+export function TriageGenericSheet({
   open,
   onClose,
   item,
@@ -38,7 +38,7 @@ export function FocusGenericSheet({
   onNoAction,
   showLink = false,
   onLink,
-}: FocusGenericSheetProps) {
+}: TriageGenericSheetProps) {
   if (!item) return null;
 
   const isNote = item.source_type === "note";
@@ -49,7 +49,7 @@ export function FocusGenericSheet({
     <Sheet open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
         {/* Triage bar */}
-        <FocusTriageBar
+        <TriageActionsBar
           onMarkTrusted={onMarkTrusted}
           onSnooze={onSnooze}
           onNoAction={onNoAction}

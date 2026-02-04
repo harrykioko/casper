@@ -1,5 +1,5 @@
 /**
- * FocusCommitmentDrawer - Sheet-based drawer for commitment triage in Focus Queue
+ * TriageCommitmentDrawer - Sheet-based drawer for commitment triage in Triage Queue
  */
 
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -12,7 +12,7 @@ import { useFloatingNote } from "@/contexts/FloatingNoteContext";
 import { Button } from "@/components/ui/button";
 import type { Commitment } from "@/types/commitment";
 
-interface FocusCommitmentDrawerProps {
+interface TriageCommitmentDrawerProps {
   open: boolean;
   onClose: () => void;
   commitment: Commitment | null;
@@ -26,7 +26,7 @@ interface FocusCommitmentDrawerProps {
   onCancel: () => void;
 }
 
-export function FocusCommitmentDrawer({
+export function TriageCommitmentDrawer({
   open,
   onClose,
   commitment,
@@ -37,7 +37,7 @@ export function FocusCommitmentDrawer({
   onFollowUp,
   onMarkBroken,
   onCancel,
-}: FocusCommitmentDrawerProps) {
+}: TriageCommitmentDrawerProps) {
   const { openFloatingNote } = useFloatingNote();
 
   const handleOpenFloatingNote = () => {

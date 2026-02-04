@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { InboxDetailWorkspace } from "@/components/inbox/InboxDetailWorkspace";
-import { FocusTriageBar } from "./FocusTriageBar";
+import { TriageActionsBar } from "./TriageActionsBar";
 import { AddTaskDialog } from "@/components/modals/AddTaskDialog";
 import { LinkCompanyModal } from "@/components/inbox/LinkCompanyModal";
 import { SaveAttachmentsModal } from "@/components/inbox/SaveAttachmentsModal";
@@ -18,12 +18,12 @@ import type { InboxItem, TaskPrefillOptions } from "@/types/inbox";
 import type { StructuredSuggestion, CreatePipelineCompanyMetadata } from "@/types/inboxSuggestions";
 import type { InboxAttachment } from "@/hooks/useInboxAttachments";
 
-const STORAGE_KEY = "casper:focus-inbox-drawer:width";
+const STORAGE_KEY = "casper:triage-inbox-drawer:width";
 const DEFAULT_WIDTH = 720;
 const MIN_WIDTH = 600;
 const MAX_WIDTH = 1200;
 
-interface FocusInboxDrawerProps {
+interface TriageInboxDrawerProps {
   open: boolean;
   onClose: () => void;
   item: InboxItem | null;
@@ -38,7 +38,7 @@ interface FocusInboxDrawerProps {
   onLink?: () => void;
 }
 
-export function FocusInboxDrawer({
+export function TriageInboxDrawer({
   open,
   onClose,
   item,
@@ -50,7 +50,7 @@ export function FocusInboxDrawer({
   onNoAction,
   showLink = false,
   onLink,
-}: FocusInboxDrawerProps) {
+}: TriageInboxDrawerProps) {
   const { user } = useAuth();
   const { snooze, linkCompany, unlinkCompany } = useInboxItems();
   const { createTask } = useTasks();
@@ -348,7 +348,7 @@ export function FocusInboxDrawer({
                 {/* Main Content */}
                 <div className="flex-1 h-full bg-background border-l border-border shadow-2xl overflow-hidden flex flex-col">
                   {/* Triage bar at top */}
-                  <FocusTriageBar
+                  <TriageActionsBar
                     onMarkTrusted={onMarkTrusted}
                     onSnooze={onSnooze}
                     onNoAction={onNoAction}

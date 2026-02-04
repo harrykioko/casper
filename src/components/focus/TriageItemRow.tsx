@@ -30,10 +30,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { formatDistanceToNow, addHours, addDays, startOfTomorrow, nextMonday } from "date-fns";
 import type { WorkItemSourceType } from "@/hooks/useWorkQueue";
-import type { FocusQueueItem } from "@/hooks/useFocusQueue";
+import type { TriageQueueItem } from "@/hooks/useTriageQueue";
 
-interface FocusItemRowProps {
-  item: FocusQueueItem;
+interface TriageItemRowProps {
+  item: TriageQueueItem;
   isSelected: boolean;
   onClick: () => void;
   index: number;
@@ -81,7 +81,7 @@ function getScoreTier(score: number): string {
   return "low";
 }
 
-export function FocusItemRow({
+export function TriageItemRow({
   item,
   isSelected,
   onClick,
@@ -94,7 +94,7 @@ export function FocusItemRow({
   onEmailNoAction,
   onCommitmentComplete,
   onSnooze,
-}: FocusItemRowProps) {
+}: TriageItemRowProps) {
   const Icon = SOURCE_ICONS[item.source_type] || Mail;
   const iconColor = SOURCE_COLORS[item.source_type] || "text-muted-foreground";
   const scoreTier = getScoreTier(item.priorityScore);
