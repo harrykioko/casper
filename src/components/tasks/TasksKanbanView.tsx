@@ -27,9 +27,9 @@ type KanbanColumn = {
 
 export function TasksKanbanView({ tasks, inboxTasks, onTaskComplete, onTaskDelete, onUpdateTaskStatus, onTaskClick }: TasksKanbanViewProps) {
   const columns: KanbanColumn[] = [
-    { id: "todo", title: "To Do" },
-    { id: "inprogress", title: "In Progress" },
-    { id: "done", title: "Done", emptyMessage: "Drag a task here to mark it complete" }
+    { id: "todo", title: "Ready" },
+    { id: "inprogress", title: "Doing" },
+    { id: "done", title: "Done Today", emptyMessage: "Drag a task here to mark it complete" }
   ];
 
   const getColumnTasks = (columnId: "todo" | "inprogress" | "done") => {

@@ -1,5 +1,4 @@
-
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,11 +16,12 @@ import { TasksKanbanView } from "@/components/tasks/TasksKanbanView";
 import { InboxSection } from "@/components/tasks/InboxSection";
 import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
 import { TasksSummaryPanel } from "@/components/tasks/TasksSummaryPanel";
+import { TasksPageHeader } from "@/components/tasks/TasksPageHeader";
 import { cn } from "@/lib/utils";
 
 export default function Tasks() {
   const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("ready"); // Default to "Ready to Work"
   const [priorityFilter, setPriorityFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [projectFilter, setProjectFilter] = useState("all");
@@ -32,6 +32,8 @@ export default function Tasks() {
   const [showInbox, setShowInbox] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  
+  const quickInputRef = useRef<HTMLInputElement>(null);
 
   const isDesktop = useIsDesktop();
 
@@ -115,17 +117,27 @@ export default function Tasks() {
     setSelectedTask(null);
   };
 
+  const handleAddTaskFocus = () => {
+    quickInputRef.current?.focus();
+  };
+
   const gridClasses = cn(
-    "grid gap-5",
+    "grid gap-6",
     isDesktop
-      ? "grid-cols-[280px_minmax(0,1fr)] 2xl:grid-cols-[320px_1fr]"
+      ? "grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_1fr]"
       : "grid-cols-1"
   );
 
   return (
     <TooltipProvider>
       <div className="min-h-screen p-6">
-        <div className="max-w-7xl mx-auto space-y-6">
+        <div className="max-w-7xl mx-auto space-y-4">
+          {/* Session Header */}
+          <TasksPageHeader 
+            tasks={nonInboxTasks} 
+            onAddTaskClick={handleAddTaskFocus}
+          />
+
           {/* Mobile filters toggle */}
           {!isDesktop && (
             <div className="flex items-center justify-end">
@@ -195,7 +207,7 @@ export default function Tasks() {
             )}
 
             {/* Right: Main content */}
-            <div className="space-y-6">
+            <div className="space-y-5">
               {/* Quick Add Input Bar */}
               <QuickTaskInput onAddTask={handleAddTask_click} />
 
