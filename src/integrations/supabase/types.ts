@@ -1697,6 +1697,8 @@ export type Database = {
           content: string
           created_at: string
           created_by: string | null
+          effort_category: string | null
+          effort_minutes: number | null
           id: string
           is_quick_task: boolean | null
           is_top_priority: boolean
@@ -1718,6 +1720,8 @@ export type Database = {
           content: string
           created_at?: string
           created_by?: string | null
+          effort_category?: string | null
+          effort_minutes?: number | null
           id?: string
           is_quick_task?: boolean | null
           is_top_priority?: boolean
@@ -1739,6 +1743,8 @@ export type Database = {
           content?: string
           created_at?: string
           created_by?: string | null
+          effort_category?: string | null
+          effort_minutes?: number | null
           id?: string
           is_quick_task?: boolean | null
           is_top_priority?: boolean
