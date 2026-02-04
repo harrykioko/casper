@@ -72,16 +72,24 @@ export function parseDueHint(hint: string): Date | null {
  */
 function inferCategoryFromIntent(
   type?: string,
-  extractedCategories?: string[] | null
+  extractedCategories?: string[] | null,
+  companyType?: "portfolio" | "pipeline" | null
 ): string | undefined {
-  // Direct mapping from suggestion type
+  // Map suggestion type to category
   if (type === "CREATE_PERSONAL_TASK") return "Personal";
   
-  // Check extracted categories
+  // Infer from company type (if email is linked to a company)
+  if (companyType === "portfolio") return "Portfolio";
+  if (companyType === "pipeline") return "Pipeline";
+  
+  // Check extracted categories from AI
   if (extractedCategories?.includes("personal")) return "Personal";
-  if (extractedCategories?.includes("admin")) return "Admin";
-  if (extractedCategories?.includes("investing")) return "Investing";
-  if (extractedCategories?.includes("travel")) return "Travel";
+  if (extractedCategories?.includes("portfolio")) return "Portfolio";
+  if (extractedCategories?.includes("pipeline")) return "Pipeline";
+  if (extractedCategories?.includes("investing")) return "Portfolio"; // Legacy mapping
+  if (extractedCategories?.includes("admin")) return "General";
+  if (extractedCategories?.includes("travel")) return "Personal";
+  if (extractedCategories?.includes("work")) return "General";
   
   return undefined;
 }
@@ -134,10 +142,11 @@ export function buildTaskDraftFromEmail(
     }
   }
 
-  // Category inference from suggestion type and extracted categories
+  // Category inference from suggestion type, extracted categories, and company type
   const inferredCategory = inferCategoryFromIntent(
     suggestion?.type,
-    item.extractedCategories
+    item.extractedCategories,
+    draft.companyType || item.relatedCompanyType as "portfolio" | "pipeline" | null
   );
   if (inferredCategory) {
     draft.category = inferredCategory;

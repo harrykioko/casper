@@ -187,6 +187,8 @@ function QuickDatePicks({
 }
 
 // Category Options Component
+import { useCategories } from "@/hooks/useCategories";
+
 function CategoryOptions({ 
   value, 
   onChange 
@@ -194,22 +196,26 @@ function CategoryOptions({
   value?: string; 
   onChange: (val: string) => void 
 }) {
-  const categories = ["Personal", "Admin", "Investing", "Travel", "Work"];
+  const { categories, loading } = useCategories();
+
+  if (loading) {
+    return <div className="text-xs text-muted-foreground p-2">Loading...</div>;
+  }
 
   return (
     <div className="flex flex-col gap-1">
       {categories.map((cat) => (
         <button
-          key={cat}
+          key={cat.id}
           type="button"
-          onClick={() => onChange(cat)}
+          onClick={() => onChange(cat.name)}
           className={cn(
             "text-left px-2 py-1 text-xs rounded hover:bg-muted transition-colors",
-            value === cat && "bg-muted font-medium"
+            value === cat.name && "bg-muted font-medium"
           )}
         >
-          {cat}
-          {value === cat && <span className="ml-1 text-muted-foreground">*</span>}
+          {cat.name}
+          {value === cat.name && <span className="ml-1 text-muted-foreground">*</span>}
         </button>
       ))}
     </div>
