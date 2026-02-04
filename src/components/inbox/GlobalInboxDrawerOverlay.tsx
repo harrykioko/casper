@@ -7,9 +7,9 @@ import { useGlobalInboxDrawer } from "@/contexts/GlobalInboxDrawerContext";
 import { InboxDetailWorkspace } from "./InboxDetailWorkspace";
 
 const STORAGE_KEY = "casper:inbox-drawer:width";
-const DEFAULT_WIDTH = 720;
-const MIN_WIDTH = 600;
-const MAX_WIDTH = 1200;
+const DEFAULT_WIDTH = 900;
+const MIN_WIDTH = 800;
+const MAX_WIDTH = 1400;
 
 export function GlobalInboxDrawerOverlay() {
   const { isOpen, item, handlers, closeDrawer } = useGlobalInboxDrawer();
