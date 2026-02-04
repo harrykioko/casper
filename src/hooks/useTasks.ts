@@ -33,6 +33,9 @@ export interface Task {
   source_inbox_item_id?: string | null;
   archived_at?: string | null;
   completed_at?: string | null;
+  // Effort estimation
+  effort_minutes?: number | null;
+  effort_category?: 'quick' | 'medium' | 'deep' | 'unknown' | null;
 }
 
 // Transform database row to frontend Task type
@@ -59,6 +62,9 @@ const transformTask = (row: TaskRow & { project?: any; category?: any }): Task =
     source_inbox_item_id: row.source_inbox_item_id || null,
     archived_at: (row as any).archived_at || null,
     completed_at: row.completed_at || null,
+    // Effort fields
+    effort_minutes: (row as any).effort_minutes || null,
+    effort_category: (row as any).effort_category || null,
   };
 };
 

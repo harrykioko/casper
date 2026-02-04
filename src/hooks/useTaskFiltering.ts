@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { Task } from './useTasks';
 import { Category } from './useCategories';
 import { Database } from '@/integrations/supabase/types';
+import { parseISO, differenceInDays, isToday, isPast } from 'date-fns';
 
 type Project = Database['public']['Tables']['projects']['Row'];
 
@@ -18,6 +19,13 @@ interface FilterOptions {
   showArchived?: boolean;
 }
 
+function isWithinWeek(dateString: string): boolean {
+  const date = parseISO(dateString);
+  const now = new Date();
+  const diff = differenceInDays(date, now);
+  return diff >= -1 && diff <= 7;
+}
+
 export function useTaskFiltering(tasks: Task[], filters: FilterOptions) {
   const filteredAndSortedTasks = useMemo(() => {
     let filtered = [...tasks];
@@ -29,7 +37,15 @@ export function useTaskFiltering(tasks: Task[], filters: FilterOptions) {
 
     // Filter by status
     if (filters.statusFilter && filters.statusFilter !== 'all') {
-      if (filters.statusFilter === 'todo') {
+      if (filters.statusFilter === 'ready') {
+        // Ready to Work: high/medium priority OR due soon, not completed
+        filtered = filtered.filter(task => {
+          const isHighPriority = task.priority === 'high' || task.priority === 'medium';
+          const isDueSoon = task.scheduledFor && isWithinWeek(task.scheduledFor);
+          const isNotDone = task.status !== 'done' && !task.completed;
+          return (isHighPriority || isDueSoon) && isNotDone;
+        });
+      } else if (filters.statusFilter === 'todo') {
         filtered = filtered.filter(task => task.status === 'todo');
       } else if (filters.statusFilter === 'progress') {
         filtered = filtered.filter(task => task.status === 'inprogress');

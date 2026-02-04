@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Search,
   CheckSquare,
@@ -13,10 +13,13 @@ import {
   Filter,
   Sparkles,
   Archive,
+  ChevronDown,
+  Zap,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useCategories } from "@/hooks/useCategories";
 import { useProjects } from "@/hooks/useProjects";
@@ -53,18 +56,20 @@ interface StatChipProps {
   isActive: boolean;
   onClick: () => void;
   colorClass: string;
+  subtle?: boolean;
 }
 
-function StatChip({ label, count, icon, isActive, onClick, colorClass }: StatChipProps) {
+function StatChip({ label, count, icon, isActive, onClick, colorClass, subtle }: StatChipProps) {
   return (
     <button
       onClick={onClick}
       className={cn(
         "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all w-full",
-        "border",
         isActive
-          ? `${colorClass} border-current`
-          : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
+          ? `${colorClass}`
+          : subtle 
+            ? "text-muted-foreground hover:bg-muted/50"
+            : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
       )}
     >
       {icon}
@@ -104,6 +109,7 @@ export function TasksSummaryPanel({
 }: TasksSummaryPanelProps) {
   const { categories, loading: categoriesLoading } = useCategories();
   const { projects, loading: projectsLoading } = useProjects();
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
 
   const counts = useMemo(() => {
     const all = tasks.length;
@@ -113,120 +119,146 @@ export function TasksSummaryPanel({
     const high = tasks.filter(t => t.priority === "high").length;
     const medium = tasks.filter(t => t.priority === "medium").length;
     const low = tasks.filter(t => t.priority === "low").length;
-    return { all, todo, inProgress, done, high, medium, low };
+    // Ready to work count
+    const ready = tasks.filter(t => {
+      const isHighPriority = t.priority === 'high' || t.priority === 'medium';
+      const hasDueDate = !!t.scheduledFor;
+      const isNotDone = t.status !== 'done' && !t.completed;
+      return (isHighPriority || hasDueDate) && isNotDone;
+    }).length;
+    return { all, todo, inProgress, done, high, medium, low, ready };
   }, [tasks]);
 
   return (
-    <div className="sticky top-24 space-y-5">
-      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-            <Sparkles className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-foreground">Tasks Command</h2>
-            <p className="text-xs text-muted-foreground">Manage your work</p>
-          </div>
-        </div>
-
+    <div className="sticky top-24 space-y-4">
+      <div className="rounded-2xl bg-card/50 backdrop-blur-sm p-4 space-y-4">
         {/* Search */}
-        <div className="relative mb-5">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search tasks..."
             value={searchQuery}
             onChange={(e) => onSearchQueryChange(e.target.value)}
-            className="pl-10 h-9 text-sm"
+            className="pl-10 h-9 text-sm bg-muted/30 border-muted/30"
           />
         </div>
 
-        {/* By Status */}
-        <div className="space-y-1.5 mb-4">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-            By Status
+        {/* View Mode */}
+        <div className="space-y-2">
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+            View
           </p>
-          <StatChip
-            label="All Items"
-            count={counts.all}
-            icon={<CheckSquare className="h-4 w-4" />}
-            isActive={statusFilter === "all"}
-            onClick={() => onStatusFilterChange("all")}
-            colorClass="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-          />
-          <StatChip
-            label="To Do"
-            count={counts.todo}
-            icon={<Circle className="h-4 w-4" />}
-            isActive={statusFilter === "todo"}
-            onClick={() => onStatusFilterChange("todo")}
-            colorClass="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400"
-          />
-          <StatChip
-            label="In Progress"
-            count={counts.inProgress}
-            icon={<Loader2 className="h-4 w-4" />}
-            isActive={statusFilter === "progress"}
-            onClick={() => onStatusFilterChange("progress")}
-            colorClass="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-          />
-          <StatChip
-            label="Done"
-            count={counts.done}
-            icon={<CheckCircle2 className="h-4 w-4" />}
-            isActive={statusFilter === "done"}
-            onClick={() => onStatusFilterChange("done")}
-            colorClass="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-          />
-          <StatChip
-            label="Archived"
-            count={archivedCount}
-            icon={<Archive className="h-4 w-4" />}
-            isActive={showArchived}
-            onClick={() => onShowArchivedChange(!showArchived)}
-            colorClass="bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
-          />
+          <div className="space-y-1">
+            <StatChip
+              label="Ready to Work"
+              count={counts.ready}
+              icon={<Zap className="h-4 w-4" />}
+              isActive={statusFilter === "ready"}
+              onClick={() => onStatusFilterChange("ready")}
+              colorClass="bg-primary/10 text-primary"
+            />
+            <StatChip
+              label="All Tasks"
+              count={counts.all}
+              icon={<CheckSquare className="h-4 w-4" />}
+              isActive={statusFilter === "all"}
+              onClick={() => onStatusFilterChange("all")}
+              colorClass="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+            />
+          </div>
         </div>
 
-        {/* By Priority */}
-        <div className="space-y-1.5 mb-4">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-            By Priority
+        {/* Status */}
+        <div className="space-y-2">
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+            Status
           </p>
-          <StatChip
-            label="High"
-            count={counts.high}
-            icon={<ArrowUp className="h-4 w-4" />}
-            isActive={priorityFilter === "high"}
-            onClick={() => onPriorityFilterChange(priorityFilter === "high" ? "all" : "high")}
-            colorClass="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-          />
-          <StatChip
-            label="Medium"
-            count={counts.medium}
-            icon={<ArrowRight className="h-4 w-4" />}
-            isActive={priorityFilter === "medium"}
-            onClick={() => onPriorityFilterChange(priorityFilter === "medium" ? "all" : "medium")}
-            colorClass="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-          />
-          <StatChip
-            label="Low"
-            count={counts.low}
-            icon={<ArrowDown className="h-4 w-4" />}
-            isActive={priorityFilter === "low"}
-            onClick={() => onPriorityFilterChange(priorityFilter === "low" ? "all" : "low")}
-            colorClass="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400"
-          />
+          <div className="space-y-1">
+            <StatChip
+              label="To Do"
+              count={counts.todo}
+              icon={<Circle className="h-4 w-4" />}
+              isActive={statusFilter === "todo"}
+              onClick={() => onStatusFilterChange("todo")}
+              colorClass="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400"
+              subtle
+            />
+            <StatChip
+              label="In Progress"
+              count={counts.inProgress}
+              icon={<Loader2 className="h-4 w-4" />}
+              isActive={statusFilter === "progress"}
+              onClick={() => onStatusFilterChange("progress")}
+              colorClass="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+              subtle
+            />
+            <StatChip
+              label="Done"
+              count={counts.done}
+              icon={<CheckCircle2 className="h-4 w-4" />}
+              isActive={statusFilter === "done"}
+              onClick={() => onStatusFilterChange("done")}
+              colorClass="bg-green-500/10 text-green-600 dark:text-green-400"
+              subtle
+            />
+          </div>
         </div>
 
-        {/* Filters (dropdowns) */}
-        <div className="space-y-3 mb-4">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
-            Filters
+        {/* Priority */}
+        <div className="space-y-2">
+          <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+            Priority
           </p>
-          <div className="space-y-2">
+          <div className="flex gap-1">
+            <button
+              onClick={() => onPriorityFilterChange(priorityFilter === "high" ? "all" : "high")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all",
+                priorityFilter === "high"
+                  ? "bg-destructive/10 text-destructive"
+                  : "text-muted-foreground hover:bg-muted/50"
+              )}
+            >
+              <ArrowUp className="h-3 w-3" />
+              {counts.high}
+            </button>
+            <button
+              onClick={() => onPriorityFilterChange(priorityFilter === "medium" ? "all" : "medium")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all",
+                priorityFilter === "medium"
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  : "text-muted-foreground hover:bg-muted/50"
+              )}
+            >
+              <ArrowRight className="h-3 w-3" />
+              {counts.medium}
+            </button>
+            <button
+              onClick={() => onPriorityFilterChange(priorityFilter === "low" ? "all" : "low")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-all",
+                priorityFilter === "low"
+                  ? "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                  : "text-muted-foreground hover:bg-muted/50"
+              )}
+            >
+              <ArrowDown className="h-3 w-3" />
+              {counts.low}
+            </button>
+          </div>
+        </div>
+
+        {/* More Filters (Collapsible) */}
+        <Collapsible open={moreFiltersOpen} onOpenChange={setMoreFiltersOpen}>
+          <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full">
+            <Filter className="h-3 w-3" />
+            <span>More filters</span>
+            <ChevronDown className={cn("h-3 w-3 ml-auto transition-transform", moreFiltersOpen && "rotate-180")} />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-3 space-y-2">
             <Select value={categoryFilter} onValueChange={onCategoryFilterChange}>
-              <SelectTrigger className="w-full h-8 text-sm">
+              <SelectTrigger className="w-full h-8 text-xs bg-muted/30 border-muted/30">
                 <span className="text-muted-foreground mr-1">Category:</span>
                 <SelectValue placeholder="All" />
               </SelectTrigger>
@@ -245,7 +277,7 @@ export function TasksSummaryPanel({
             </Select>
 
             <Select value={projectFilter} onValueChange={onProjectFilterChange}>
-              <SelectTrigger className="w-full h-8 text-sm">
+              <SelectTrigger className="w-full h-8 text-xs bg-muted/30 border-muted/30">
                 <span className="text-muted-foreground mr-1">Project:</span>
                 <SelectValue placeholder="All" />
               </SelectTrigger>
@@ -264,8 +296,8 @@ export function TasksSummaryPanel({
             </Select>
 
             <Select value={sortBy} onValueChange={onSortByChange}>
-              <SelectTrigger className="w-full h-8 text-sm">
-                <span className="text-muted-foreground mr-1">Sort by:</span>
+              <SelectTrigger className="w-full h-8 text-xs bg-muted/30 border-muted/30">
+                <span className="text-muted-foreground mr-1">Sort:</span>
                 <SelectValue placeholder="Date" />
               </SelectTrigger>
               <SelectContent className="bg-popover backdrop-blur-md border border-muted/40 z-50">
@@ -275,47 +307,47 @@ export function TasksSummaryPanel({
                 <SelectItem value="status">Status</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-        </div>
+          </CollapsibleContent>
+        </Collapsible>
 
-        {/* View Controls */}
-        <div className="pt-4 border-t border-border space-y-3">
-          <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-            View
-          </p>
+        {/* View Mode Toggle */}
+        <div className="pt-3 border-t border-border/50 space-y-2">
           <div className="flex gap-1">
             <button
               onClick={() => onViewModeChange("list")}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-1 justify-center",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex-1 justify-center",
                 viewMode === "list"
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted/50"
               )}
             >
-              <List className="h-4 w-4" />
+              <List className="h-3.5 w-3.5" />
               List
             </button>
             <button
               onClick={() => onViewModeChange("kanban")}
               className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-1 justify-center",
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex-1 justify-center",
                 viewMode === "kanban"
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                  : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted/50"
               )}
             >
-              <LayoutGrid className="h-4 w-4" />
+              <LayoutGrid className="h-3.5 w-3.5" />
               Kanban
             </button>
           </div>
+        </div>
 
-          <div className="flex items-center justify-between">
+        {/* Toggles */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between py-1">
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Show Triage</span>
+              <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Triage</span>
               {triageCount > 0 && (
-                <span className="min-w-[20px] h-5 px-1.5 rounded-full text-xs flex items-center justify-center bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
                   {triageCount}
                 </span>
               )}
@@ -323,15 +355,16 @@ export function TasksSummaryPanel({
             <Switch
               checked={showTriage}
               onCheckedChange={onShowTriageChange}
+              className="scale-75"
             />
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between py-1">
             <div className="flex items-center gap-2">
-              <Archive className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Show Archived</span>
+              <Archive className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Archived</span>
               {archivedCount > 0 && (
-                <span className="min-w-[20px] h-5 px-1.5 rounded-full text-xs flex items-center justify-center bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
                   {archivedCount}
                 </span>
               )}
@@ -339,6 +372,7 @@ export function TasksSummaryPanel({
             <Switch
               checked={showArchived}
               onCheckedChange={onShowArchivedChange}
+              className="scale-75"
             />
           </div>
         </div>
