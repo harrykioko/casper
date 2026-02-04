@@ -1,110 +1,299 @@
 
+# One-Tap High-Confidence Entity Link Approval
 
-# Sync Triage Clearing with Inbox Resolution
+## Overview
 
-## Problem
+This plan introduces a lightweight "Suggested Links" section in the email drawer that allows users to accept or reject high-confidence entity link suggestions with a single tap, without opening any forms or modals.
 
-When inbox items are cleared from the Triage queue (marked as "trusted" or "ignored" in the `work_items` table), they remain visible in the main Inbox view. The user expects these emails to be removed from the active Inbox since they've been triaged, while still remaining accessible via:
-- Search
-- Linked tasks
-- Linked entities (companies, obligations)
-- Direct deep links
+---
 
-## Current State
+## Current Behavior
 
-### Inbox filtering (useInboxItems.ts, line 161)
+1. When AI suggests a `LINK_COMPANY` action, clicking "Link" opens the `InlineLinkCompanyForm` composer
+2. This is too heavy for high-confidence matches where the user just wants to confirm
+3. All link suggestions (regardless of confidence) go through the same workflow
+
+---
+
+## Proposed Behavior
+
+1. **High-confidence** `LINK_COMPANY` suggestions (confidence = "high") are displayed in a new "Suggested Links" section with accept/reject buttons
+2. **Accept**: Immediately creates the link, updates UI, logs activity
+3. **Reject**: Dismisses the suggestion, logs activity
+4. **Lower-confidence** suggestions remain in "Suggested Actions" and open the link composer when clicked
+
+---
+
+## Technical Implementation
+
+### 1. Update Activity Types
+
+**File: `src/types/inboxActivity.ts`**
+
+Add two new action types for tracking suggested link decisions:
+
 ```typescript
-let query = supabase
-  .from("inbox_items")
-  .select("*")
-  .eq("is_resolved", false);  // Only shows unresolved items
+export type InboxActivityActionType =
+  | 'link_company'
+  | 'create_task'
+  | 'create_commitment'
+  | 'create_pipeline_company'
+  | 'mark_complete'
+  | 'archive'
+  | 'snooze'
+  | 'dismiss_suggestion'
+  | 'add_note'
+  | 'save_attachments'
+  | 'accept_suggested_link'    // NEW
+  | 'reject_suggested_link';   // NEW
 ```
 
-### Triage clearing (useWorkItemActions.ts)
-- `markTrusted()`: Updates work_item status to 'trusted' but does NOT touch inbox_items
-- `noAction()`: Updates work_item status to 'ignored' but does NOT touch inbox_items
+**File: `src/hooks/useInboxItemActivity.ts`**
 
-### Existing triggers (one-way only)
-- When `inbox_items.is_resolved` becomes true → work_item marked as 'trusted' ✅
-- When work_item becomes 'trusted'/'ignored' → inbox_items.is_resolved NOT updated ❌
+Add labels for the new action types:
 
-This is the gap: there's no reverse trigger to sync from work_items back to inbox_items.
-
-## Solution
-
-Add a database trigger that automatically sets `inbox_items.is_resolved = true` when the corresponding `work_items` record transitions to 'trusted' or 'ignored' status. This ensures bi-directional sync between the triage system and inbox visibility.
-
-## Implementation
-
-### Database Migration: New Trigger
-
-Create a new trigger function `trigger_resolve_inbox_on_work_item_exit()` that fires when a work_item is updated to 'trusted' or 'ignored':
-
-```sql
-CREATE OR REPLACE FUNCTION public.trigger_resolve_inbox_on_work_item_exit()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-BEGIN
-  -- When a work_item transitions to trusted or ignored, resolve the source inbox item
-  IF NEW.source_type = 'email'
-     AND NEW.status IN ('trusted', 'ignored')
-     AND (OLD.status IS NULL OR OLD.status NOT IN ('trusted', 'ignored'))
-  THEN
-    UPDATE public.inbox_items
-    SET is_resolved = true,
-        updated_at = now()
-    WHERE id = NEW.source_id
-      AND created_by = NEW.created_by
-      AND is_resolved = false;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS trg_resolve_inbox_on_work_item_exit ON public.work_items;
-CREATE TRIGGER trg_resolve_inbox_on_work_item_exit
-  AFTER UPDATE ON public.work_items
-  FOR EACH ROW
-  EXECUTE FUNCTION public.trigger_resolve_inbox_on_work_item_exit();
+```typescript
+const ACTION_LABELS: Record<InboxActivityActionType, string> = {
+  // ... existing labels ...
+  accept_suggested_link: 'Linked via suggestion',
+  reject_suggested_link: 'Dismissed suggested link',
+};
 ```
 
-### Why a database trigger (vs. application code)?
+### 2. Create SuggestedLinkCard Component
 
-1. **Atomicity**: The resolution happens in the same transaction as the work_item update
-2. **Consistency**: Works regardless of which action triggers the exit (manual trusted, no action, auto-exit from linking, etc.)
-3. **Simplicity**: No need to modify multiple frontend handlers
-4. **Existing pattern**: Matches the existing auto-exit triggers already in the codebase
+**New File: `src/components/inbox/SuggestedLinkCard.tsx`**
 
-## Behavior After Implementation
+A compact approval card with:
+- Entity name and type badge (pipeline/portfolio)
+- Confidence indicator
+- Optional one-line rationale (muted text)
+- Accept button (check icon)
+- Reject button (x icon)
 
-| Action | Effect on work_items | Effect on inbox_items |
-|--------|---------------------|----------------------|
-| "Mark Trusted" in Triage | status → 'trusted' | is_resolved → true (via trigger) |
-| "No Action" in Triage | status → 'ignored' | is_resolved → true (via trigger) |
-| "No Action" quick action (email row) | status → 'ignored' | is_resolved → true (via trigger) |
-| Auto-exit from linking entity | status → 'trusted' | is_resolved → true (via trigger) |
-| Manual "Mark Complete" in Inbox | is_resolved → true | (triggers work_item exit) |
+```text
++-----------------------------------------------+
+| [Building2] OatFi              Pipeline  High |
+| Matched via domain: oatfi.com                 |
+|                           [check] [x]         |
++-----------------------------------------------+
+```
 
-## Accessibility After Resolution
+Key props:
+- `companyId: string`
+- `companyName: string`
+- `companyType: "pipeline" | "portfolio"`
+- `confidence: "high" | "medium" | "low"`
+- `rationale?: string`
+- `onAccept: () => void`
+- `onReject: () => void`
 
-Resolved inbox items will still be:
-- **Searchable**: Update Inbox search to optionally include resolved items (future enhancement if needed)
-- **Viewable from linked tasks**: Tasks with `source_inbox_item_id` can fetch the email via `fetchInboxItemById()`
-- **Viewable from company pages**: Company communications query can include resolved items
-- **Viewable in Archive**: Already works via `useInboxItems({ onlyArchived: true })` plus a query filter adjustment
+Uses icon buttons with tooltips ("Link to [company]", "Dismiss suggestion").
+
+### 3. Update InlineActionPanel
+
+**File: `src/components/inbox/InlineActionPanel.tsx`**
+
+#### A. Filter suggestions into two groups:
+
+```typescript
+const { highConfidenceLinkSuggestions, otherSuggestions } = useMemo(() => {
+  const highConfLinks: StructuredSuggestion[] = [];
+  const others: StructuredSuggestion[] = [];
+  
+  for (const s of suggestions) {
+    // High-confidence LINK_COMPANY that is not already linked
+    if (
+      s.type === "LINK_COMPANY" &&
+      s.confidence === "high" &&
+      s.company_id &&
+      s.company_id !== item.relatedCompanyId // Not already linked
+    ) {
+      highConfLinks.push(s);
+    } else {
+      others.push(s);
+    }
+  }
+  
+  return { highConfidenceLinkSuggestions: highConfLinks, otherSuggestions: others };
+}, [suggestions, item.relatedCompanyId]);
+```
+
+#### B. Add "Suggested Links" section (above or below Suggested Actions):
+
+```typescript
+{/* Suggested Links Section */}
+{highConfidenceLinkSuggestions.length > 0 && (
+  <div>
+    <SectionHeader>Suggested Links</SectionHeader>
+    <div className="space-y-2">
+      {highConfidenceLinkSuggestions.slice(0, 3).map((suggestion) => (
+        <SuggestedLinkCard
+          key={suggestion.id}
+          companyId={suggestion.company_id!}
+          companyName={suggestion.company_name!}
+          companyType={suggestion.company_type!}
+          confidence={suggestion.confidence}
+          rationale={suggestion.rationale}
+          onAccept={() => handleAcceptSuggestedLink(suggestion)}
+          onReject={() => handleRejectSuggestedLink(suggestion)}
+        />
+      ))}
+      {highConfidenceLinkSuggestions.length > 3 && (
+        <p className="text-[10px] text-muted-foreground">
+          +{highConfidenceLinkSuggestions.length - 3} more
+        </p>
+      )}
+    </div>
+    <div className="border-t border-border my-3" />
+  </div>
+)}
+```
+
+#### C. Add accept/reject handlers:
+
+```typescript
+const handleAcceptSuggestedLink = async (suggestion: StructuredSuggestion) => {
+  if (!suggestion.company_id || !suggestion.company_name || !suggestion.company_type) return;
+  
+  // 1. Create the link immediately
+  linkCompany(
+    item.id,
+    suggestion.company_id,
+    suggestion.company_name,
+    suggestion.company_type,
+    null // logo URL - could be fetched if needed
+  );
+  
+  // 2. Log activity
+  await logActivity({
+    inboxItemId: item.id,
+    actionType: "accept_suggested_link",
+    targetId: suggestion.company_id,
+    targetType: suggestion.company_type === "pipeline" ? "pipeline_company" : "company",
+    metadata: { companyName: suggestion.company_name },
+  });
+  refetchActivity();
+  
+  // 3. Dismiss the suggestion
+  dismissSuggestion(suggestion.id);
+  
+  // 4. Show success toast
+  toast.success(`Linked to ${suggestion.company_name}`);
+};
+
+const handleRejectSuggestedLink = async (suggestion: StructuredSuggestion) => {
+  // 1. Dismiss the suggestion
+  dismissSuggestion(suggestion.id);
+  
+  // 2. Log activity
+  await logActivity({
+    inboxItemId: item.id,
+    actionType: "reject_suggested_link",
+    targetId: suggestion.company_id || undefined,
+    targetType: suggestion.company_type === "pipeline" ? "pipeline_company" : "company",
+    metadata: { 
+      companyName: suggestion.company_name,
+      reason: "user_dismissed"
+    },
+  });
+  refetchActivity();
+};
+```
+
+#### D. Update "Suggested Actions" to use filtered list:
+
+Change from:
+```typescript
+{suggestions.map((suggestion) => (
+```
+
+To:
+```typescript
+{otherSuggestions.map((suggestion) => (
+```
+
+### 4. Already-Linked Handling
+
+The filtering logic already handles this:
+```typescript
+s.company_id !== item.relatedCompanyId
+```
+
+If the email is already linked to the suggested company, that suggestion will not appear in the "Suggested Links" section.
+
+---
+
+## UI Layout
+
+The right panel will now have this structure:
+
+```text
++----------------------------------+
+| TAKE ACTION                      |
+| [Create Task]                    |
+| [Track Obligation]               |
+| [Add Note]                       |
+| [Link Company] -> Linked: Foo    |
+| [Add to Pipeline]                |
+| [Snooze v]                       |
+| -------------------------------- |
+| [Complete]  [Archive]            |
++----------------------------------+
+| SUGGESTED LINKS                  |  <-- NEW
+| +------------------------------+ |
+| | OatFi           Pipeline High| |
+| | Matched via domain           | |
+| |                    [v] [x]   | |
+| +------------------------------+ |
++----------------------------------+
+| SUGGESTED ACTIONS                |
+| (other suggestions here)         |
++----------------------------------+
+| ACTIVITY                         |
++----------------------------------+
+```
+
+---
 
 ## Files Changed
 
 | File | Change |
 |------|--------|
-| New migration SQL | Add `trigger_resolve_inbox_on_work_item_exit` function and trigger |
+| `src/types/inboxActivity.ts` | Add `accept_suggested_link` and `reject_suggested_link` action types |
+| `src/hooks/useInboxItemActivity.ts` | Add labels for new action types |
+| `src/components/inbox/SuggestedLinkCard.tsx` | **NEW** - Compact approval card component |
+| `src/components/inbox/InlineActionPanel.tsx` | Filter suggestions, add Suggested Links section, add accept/reject handlers |
+
+---
+
+## Activity Log Examples
+
+**After accepting a suggested link:**
+```
+Linked via suggestion: OatFi (pipeline) - 2 minutes ago
+```
+
+**After rejecting a suggested link:**
+```
+Dismissed suggested link: OatFi - 2 minutes ago
+```
+
+---
 
 ## Edge Cases
 
-1. **Already resolved**: Trigger only acts if `is_resolved = false`, preventing redundant updates
-2. **Non-email work items**: Trigger only fires for `source_type = 'email'`
-3. **Snoozing**: Snooze sets `status = 'snoozed'`, not 'trusted'/'ignored', so items remain in inbox while snoozed
+1. **Email already linked to same company**: Suggestion hidden (via filter)
+2. **Email already linked to different company**: Suggested Links still shows; accepting replaces the existing link
+3. **No high-confidence link suggestions**: "Suggested Links" section not rendered
+4. **More than 3 high-confidence suggestions**: Show first 3, display "+N more" indicator
+5. **Suggestion has missing company_id**: Filtered out (won't appear in Suggested Links)
 
+---
+
+## What Stays the Same
+
+- Manual "Link Company" button and `InlineLinkCompanyForm` workflow unchanged
+- Low/medium confidence `LINK_COMPANY` suggestions still open the composer
+- All other suggestion types (tasks, pipeline creation, etc.) unchanged
+- Existing activity logging patterns preserved
