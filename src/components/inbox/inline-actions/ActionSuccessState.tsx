@@ -8,7 +8,8 @@ export type ActionType =
   | "add_note"
   | "link_company"
   | "create_pipeline"
-  | "save_attachments";
+  | "save_attachments"
+  | "create_commitment";
 
 interface ActionResult {
   id: string;
@@ -29,6 +30,7 @@ const ACTION_LABELS: Record<ActionType, string> = {
   link_company: "Company linked",
   create_pipeline: "Added to pipeline",
   save_attachments: "Attachments saved",
+  create_commitment: "Obligation tracked",
 };
 
 export function ActionSuccessState({

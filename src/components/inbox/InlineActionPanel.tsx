@@ -13,6 +13,7 @@ import {
   Wand2,
   Download,
   Plus,
+  Handshake,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,7 @@ import { useTasks } from "@/hooks/useTasks";
 import { useInboxItems } from "@/hooks/useInboxItems";
 import { useInboxActivity } from "@/hooks/useInboxActivity";
 import { useInboxItemActivity } from "@/hooks/useInboxItemActivity";
+import { useCommitments } from "@/hooks/useCommitments";
 import { useAuth } from "@/contexts/AuthContext";
 import { SuggestionCard } from "@/components/inbox/SuggestionCard";
 import { EMAIL_INTENT_LABELS } from "@/types/inboxSuggestions";
@@ -39,13 +41,16 @@ import {
   InlineNoteForm,
   InlineSaveAttachmentsForm,
   InlineCreatePipelineForm,
+  InlineCommitmentForm,
   type ActionType,
   type PipelineFormData,
+  type CommitmentFormData,
 } from "@/components/inbox/inline-actions";
 import { usePipeline } from "@/hooks/usePipeline";
 import { supabase } from "@/integrations/supabase/client";
 import type { CreatePipelineCompanyMetadata } from "@/types/inboxSuggestions";
 import { copyInboxAttachmentToPipeline } from "@/lib/inbox/copyAttachmentToCompany";
+import { buildTaskDraftFromEmail, buildCommitmentDraftFromSuggestion } from "@/lib/inbox/buildTaskDraft";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { InboxItem } from "@/types/inbox";
@@ -128,6 +133,7 @@ export function InlineActionPanel({
   const { tasks, createTask } = useTasks();
   const { linkCompany } = useInboxItems();
   const { createCompany } = usePipeline();
+  const { createCommitment } = useCommitments();
   const { logActivity } = useInboxActivity();
   const { activities: inboxActivities, refetch: refetchActivity } = useInboxItemActivity(item.id);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
@@ -224,13 +230,25 @@ export function InlineActionPanel({
     setSuccessResult(null);
   };
 
-  // Task creation
-  const handleConfirmTask = async (data: { title: string; description: string; companyId?: string; companyName?: string; companyType?: "portfolio" | "pipeline" }) => {
+  // Task creation - enhanced with draft support
+  const handleConfirmTask = async (data: { 
+    title: string; 
+    description: string; 
+    companyId?: string; 
+    companyName?: string; 
+    companyType?: "portfolio" | "pipeline";
+    priority?: "low" | "medium" | "high";
+    dueDate?: Date | null;
+    category?: string;
+  }) => {
     const result = await createTask({
       content: data.title,
       source_inbox_item_id: item.id,
       pipeline_company_id: data.companyType === "pipeline" ? data.companyId : undefined,
       company_id: data.companyType === "portfolio" ? data.companyId : undefined,
+      priority: data.priority,
+      scheduled_for: data.dueDate?.toISOString(),
+      // Note: category_id would require lookup from categories table
     });
     
     if (result) {
@@ -253,6 +271,62 @@ export function InlineActionPanel({
       if (activeSuggestion) {
         dismissSuggestion(activeSuggestion.id);
       }
+    }
+  };
+
+  // Commitment creation
+  const handleConfirmCommitment = async (data: CommitmentFormData) => {
+    try {
+      const commitment = await createCommitment({
+        title: data.title,
+        content: data.content,
+        context: data.context,
+        direction: data.direction,
+        personName: data.counterpartyName,
+        companyId: data.companyId,
+        companyType: data.companyType,
+        companyName: data.companyName,
+        dueAt: data.dueDate?.toISOString(),
+        sourceType: "email",
+        sourceId: data.sourceEmailId,
+        sourceReference: `From email: ${item.subject}`,
+      });
+
+      // If also creating a task, create it now
+      if (data.alsoCreateTask) {
+        await createTask({
+          content: data.title,
+          source_inbox_item_id: data.sourceEmailId,
+          pipeline_company_id: data.companyType === "pipeline" ? data.companyId : undefined,
+          company_id: data.companyType === "portfolio" ? data.companyId : undefined,
+          scheduled_for: data.dueDate?.toISOString(),
+          priority: "high",
+        });
+      }
+
+      // Log activity
+      await logActivity({
+        inboxItemId: item.id,
+        actionType: "create_commitment",
+        targetId: commitment.id,
+        targetType: "commitment",
+        metadata: { title: data.title },
+      });
+      refetchActivity();
+
+      handleActionSuccess("create_commitment", {
+        id: commitment.id,
+        name: data.title,
+        link: "/focus",
+      });
+
+      // Auto-dismiss suggestion
+      if (activeSuggestion) {
+        dismissSuggestion(activeSuggestion.id);
+      }
+    } catch (error) {
+      console.error("Failed to create commitment:", error);
+      toast.error("Failed to create obligation");
     }
   };
 
@@ -402,24 +476,33 @@ export function InlineActionPanel({
     }
   };
 
-  // Handle suggestion selection - prefill the form
+  // Handle suggestion selection - prefill the form with draft data
   const handleSuggestionSelect = (suggestion: StructuredSuggestion) => {
     setActiveSuggestion(suggestion);
     
     switch (suggestion.type) {
       case "CREATE_FOLLOW_UP_TASK":
       case "CREATE_PERSONAL_TASK":
-      case "CREATE_INTRO_TASK":
+      case "CREATE_INTRO_TASK": {
+        // Use the new draft builder for smarter prefills
+        const taskDraft = buildTaskDraftFromEmail(item, suggestion);
         setActiveAction("create_task");
         setPrefillData({
-          title: suggestion.title,
-          description: item.preview || "",
-          companyId: suggestion.company_id || item.relatedCompanyId,
-          companyName: suggestion.company_name || item.relatedCompanyName,
+          title: taskDraft.title,
+          description: taskDraft.initialNote || "",
+          companyId: taskDraft.companyId,
+          companyName: taskDraft.companyName,
           rationale: suggestion.rationale,
           confidence: suggestion.confidence,
         });
         break;
+      }
+      case "CREATE_WAITING_ON": {
+        // Route to commitment form
+        setActiveAction("create_commitment");
+        setPrefillData({});
+        break;
+      }
       case "LINK_COMPANY":
         setActiveAction("link_company");
         setPrefillData({ 
@@ -492,6 +575,26 @@ export function InlineActionPanel({
                   prefill={prefillData as any}
                   suggestion={activeSuggestion}
                   onConfirm={handleConfirmTask}
+                  onCancel={handleCancelAction}
+                />
+              )}
+            </AnimatePresence>
+
+            {/* Track Obligation button */}
+            <ActionButton
+              icon={Handshake}
+              label="Track Obligation"
+              onClick={() => handleSelectAction("create_commitment")}
+              isActive={activeAction === "create_commitment"}
+            />
+            
+            {/* Inline Commitment Form */}
+            <AnimatePresence>
+              {activeAction === "create_commitment" && activeSuggestion && (
+                <InlineCommitmentForm
+                  emailItem={item}
+                  suggestion={activeSuggestion}
+                  onConfirm={handleConfirmCommitment}
                   onCancel={handleCancelAction}
                 />
               )}
