@@ -28,6 +28,8 @@ const ACTION_LABELS: Record<InboxActivityActionType, string> = {
   dismiss_suggestion: 'Dismissed suggestion',
   add_note: 'Added note',
   save_attachments: 'Saved attachments',
+  accept_suggested_link: 'Linked via suggestion',
+  reject_suggested_link: 'Dismissed suggested link',
 };
 
 export function useInboxItemActivity(inboxItemId: string) {

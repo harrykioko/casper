@@ -33,6 +33,7 @@ import { useInboxItemActivity } from "@/hooks/useInboxItemActivity";
 import { useCommitments } from "@/hooks/useCommitments";
 import { useAuth } from "@/contexts/AuthContext";
 import { SuggestionCard } from "@/components/inbox/SuggestionCard";
+import { SuggestedLinkCard } from "@/components/inbox/SuggestedLinkCard";
 import { EMAIL_INTENT_LABELS } from "@/types/inboxSuggestions";
 import { 
   ActionSuccessState, 
@@ -154,6 +155,28 @@ export function InlineActionPanel({
     generateSuggestions,
     dismissSuggestion,
   } = useInboxSuggestionsV2(item.id);
+
+  // Filter suggestions: separate high-confidence link suggestions from others
+  const { highConfidenceLinkSuggestions, otherSuggestions } = useMemo(() => {
+    const highConfLinks: StructuredSuggestion[] = [];
+    const others: StructuredSuggestion[] = [];
+    
+    for (const s of suggestions) {
+      // High-confidence LINK_COMPANY that is not already linked
+      if (
+        s.type === "LINK_COMPANY" &&
+        s.confidence === "high" &&
+        s.company_id &&
+        s.company_id !== item.relatedCompanyId
+      ) {
+        highConfLinks.push(s);
+      } else {
+        others.push(s);
+      }
+    }
+    
+    return { highConfidenceLinkSuggestions: highConfLinks, otherSuggestions: others };
+  }, [suggestions, item.relatedCompanyId]);
 
   // Filter tasks that originated from this inbox item
   const relatedTasks = useMemo(() => {
@@ -541,6 +564,55 @@ export function InlineActionPanel({
     handleSuggestionSelect(suggestion);
   };
 
+  // Handle accept for high-confidence link suggestions
+  const handleAcceptSuggestedLink = async (suggestion: StructuredSuggestion) => {
+    if (!suggestion.company_id || !suggestion.company_name || !suggestion.company_type) return;
+    
+    // 1. Create the link immediately
+    linkCompany(
+      item.id,
+      suggestion.company_id,
+      suggestion.company_name,
+      suggestion.company_type,
+      null // logo URL
+    );
+    
+    // 2. Log activity
+    await logActivity({
+      inboxItemId: item.id,
+      actionType: "accept_suggested_link",
+      targetId: suggestion.company_id,
+      targetType: suggestion.company_type === "pipeline" ? "pipeline_company" : "company",
+      metadata: { companyName: suggestion.company_name },
+    });
+    refetchActivity();
+    
+    // 3. Dismiss the suggestion
+    dismissSuggestion(suggestion.id);
+    
+    // 4. Show success toast
+    toast.success(`Linked to ${suggestion.company_name}`);
+  };
+
+  // Handle reject for high-confidence link suggestions
+  const handleRejectSuggestedLink = async (suggestion: StructuredSuggestion) => {
+    // 1. Dismiss the suggestion
+    dismissSuggestion(suggestion.id);
+    
+    // 2. Log activity
+    await logActivity({
+      inboxItemId: item.id,
+      actionType: "reject_suggested_link",
+      targetId: suggestion.company_id || undefined,
+      targetType: suggestion.company_type === "pipeline" ? "pipeline_company" : "company",
+      metadata: { 
+        companyName: suggestion.company_name,
+        reason: "user_dismissed"
+      },
+    });
+    refetchActivity();
+  };
+
   return (
     <div className="h-full p-4 space-y-5 bg-muted/30 overflow-y-auto">
       {/* Success State */}
@@ -746,15 +818,50 @@ export function InlineActionPanel({
       {/* Divider */}
       <div className="border-t border-border" />
 
+      {/* Suggested Links Section - High-confidence link approvals */}
+      {highConfidenceLinkSuggestions.length > 0 && (
+        <div>
+          <SectionHeader>
+            <span className="flex items-center gap-1.5">
+              <Building2 className="h-3 w-3" />
+              Suggested Links
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                {highConfidenceLinkSuggestions.length}
+              </span>
+            </span>
+          </SectionHeader>
+          <div className="space-y-2">
+            {highConfidenceLinkSuggestions.slice(0, 3).map((suggestion) => (
+              <SuggestedLinkCard
+                key={suggestion.id}
+                companyId={suggestion.company_id!}
+                companyName={suggestion.company_name!}
+                companyType={suggestion.company_type!}
+                confidence={suggestion.confidence}
+                rationale={suggestion.rationale}
+                onAccept={() => handleAcceptSuggestedLink(suggestion)}
+                onReject={() => handleRejectSuggestedLink(suggestion)}
+              />
+            ))}
+            {highConfidenceLinkSuggestions.length > 3 && (
+              <p className="text-[10px] text-muted-foreground">
+                +{highConfidenceLinkSuggestions.length - 3} more
+              </p>
+            )}
+          </div>
+          <div className="border-t border-border my-3" />
+        </div>
+      )}
+
       {/* Suggested Actions Section */}
       <div>
         <SectionHeader>
           <span className="flex items-center gap-1.5">
             <Sparkles className="h-3 w-3" />
             Suggested Actions
-            {suggestions.length > 0 && (
+            {otherSuggestions.length > 0 && (
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
-                {suggestions.length}
+                {otherSuggestions.length}
               </span>
             )}
             {isAI && (
@@ -784,18 +891,18 @@ export function InlineActionPanel({
             <Loader2 className="h-3 w-3 animate-spin" />
             Loading...
           </div>
-        ) : suggestions.length === 0 && isGenerating ? (
+        ) : otherSuggestions.length === 0 && isGenerating ? (
           <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
             <Loader2 className="h-3 w-3 animate-spin" />
             Generating suggestions...
           </div>
-        ) : suggestions.length === 0 ? (
+        ) : otherSuggestions.length === 0 ? (
           <p className="text-xs text-muted-foreground italic">
             No suggestions available
           </p>
         ) : (
           <div className="space-y-2">
-            {suggestions.map((suggestion) => (
+            {otherSuggestions.map((suggestion) => (
               <SuggestionCard
                 key={suggestion.id}
                 suggestion={suggestion}
