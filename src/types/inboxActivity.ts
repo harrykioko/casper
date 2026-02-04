@@ -12,7 +12,9 @@ export type InboxActivityActionType =
   | 'mark_complete'
   | 'archive'
   | 'snooze'
-  | 'dismiss_suggestion';
+  | 'dismiss_suggestion'
+  | 'add_note'
+  | 'save_attachments';
 
 export interface InboxActivity {
   id: string;

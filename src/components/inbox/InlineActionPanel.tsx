@@ -27,6 +27,8 @@ import { AnimatePresence } from "framer-motion";
 import { useInboxSuggestionsV2 } from "@/hooks/useInboxSuggestionsV2";
 import { useTasks } from "@/hooks/useTasks";
 import { useInboxItems } from "@/hooks/useInboxItems";
+import { useInboxActivity } from "@/hooks/useInboxActivity";
+import { useInboxItemActivity } from "@/hooks/useInboxItemActivity";
 import { useAuth } from "@/contexts/AuthContext";
 import { SuggestionCard } from "@/components/inbox/SuggestionCard";
 import { EMAIL_INTENT_LABELS } from "@/types/inboxSuggestions";
@@ -123,9 +125,11 @@ export function InlineActionPanel({
   onSnooze,
 }: InlineActionPanelProps) {
   const { user } = useAuth();
-  const { createTask } = useTasks();
+  const { tasks, createTask } = useTasks();
   const { linkCompany } = useInboxItems();
   const { createCompany } = usePipeline();
+  const { logActivity } = useInboxActivity();
+  const { activities: inboxActivities, refetch: refetchActivity } = useInboxItemActivity(item.id);
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   
   // Active action state
@@ -145,23 +149,40 @@ export function InlineActionPanel({
     dismissSuggestion,
   } = useInboxSuggestionsV2(item.id);
 
-  // Get tasks created from this inbox item
-  const { tasks } = useTasks();
-  
   // Filter tasks that originated from this inbox item
   const relatedTasks = useMemo(() => {
     return tasks.filter(t => t.source_inbox_item_id === item.id);
   }, [tasks, item.id]);
 
-  // Build activity items from related tasks
+  // Build combined activity items from tasks and inbox_activity records
   const activityItems = useMemo(() => {
-    return relatedTasks.map(task => ({
-      action: `Created task: "${task.content.length > 40 ? task.content.slice(0, 40) + '...' : task.content}"`,
-      timestamp: task.created_at 
-        ? formatDistanceToNow(new Date(task.created_at), { addSuffix: true })
-        : 'recently',
-    }));
-  }, [relatedTasks]);
+    const items: { action: string; timestamp: string; createdAt: Date }[] = [];
+    
+    // Add task-based activities
+    relatedTasks.forEach(task => {
+      const createdAt = task.created_at ? new Date(task.created_at) : new Date();
+      items.push({
+        action: `Created task: "${task.content.length > 40 ? task.content.slice(0, 40) + '...' : task.content}"`,
+        timestamp: formatDistanceToNow(createdAt, { addSuffix: true }),
+        createdAt,
+      });
+    });
+    
+    // Add inbox_activity records (excluding create_task to avoid duplicates)
+    inboxActivities
+      .filter(a => a.actionType !== 'create_task')
+      .forEach(activity => {
+        const createdAt = new Date(activity.timestamp);
+        items.push({
+          action: activity.action,
+          timestamp: formatDistanceToNow(createdAt, { addSuffix: true }),
+          createdAt,
+        });
+      });
+    
+    // Sort by timestamp descending (newest first)
+    return items.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }, [relatedTasks, inboxActivities]);
 
   const handleSnooze = (hours: number) => {
     if (!onSnooze) return;
@@ -213,6 +234,15 @@ export function InlineActionPanel({
     });
     
     if (result) {
+      // Log activity
+      await logActivity({
+        inboxItemId: item.id,
+        actionType: "create_task",
+        targetId: result.id,
+        targetType: "task",
+      });
+      refetchActivity();
+      
       handleActionSuccess("create_task", {
         id: result.id,
         name: data.title,
@@ -229,6 +259,17 @@ export function InlineActionPanel({
   // Company linking
   const handleConfirmLinkCompany = async (company: { id: string; name: string; type: "pipeline" | "portfolio"; logoUrl?: string | null }) => {
     linkCompany(item.id, company.id, company.name, company.type, company.logoUrl);
+    
+    // Log activity
+    await logActivity({
+      inboxItemId: item.id,
+      actionType: "link_company",
+      targetId: company.id,
+      targetType: company.type === "pipeline" ? "pipeline_company" : "company",
+      metadata: { companyName: company.name },
+    });
+    refetchActivity();
+    
     handleActionSuccess("link_company", {
       id: company.id,
       name: company.name,
@@ -265,6 +306,16 @@ export function InlineActionPanel({
     }
     
     if (successCount > 0) {
+      // Log activity
+      await logActivity({
+        inboxItemId: item.id,
+        actionType: "save_attachments",
+        targetId: item.relatedCompanyId,
+        targetType: item.relatedCompanyType === "pipeline" ? "pipeline_company" : "company",
+        metadata: { fileCount: successCount },
+      });
+      refetchActivity();
+      
       handleActionSuccess("save_attachments", {
         id: "attachments",
         name: `${successCount} file${successCount !== 1 ? "s" : ""} saved`,
@@ -324,7 +375,17 @@ export function InlineActionPanel({
       // 4. Link the email to the new company
       linkCompany(item.id, newCompany.id, data.companyName, "pipeline", null);
 
-      // 5. Show success state
+      // 5. Log activity
+      await logActivity({
+        inboxItemId: item.id,
+        actionType: "create_pipeline_company",
+        targetId: newCompany.id,
+        targetType: "pipeline_company",
+        metadata: { companyName: data.companyName },
+      });
+      refetchActivity();
+
+      // 6. Show success state
       handleActionSuccess("create_pipeline", {
         id: newCompany.id,
         name: data.companyName,
