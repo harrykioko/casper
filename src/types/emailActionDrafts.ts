@@ -53,3 +53,37 @@ export function hasSuggestedFields(draft: TaskDraft): boolean {
     (draft.companyId && draft.companyConfidence === "suggested")
   );
 }
+
+/**
+ * Pipeline Company Draft
+ * 
+ * Structured prefill data for creating pipeline companies from email.
+ * Includes confidence indicators for AI-suggested fields.
+ */
+export interface PipelineCompanyDraftContact {
+  name: string;
+  email: string;
+  role?: string;
+  confidence?: ConfidenceLevel;
+}
+
+export interface PipelineCompanyDraft {
+  companyName: string;
+  companyNameConfidence?: ConfidenceLevel;
+  domain?: string | null;
+  domainConfidence?: ConfidenceLevel;
+  website?: string | null;
+  contacts: PipelineCompanyDraftContact[];
+  contextSummary?: string;
+  keyPoints?: string[];
+  introSource?: string;
+  suggestedStage?: string;
+  suggestedTags?: string[];
+  reason: string;
+  sourceEmailId: string;
+  confidence: {
+    isIntroOrFollowup: number;
+    companyMatch: number;
+    domainInferred: number;
+  };
+}
