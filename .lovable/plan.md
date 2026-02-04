@@ -1,140 +1,110 @@
 
-## What’s happening (root cause)
 
-The “Sandbox Wealth” email in the drawer is a forwarded email:
+# Sync Triage Clearing with Inbox Resolution
 
-- `from_email` / `from_name` in `inbox_items` are the forwarder (you / Harrison).
-- The real sender is stored in the cleaned “display” fields: `display_from_email = ray@sandboxwealth.com`, `display_from_name = Ray Denis`.
-- The UI correctly shows “Ray Denis … via Harrison” by using `display_*` fields.
+## Problem
 
-However, the **`inbox-suggest-v2` edge function currently uses `from_email`**, so it thinks the sender domain is `canapi.com`. That causes two bad downstream effects:
-1) Candidate matching uses the forwarder’s domain + history and surfaces unrelated “existing companies” (like “Wealth”).
-2) The model then confidently outputs LINK_COMPANY and even describes it as “portfolio” in the rationale, because the whole context is skewed.
+When inbox items are cleared from the Triage queue (marked as "trusted" or "ignored" in the `work_items` table), they remain visible in the main Inbox view. The user expects these emails to be removed from the active Inbox since they've been triaged, while still remaining accessible via:
+- Search
+- Linked tasks
+- Linked entities (companies, obligations)
+- Direct deep links
 
-There is also a second issue: even when the real sender domain is used, the current domain-conflict logic uses `includes()` checks that incorrectly treat `sandboxwealth.com` as “related” to `wealth.com` (because `"sandboxwealth.com".includes("wealth.com") === true`). This allows false matches like “Wealth” when the email is actually about “Sandbox Wealth”.
+## Current State
 
-## Goals for the fix
+### Inbox filtering (useInboxItems.ts, line 161)
+```typescript
+let query = supabase
+  .from("inbox_items")
+  .select("*")
+  .eq("is_resolved", false);  // Only shows unresolved items
+```
 
-1) Candidate matching and intent classification should use the **effective sender** (`display_from_email` when present).
-2) Name-mention matching must **not** treat `sandboxwealth.com` as a subdomain of `wealth.com`.
-3) When the model chooses a `company_id`, we should **normalize** `company_name` and `company_type` to the candidate record to prevent incorrect labeling.
+### Triage clearing (useWorkItemActions.ts)
+- `markTrusted()`: Updates work_item status to 'trusted' but does NOT touch inbox_items
+- `noAction()`: Updates work_item status to 'ignored' but does NOT touch inbox_items
 
-## Implementation plan
+### Existing triggers (one-way only)
+- When `inbox_items.is_resolved` becomes true → work_item marked as 'trusted' ✅
+- When work_item becomes 'trusted'/'ignored' → inbox_items.is_resolved NOT updated ❌
 
-### A) Use “effective” email fields in `inbox-suggest-v2` (forward-aware)
+This is the gap: there's no reverse trigger to sync from work_items back to inbox_items.
 
-**File:** `supabase/functions/inbox-suggest-v2/index.ts`
+## Solution
 
-1) Update the inbox item fetch to include display/cleaned fields:
-- `display_from_email`, `display_from_name`
-- `display_subject`, `cleaned_text`
-- (optional) `thread_clean_text` if you want better context
+Add a database trigger that automatically sets `inbox_items.is_resolved = true` when the corresponding `work_items` record transitions to 'trusted' or 'ignored' status. This ensures bi-directional sync between the triage system and inbox visibility.
 
-2) Compute “effective” values:
-- `effectiveFromEmail = item.display_from_email ?? item.from_email`
-- `effectiveFromName = item.display_from_name ?? item.from_name`
-- `effectiveSubject = item.display_subject ?? item.subject`
-- `effectiveBody = item.thread_clean_text ?? item.cleaned_text ?? item.text_body ?? ""`
+## Implementation
 
-3) Pass these effective values into:
-- `fetchCandidateCompanies(supabase, effectiveFromEmail, effectiveSubject, effectiveBody)`
-- `callOpenAI(effectiveSubject, effectiveBody, effectiveFromEmail, effectiveFromName, candidates)`
+### Database Migration: New Trigger
 
-This ensures forwarded emails behave like “normal” emails for suggestion logic.
+Create a new trigger function `trigger_resolve_inbox_on_work_item_exit()` that fires when a work_item is updated to 'trusted' or 'ignored':
 
-### B) Fix domain “relatedness” logic (replace `includes` with real subdomain checks)
+```sql
+CREATE OR REPLACE FUNCTION public.trigger_resolve_inbox_on_work_item_exit()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  -- When a work_item transitions to trusted or ignored, resolve the source inbox item
+  IF NEW.source_type = 'email'
+     AND NEW.status IN ('trusted', 'ignored')
+     AND (OLD.status IS NULL OR OLD.status NOT IN ('trusted', 'ignored'))
+  THEN
+    UPDATE public.inbox_items
+    SET is_resolved = true,
+        updated_at = now()
+    WHERE id = NEW.source_id
+      AND created_by = NEW.created_by
+      AND is_resolved = false;
+  END IF;
+  RETURN NEW;
+END;
+$$;
 
-**File:** `supabase/functions/inbox-suggest-v2/index.ts`
+DROP TRIGGER IF EXISTS trg_resolve_inbox_on_work_item_exit ON public.work_items;
+CREATE TRIGGER trg_resolve_inbox_on_work_item_exit
+  AFTER UPDATE ON public.work_items
+  FOR EACH ROW
+  EXECUTE FUNCTION public.trigger_resolve_inbox_on_work_item_exit();
+```
 
-1) Add a small helper:
-- `domainsAreSameOrSubdomain(a, b)` returns true only if:
-  - `a === b`, OR
-  - `a.endsWith("." + b)`, OR
-  - `b.endsWith("." + a)`
+### Why a database trigger (vs. application code)?
 
-2) Update the name-mention domain conflict guard:
-- Today it uses `includes()` which is too permissive.
-- Replace it with `domainsAreSameOrSubdomain(senderDomainNormalized, companyDomainNormalized)`.
+1. **Atomicity**: The resolution happens in the same transaction as the work_item update
+2. **Consistency**: Works regardless of which action triggers the exit (manual trusted, no action, auto-exit from linking, etc.)
+3. **Simplicity**: No need to modify multiple frontend handlers
+4. **Existing pattern**: Matches the existing auto-exit triggers already in the codebase
 
-Result: `sandboxwealth.com` will correctly be treated as NOT related to `wealth.com`.
+## Behavior After Implementation
 
-### C) Improve domain matching to support true subdomains (optional but recommended)
+| Action | Effect on work_items | Effect on inbox_items |
+|--------|---------------------|----------------------|
+| "Mark Trusted" in Triage | status → 'trusted' | is_resolved → true (via trigger) |
+| "No Action" in Triage | status → 'ignored' | is_resolved → true (via trigger) |
+| "No Action" quick action (email row) | status → 'ignored' | is_resolved → true (via trigger) |
+| Auto-exit from linking entity | status → 'trusted' | is_resolved → true (via trigger) |
+| Manual "Mark Complete" in Inbox | is_resolved → true | (triggers work_item exit) |
 
-**File:** `supabase/functions/inbox-suggest-v2/index.ts`
+## Accessibility After Resolution
 
-Currently, domain matches only fire when company domain exactly equals sender domain.
+Resolved inbox items will still be:
+- **Searchable**: Update Inbox search to optionally include resolved items (future enhancement if needed)
+- **Viewable from linked tasks**: Tasks with `source_inbox_item_id` can fetch the email via `fetchInboxItemById()`
+- **Viewable from company pages**: Company communications query can include resolved items
+- **Viewable in Archive**: Already works via `useInboxItems({ onlyArchived: true })` plus a query filter adjustment
 
-Update the “domain match” block so that if:
-- `senderDomainNormalized === companyDomainNormalized` OR
-- `senderDomainNormalized.endsWith("." + companyDomainNormalized)`
-then it counts as a domain match (high score).
+## Files Changed
 
-This helps real-world cases like `mail.acme.com` matching `acme.com`, without introducing the `includes()` bug.
+| File | Change |
+|------|--------|
+| New migration SQL | Add `trigger_resolve_inbox_on_work_item_exit` function and trigger |
 
-### D) Make prior-link history forwarded-aware (avoid “forwarder history” pollution)
+## Edge Cases
 
-**File:** `supabase/functions/inbox-suggest-v2/index.ts`
+1. **Already resolved**: Trigger only acts if `is_resolved = false`, preventing redundant updates
+2. **Non-email work items**: Trigger only fires for `source_type = 'email'`
+3. **Snoozing**: Snooze sets `status = 'snoozed'`, not 'trusted'/'ignored', so items remain in inbox while snoozed
 
-In the “Prior links from same sender” query and comparisons:
-1) Select `display_from_email` in addition to `from_email`.
-2) When comparing sender identity/domain for history, use:
-- `priorEffectiveFromEmail = prior.display_from_email ?? prior.from_email`
-- compare to `effectiveFromEmail` and its domain
-
-This prevents the forwarder email (`canapi.com`) from becoming the “sender history” key.
-
-### E) Normalize `company_name` and `company_type` based on candidates (prevents “portfolio” mislabel)
-
-**File:** `supabase/functions/inbox-suggest-v2/index.ts`
-
-Enhance `validateCompanyReferences()`:
-
-- Build a `Map<candidateId, candidate>` from `candidates`.
-- For each suggestion with `company_id`:
-  - If candidate exists:
-    - Force `suggestion.company_name = candidate.name`
-    - Force `suggestion.company_type = candidate.type`
-  - If candidate does not exist:
-    - Clear `company_id`, `company_name`, `company_type` (existing behavior)
-
-This ensures the UI never reflects a hallucinated “portfolio vs pipeline” type for a known candidate.
-
-### F) (Small) Give the model better candidate context
-
-**File:** `supabase/functions/inbox-suggest-v2/index.ts`
-
-Update the `candidateList` text to include:
-- `Domain: ${c.primary_domain ?? "null"}`
-- `Match: ${c.match_reason} (${c.match_score})`
-
-This helps the model understand why a candidate is present and reduces “confident but wrong” narrative in rationale.
-
-## How we’ll verify the fix (end-to-end)
-
-1) In `/triage`, open the “Sandbox Wealth Investor Update” email again.
-2) Click **Regenerate** (force) to bypass the 1-hour cache.
-3) Confirm in Suggested Actions:
-   - “Link to Sandbox Wealth” to “Wealth” no longer appears.
-   - A “Create New Pipeline Company: Sandbox Wealth” suggestion appears (or at minimum, “Add to Pipeline” becomes the top relevant recommendation).
-4) Confirm the intent badge is no longer incorrectly anchored on the forwarder’s context (it should not be “Portfolio Update” solely due to forwarder history).
-5) (Dev verification) Check edge logs for `inbox-suggest-v2`:
-   - It should log the effective sender as `ray@sandboxwealth.com`.
-   - Candidate companies should no longer be dominated by `canapi.com` sender-history matches.
-
-## Files to change
-
-- `supabase/functions/inbox-suggest-v2/index.ts`
-  - Use `display_*`/`cleaned_*` fields for effective sender/subject/body
-  - Fix domain relationship logic (no `includes()` for domain comparisons)
-  - Make prior-link history forwarded-aware
-  - Normalize AI outputs (`company_name`, `company_type`) from candidates
-  - Improve candidate context sent to OpenAI
-
-## Risks / edge cases and mitigations
-
-- Risk: Some forwarded emails may not have `display_from_email` populated.
-  - Mitigation: Always fallback to raw `from_email`.
-- Risk: Tightening domain conflict checks could hide legitimate matches for true subdomains.
-  - Mitigation: Use `endsWith("." + domain)` subdomain logic, not strict inequality.
-- Risk: After changes, existing cached suggestions may still show until TTL expires.
-  - Mitigation: Use the existing “Regenerate” button (force) to immediately refresh for the affected email(s).
