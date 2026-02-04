@@ -11,6 +11,25 @@ const corsHeaders = {
 
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
+const GENERIC_EMAIL_DOMAINS = new Set([
+  "gmail.com", "googlemail.com",
+  "yahoo.com", "ymail.com",
+  "outlook.com", "hotmail.com", "live.com", "msn.com",
+  "icloud.com", "me.com", "mac.com",
+  "aol.com",
+  "protonmail.com", "proton.me",
+  "zoho.com", "mail.com", "fastmail.com",
+]);
+
+function isGenericEmailDomain(domain: string | null): boolean {
+  if (!domain) return false;
+  return GENERIC_EMAIL_DOMAINS.has(domain.toLowerCase());
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 const EMAIL_INTENTS = [
   "intro_first_touch",
   "pipeline_follow_up",
@@ -156,12 +175,42 @@ async function fetchCandidateCompanies(
     }
   }
 
-  // Name mentions in subject/body
+  // Name mentions in subject/body - with word boundary check
   const searchText = `${subject} ${bodySnippet.slice(0, 500)}`.toLowerCase();
+  
   for (const company of companies) {
     if (candidateMap.has(company.id)) continue;
-    const companyNameLower = company.name.toLowerCase();
-    if (companyNameLower.length >= 3 && searchText.includes(companyNameLower)) {
+    
+    const companyNameLower = company.name.toLowerCase().trim();
+    
+    // Skip very short names (high false positive risk)
+    if (companyNameLower.length < 4) continue;
+    
+    // Use word boundary regex to prevent partial matches
+    // "Wealth" should not match "Sandbox Wealth" unless it's the complete word
+    const wordBoundaryPattern = new RegExp(`\\b${escapeRegex(companyNameLower)}\\b`, "i");
+    
+    if (wordBoundaryPattern.test(searchText)) {
+      // Additional check: if sender has a professional domain, verify it doesn't conflict
+      const senderDomainNormalized = normalizeDomain(senderDomain);
+      const companyDomainNormalized = normalizeDomain(company.primary_domain);
+      
+      // If both have domains and they differ significantly, skip this match
+      // (prevents "Wealth" from matching email about "Sandbox Wealth")
+      if (
+        senderDomainNormalized && 
+        !isGenericEmailDomain(senderDomainNormalized) &&
+        companyDomainNormalized && 
+        senderDomainNormalized !== companyDomainNormalized &&
+        !senderDomainNormalized.includes(companyDomainNormalized) &&
+        !companyDomainNormalized.includes(senderDomainNormalized)
+      ) {
+        // Sender domain is professional but different from company domain
+        // This is likely a different company (sandboxwealth.com vs wealth.com)
+        console.log(`Skipping name match: "${company.name}" (${companyDomainNormalized}) for sender domain ${senderDomainNormalized}`);
+        continue;
+      }
+      
       candidateMap.set(company.id, {
         id: company.id,
         name: company.name,
@@ -211,6 +260,8 @@ Suggest actions using these types:
 
 When suggesting CREATE_PIPELINE_COMPANY (for intro emails with no existing company match):
 - This should be HIGH priority when subject contains "Intro", "Introduction", "Meet", "Connecting you"
+- IMPORTANT: If candidate_companies contains a partial match (e.g., "Wealth" for "Sandbox Wealth"), 
+  verify the domains match. If sender domain differs from candidate domain, suggest CREATE_PIPELINE_COMPANY instead of LINK_COMPANY.
 - Extract company details and include in metadata:
   - extracted_company_name: The company name (from signature, subject line, or email body)
   - extracted_domain: Domain from sender email or mentioned URLs
@@ -245,6 +296,9 @@ When suggesting CREATE_WAITING_ON (for emails where someone promises to do somet
 7. NEVER hallucinate company IDs - only use IDs from the candidate_companies list
 8. Max 5 suggestions, ordered by usefulness
 9. CREATE_PIPELINE_COMPANY should be first suggestion when intent is intro_first_touch and no candidates match
+10. CRITICAL: Do not suggest LINK_COMPANY if the sender's email domain differs from the candidate company's domain.
+    Example: Email from ray@sandboxwealth.com should NOT link to "Wealth" (wealth.com) - these are different companies.
+    In such cases, suggest CREATE_PIPELINE_COMPANY with the correct company name from the email.
 
 ## Response Format
 
