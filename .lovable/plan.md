@@ -1,413 +1,223 @@
 
-# Email Drawer Action UI Refactor
 
-## Overview
+# Add "Add to Pipeline" Action to Email Drawer
 
-This plan refactors the Email Detail Drawer to support inline, confirmable actions without detached modals. The key changes are:
-1. Widen the drawer to accommodate form-based actions
-2. Replace the Action Rail with an Inline Action Panel that expands to show forms
-3. Ensure AI suggestions reuse the same inline action composer
-4. Maintain the principle that actions do not automatically clear emails
+## Problem
 
----
+The inline action panel in the email drawer is missing a button to create a new pipeline company. The screenshot shows actions for:
+- Create Task
+- Add Note  
+- Link Company
+- Snooze
+- Complete
+- Archive
 
-## Part 1: Widen the Email Drawer
+But there's no "Add to Pipeline" action for when a user receives an intro email about a company they want to add to their deal pipeline.
 
-### Current State
-- Default width: 720px
-- Min width: 600px
-- Max width: 1200px
-- Two-column layout: Content (flexible) + Action Rail (240px/280px)
+## Solution
 
-### Changes
-
-**Files: `src/components/inbox/GlobalInboxDrawerOverlay.tsx` and `src/components/focus/TriageInboxDrawer.tsx`**
-
-Update width constants:
-```text
-DEFAULT_WIDTH: 720 → 900
-MIN_WIDTH: 600 → 800
-MAX_WIDTH: 1200 → 1400
-```
-
-**File: `src/components/inbox/InboxDetailWorkspace.tsx`**
-
-Update action panel width:
-```text
-w-[240px] xl:w-[280px] → w-[320px] xl:w-[380px]
-```
+Add the "Add to Pipeline" action button and create an inline form component that mirrors the existing modal functionality but fits within the new inline action pattern.
 
 ---
 
-## Part 2: Create Inline Action Panel Component
+## Changes Required
 
-### New Component Structure
+### 1. Create `InlineCreatePipelineForm` Component
 
-Create a new component that replaces `InboxActionRail` with an expandable inline action system.
+**New File:** `src/components/inbox/inline-actions/InlineCreatePipelineForm.tsx`
 
-**New File: `src/components/inbox/InlineActionPanel.tsx`**
+This form will be an inline version of the existing `CreatePipelineFromInboxModal.tsx` with these fields:
+- **Company Name** (required)
+- **Domain** (optional)
+- **Stage/Round** (dropdown: Seed, Series A, B, C, etc.)
+- **Source** (prefilled from email context)
+- **Primary Contact** (name and email)
+- **Notes** (textarea for context)
 
-This component will:
-1. Display a collapsed "Take Action" section with canonical action buttons
-2. When an action is selected, expand an inline form below the action list
-3. Only one action may be active at a time
-4. Include Confirm and Cancel buttons within the form
+The form will:
+- Prefill from AI-extracted metadata when available
+- Create the pipeline company via `usePipeline` hook
+- Create a primary contact via `pipeline_contacts` table
+- Create an initial note via `pipeline_interactions` table
+- Show AI rationale if triggered from a suggestion
+- Auto-link the email to the new company after creation
 
-### Component Architecture
+### 2. Update Barrel Export
 
-```text
-InlineActionPanel
-├── ActionHeader (collapsed state)
-│   └── Action buttons: Create Task, Add Note, Link Company, etc.
-├── ActiveActionForm (expanded when action selected)
-│   ├── Form fields based on action type
-│   ├── Confirm button
-│   └── Cancel button
-├── AI Suggestions Section
-│   └── SuggestionCard (clicking prefills the form)
-└── Activity Section (unchanged)
+**File:** `src/components/inbox/inline-actions/index.ts`
+
+Add export for the new component:
+```typescript
+export { InlineCreatePipelineForm } from "./InlineCreatePipelineForm";
 ```
 
-### State Management
+### 3. Add Action Button to `InlineActionPanel`
 
+**File:** `src/components/inbox/InlineActionPanel.tsx`
+
+Add import for `Plus` icon and the new form component.
+
+Add a new action button after "Link Company":
 ```tsx
-interface InlineActionPanelState {
-  activeAction: ActionType | null;  // null = collapsed
-  formData: Record<string, unknown>;
-  isSubmitting: boolean;
-  successResult: ActionResult | null;  // For success state with link
-}
-
-type ActionType = 
-  | "create_task"
-  | "add_note"
-  | "link_company"
-  | "create_pipeline"
-  | "save_attachments";
-```
-
----
-
-## Part 3: Implement Action-Specific Inline Forms
-
-### 3.1 Create Task Form
-
-Reuse form logic from `AddTaskDialog.tsx`:
-- Task title input (prefilled from email subject or suggestion)
-- Initial note textarea
-- Company selector (reuse `CompanySelector` component)
-
-### 3.2 Link Company Form
-
-Adapt from `LinkCompanyModal.tsx`:
-- Search input
-- Scrollable company list (pipeline + portfolio)
-- Selected company indicator
-
-### 3.3 Create Pipeline Company Form
-
-Adapt from `CreatePipelineFromInboxModal.tsx`:
-- Company name input
-- Domain input
-- Stage selector
-- Primary contact fields
-- Notes textarea
-
-### 3.4 Add Note Form
-
-Simple form:
-- Note content textarea
-- Optional: link to company
-
-### 3.5 Save Attachments Form
-
-Adapt from `SaveAttachmentsModal.tsx`:
-- Attachment checkboxes
-- Company selector (if not already linked)
-
----
-
-## Part 4: Create Inline Form Components
-
-**New File: `src/components/inbox/inline-actions/InlineTaskForm.tsx`**
-
-```tsx
-interface InlineTaskFormProps {
-  emailItem: InboxItem;
-  prefill?: { title?: string; description?: string; companyId?: string };
-  onConfirm: (taskData: TaskCreateData) => Promise<void>;
-  onCancel: () => void;
-}
-```
-
-**New File: `src/components/inbox/inline-actions/InlineLinkCompanyForm.tsx`**
-
-**New File: `src/components/inbox/inline-actions/InlineCreatePipelineForm.tsx`**
-
-**New File: `src/components/inbox/inline-actions/InlineNoteForm.tsx`**
-
-**New File: `src/components/inbox/inline-actions/InlineSaveAttachmentsForm.tsx`**
-
----
-
-## Part 5: Update InboxDetailWorkspace
-
-**File: `src/components/inbox/InboxDetailWorkspace.tsx`**
-
-Replace `InboxActionRail` with `InlineActionPanel`:
-
-```tsx
-// Before
-<InboxActionRail
-  item={item}
-  onCreateTask={onCreateTask}
-  // ...modal-triggering handlers
+<ActionButton
+  icon={Plus}
+  label="Add to Pipeline"
+  onClick={() => handleSelectAction("create_pipeline")}
+  isActive={activeAction === "create_pipeline"}
 />
 
-// After
-<InlineActionPanel
-  item={item}
-  attachmentCount={attachmentCount}
-  // Pass data hooks directly for inline operations
-/>
+{/* Inline Create Pipeline Form */}
+<AnimatePresence>
+  {activeAction === "create_pipeline" && (
+    <InlineCreatePipelineForm
+      emailItem={item}
+      prefill={prefillData as any}
+      suggestion={activeSuggestion}
+      onConfirm={handleConfirmCreatePipeline}
+      onCancel={handleCancelAction}
+    />
+  )}
+</AnimatePresence>
 ```
 
-The key change: instead of passing modal-triggering handlers, the panel will handle all operations internally and show success states inline.
+### 4. Add Handler for Pipeline Creation
 
----
+**File:** `src/components/inbox/InlineActionPanel.tsx`
 
-## Part 6: Success State Component
-
-**New File: `src/components/inbox/inline-actions/ActionSuccessState.tsx`**
-
-After successful action completion:
-- Show checkmark icon + success message
-- Include link to created object (e.g., "View Task →")
-- "Do Another" button to reset form
-- Auto-dismiss after 3 seconds (optional)
+Add the `handleConfirmCreatePipeline` function that:
+1. Creates the pipeline company using `usePipeline` hook
+2. Creates the primary contact if provided
+3. Creates initial note if provided
+4. Links the inbox item to the new company
+5. Shows success state with link to pipeline detail page
 
 ```tsx
-interface ActionSuccessStateProps {
-  actionType: ActionType;
-  result: {
-    id: string;
-    name: string;
-    link?: string;
-  };
-  onDismiss: () => void;
-  onDoAnother: () => void;
-}
-```
-
----
-
-## Part 7: AI Suggestions Integration
-
-**File: `src/components/inbox/InlineActionPanel.tsx`**
-
-When a suggestion is clicked:
-1. Determine the corresponding action type
-2. Set `activeAction` to that type
-3. Prefill form fields from suggestion data
-4. Display rationale and confidence below form fields
-
-```tsx
-const handleSuggestionSelect = (suggestion: StructuredSuggestion) => {
-  switch (suggestion.type) {
-    case "CREATE_FOLLOW_UP_TASK":
-    case "CREATE_PERSONAL_TASK":
-    case "CREATE_INTRO_TASK":
-      setActiveAction("create_task");
-      setFormData({
-        title: suggestion.title,
-        rationale: suggestion.rationale,
-        confidence: suggestion.confidence,
-      });
-      break;
-    case "LINK_COMPANY":
-      setActiveAction("link_company");
-      setFormData({ preselectedCompanyId: suggestion.company_id });
-      break;
-    // ... other cases
-  }
+const handleConfirmCreatePipeline = async (data: {
+  companyName: string;
+  domain?: string;
+  stage: RoundEnum;
+  source?: string;
+  contactName?: string;
+  contactEmail?: string;
+  notes?: string;
+}) => {
+  // 1. Create company
+  const newCompany = await createCompany({...});
+  
+  // 2. Create contact if provided
+  if (data.contactName) { ... }
+  
+  // 3. Create initial note if provided
+  if (data.notes) { ... }
+  
+  // 4. Link email to new company
+  linkCompany(item.id, newCompany.id, data.companyName, "pipeline", null);
+  
+  // 5. Show success state
+  handleActionSuccess("create_pipeline", {
+    id: newCompany.id,
+    name: data.companyName,
+    link: `/pipeline/${newCompany.id}`,
+  });
 };
 ```
 
-AI suggestions never auto-confirm. Users must explicitly click "Confirm" after reviewing the prefilled form.
+### 5. Update Suggestion Handler
+
+**File:** `src/components/inbox/InlineActionPanel.tsx`
+
+Update the `CREATE_PIPELINE_COMPANY` case in `handleSuggestionSelect` to:
+1. Set the active action to `"create_pipeline"`
+2. Prefill form data from the suggestion metadata:
+   - `extracted_company_name`
+   - `extracted_domain`
+   - `primary_contact_name`
+   - `primary_contact_email`
+   - `description_oneliner`
+   - `notes_summary`
+   - `intro_source`
+
+Current placeholder code:
+```tsx
+case "CREATE_PIPELINE_COMPANY":
+  // For now, open link company - full pipeline form TBD
+  setActiveAction("link_company");
+  toast.info("Add to Pipeline feature coming soon - use Link Company for now");
+  break;
+```
+
+New implementation:
+```tsx
+case "CREATE_PIPELINE_COMPANY":
+  setActiveAction("create_pipeline");
+  const metadata = suggestion.metadata as CreatePipelineCompanyMetadata;
+  setPrefillData({
+    companyName: metadata?.extracted_company_name || "",
+    domain: metadata?.extracted_domain || "",
+    contactName: metadata?.primary_contact_name || "",
+    contactEmail: metadata?.primary_contact_email || "",
+    notes: metadata?.notes_summary || "",
+    source: metadata?.intro_source || "",
+    rationale: suggestion.rationale,
+    confidence: suggestion.confidence,
+  });
+  break;
+```
 
 ---
 
-## Part 8: Update Handler Architecture
+## Form Design
 
-### Current Flow (Modal-Based)
-```text
-User clicks "Create Task" → Opens AddTaskDialog modal → User fills form → Submits → Modal closes
+The inline form will be compact but complete:
+
 ```
-
-### New Flow (Inline)
-```text
-User clicks "Create Task" → Form expands inline → User fills/edits → Clicks "Confirm" → Success state shown inline → User can dismiss or do another action
+┌─────────────────────────────────────────┐
+│ + Add to Pipeline                       │
+│                                         │
+│ [AI Rationale if from suggestion]       │
+│                                         │
+│ Company Name *                          │
+│ ┌─────────────────────────────────────┐ │
+│ │ Pine                                │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│ Domain          Stage                   │
+│ ┌──────────┐   ┌──────────────────┐    │
+│ │pine.com  │   │ Series B ▾       │    │
+│ └──────────┘   └──────────────────┘    │
+│                                         │
+│ ─── Primary Contact ───                 │
+│ Name            Email                   │
+│ ┌──────────┐   ┌──────────────────┐    │
+│ │Seth      │   │ seth@pine.com    │    │
+│ └──────────┘   └──────────────────┘    │
+│                                         │
+│ Notes (optional)                        │
+│ ┌─────────────────────────────────────┐ │
+│ │ Series B intro from Harrison       │ │
+│ └─────────────────────────────────────┘ │
+│                                         │
+│        [Cancel]  [✓ Add to Pipeline]    │
+└─────────────────────────────────────────┘
 ```
-
-### Changes to Parent Components
-
-**File: `src/pages/Inbox.tsx`**
-
-Remove modal state management for:
-- `isTaskDialogOpen`, `taskPrefill`
-- `linkCompanyItem`
-- `saveAttachmentsItem`
-- `pipelineModalItem`
-
-Remove modal rendering at bottom of component.
-
-**File: `src/components/focus/TriageInboxDrawer.tsx`**
-
-Same cleanup - remove modal state and modal components.
 
 ---
 
-## Part 9: File Changes Summary
+## Files Summary
 
-### New Files
-| File | Purpose |
-|------|---------|
-| `src/components/inbox/InlineActionPanel.tsx` | Main action panel component |
-| `src/components/inbox/inline-actions/InlineTaskForm.tsx` | Task creation form |
-| `src/components/inbox/inline-actions/InlineLinkCompanyForm.tsx` | Company linking form |
-| `src/components/inbox/inline-actions/InlineCreatePipelineForm.tsx` | Pipeline company creation |
-| `src/components/inbox/inline-actions/InlineNoteForm.tsx` | Note creation form |
-| `src/components/inbox/inline-actions/InlineSaveAttachmentsForm.tsx` | Attachment saving form |
-| `src/components/inbox/inline-actions/ActionSuccessState.tsx` | Success state display |
-| `src/components/inbox/inline-actions/index.ts` | Barrel export |
-
-### Modified Files
-| File | Changes |
-|------|---------|
-| `src/components/inbox/GlobalInboxDrawerOverlay.tsx` | Increase width constants |
-| `src/components/focus/TriageInboxDrawer.tsx` | Increase width constants, remove modals |
-| `src/components/inbox/InboxDetailWorkspace.tsx` | Replace ActionRail with InlineActionPanel, update widths |
-| `src/pages/Inbox.tsx` | Remove modal state and rendering |
-| `src/contexts/GlobalInboxDrawerContext.tsx` | Simplify handler interface (fewer modal triggers) |
-
-### Files to Deprecate (can be removed later)
-| File | Reason |
+| File | Action |
 |------|--------|
-| `src/components/inbox/InboxActionRail.tsx` | Replaced by InlineActionPanel |
-
-Note: Keep `LinkCompanyModal.tsx`, `SaveAttachmentsModal.tsx`, `CreatePipelineFromInboxModal.tsx`, and `AddTaskDialog.tsx` for now as they may be used elsewhere. Mark as candidates for removal in future cleanup.
-
----
-
-## Part 10: Implementation Order
-
-1. Create inline-actions directory and base components
-2. Build `InlineTaskForm` (most common action)
-3. Build `ActionSuccessState` component
-4. Create `InlineActionPanel` with task form integration
-5. Update `InboxDetailWorkspace` to use new panel
-6. Test task creation flow end-to-end
-7. Build remaining inline forms (link company, pipeline, note, attachments)
-8. Integrate AI suggestions with form prefilling
-9. Update width constants in drawer components
-10. Clean up modal state from parent components
-11. Update handler interfaces
+| `src/components/inbox/inline-actions/InlineCreatePipelineForm.tsx` | Create |
+| `src/components/inbox/inline-actions/index.ts` | Modify |
+| `src/components/inbox/InlineActionPanel.tsx` | Modify |
 
 ---
 
-## Technical Details
+## Technical Notes
 
-### Form Validation
-Each inline form will handle its own validation:
-- Required field checks before enabling Confirm button
-- Error states displayed inline below fields
-- No blocking alerts
+- Reuse `usePipeline` hook for company creation
+- Reuse `RoundEnum` type for stage dropdown
+- Direct Supabase calls for contact and interaction creation (same pattern as modal)
+- Form follows same motion animation pattern as other inline forms
+- Keyboard shortcuts: Escape to cancel, Cmd+Enter to submit
 
-### Keyboard Navigation
-- Escape key cancels active form and returns to collapsed state
-- Enter key submits form (when valid)
-- Tab navigation through form fields
-
-### Animations
-- Use Framer Motion for smooth expand/collapse transitions
-- Match existing glassmorphic design language
-- Subtle fade-in for success state
-
-### Mobile Behavior
-Note from memory: This is a desktop-focused application. The inline action panel will work at 1280px+ widths. On narrower viewports, the drawer may need to be near-full-width to accommodate the wider action panel.
-
----
-
-## Visual Design
-
-### Collapsed State
-```text
-┌─────────────────────────────────────────┐
-│ TAKE ACTION                             │
-├─────────────────────────────────────────┤
-│ [🗒️ Create Task]  [📝 Add Note]         │
-│ [🏢 Link Company] [💾 Save Files]       │
-│ [➕ Add to Pipeline]                     │
-├─────────────────────────────────────────┤
-│ ─────────────────────────────────────── │
-├─────────────────────────────────────────┤
-│ ✨ SUGGESTED ACTIONS (3)         [AI]   │
-│ ┌───────────────────────────────────┐   │
-│ │ [Task] Follow up on intro         │   │
-│ │ ~5min • medium confidence         │   │
-│ │ [Create] [Edit] [×]               │   │
-│ └───────────────────────────────────┘   │
-└─────────────────────────────────────────┘
-```
-
-### Expanded State (Task Form Active)
-```text
-┌─────────────────────────────────────────┐
-│ TAKE ACTION                             │
-├─────────────────────────────────────────┤
-│ [🗒️ Create Task ●]  [📝] [🏢] [💾]      │
-├─────────────────────────────────────────┤
-│ ┌───────────────────────────────────┐   │
-│ │ Task                              │   │
-│ │ ┌─────────────────────────────┐   │   │
-│ │ │ Follow up on intro          │   │   │
-│ │ └─────────────────────────────┘   │   │
-│ │                                   │   │
-│ │ Initial note (optional)          │   │
-│ │ ┌─────────────────────────────┐   │   │
-│ │ │                             │   │   │
-│ │ └─────────────────────────────┘   │   │
-│ │                                   │   │
-│ │ Company                          │   │
-│ │ [Acme Corp ▾]                    │   │
-│ │                                   │   │
-│ │        [Cancel]  [✓ Confirm]     │   │
-│ └───────────────────────────────────┘   │
-├─────────────────────────────────────────┤
-│ ─────────────────────────────────────── │
-│ ✨ SUGGESTED ACTIONS...                 │
-└─────────────────────────────────────────┘
-```
-
-### Success State
-```text
-┌─────────────────────────────────────────┐
-│ ┌───────────────────────────────────┐   │
-│ │ ✓ Task created                    │   │
-│ │                                   │   │
-│ │ "Follow up on intro"              │   │
-│ │                                   │   │
-│ │ [View Task →]  [Do Another]       │   │
-│ └───────────────────────────────────┘   │
-└─────────────────────────────────────────┘
-```
-
----
-
-## Non-Goals Preserved
-
-- No new action types introduced
-- No data schema changes
-- No new modal patterns (removing modals, not adding)
-- No changes to unrelated surfaces
-- Clearing behavior unchanged (separate explicit action)
