@@ -1,254 +1,413 @@
 
-
-# Rename Focus to Triage and Formalize Triage Invariants
+# Email Drawer Action UI Refactor
 
 ## Overview
 
-This plan renames the "Focus" surface to "Triage" and reframes it as a judgment and approval layer. The goal is semantic clarity and intentionality around clearing items, without introducing new workflows, schemas, or UI complexity.
+This plan refactors the Email Detail Drawer to support inline, confirmable actions without detached modals. The key changes are:
+1. Widen the drawer to accommodate form-based actions
+2. Replace the Action Rail with an Inline Action Panel that expands to show forms
+3. Ensure AI suggestions reuse the same inline action composer
+4. Maintain the principle that actions do not automatically clear emails
 
 ---
 
-## Part 1: Rename Files and Components
+## Part 1: Widen the Email Drawer
 
-### 1.1 Rename Page File
-| Current | New |
-|---------|-----|
-| `src/pages/FocusQueue.tsx` | `src/pages/TriageQueue.tsx` |
+### Current State
+- Default width: 720px
+- Min width: 600px
+- Max width: 1200px
+- Two-column layout: Content (flexible) + Action Rail (240px/280px)
 
-### 1.2 Rename Component Files
-All files in `src/components/focus/` will be renamed:
+### Changes
 
-| Current | New |
-|---------|-----|
-| `FocusItemRow.tsx` | `TriageItemRow.tsx` |
-| `FocusSummaryPanel.tsx` | `TriageSummaryPanel.tsx` |
-| `FocusTriageBar.tsx` | `TriageActionsBar.tsx` |
-| `FocusEmptyState.tsx` | `TriageEmptyState.tsx` |
-| `FocusFiltersPanel.tsx` | `TriageFiltersPanel.tsx` |
-| `FocusInboxDrawer.tsx` | `TriageInboxDrawer.tsx` |
-| `FocusTaskDrawer.tsx` | `TriageTaskDrawer.tsx` |
-| `FocusCommitmentDrawer.tsx` | `TriageCommitmentDrawer.tsx` |
-| `FocusEventModal.tsx` | `TriageEventModal.tsx` |
-| `FocusGenericSheet.tsx` | `TriageGenericSheet.tsx` |
-| `FocusReadingSheet.tsx` | `TriageReadingSheet.tsx` |
+**Files: `src/components/inbox/GlobalInboxDrawerOverlay.tsx` and `src/components/focus/TriageInboxDrawer.tsx`**
 
-Note: The directory itself will remain at `src/components/focus/` to avoid excessive import path changes. We could rename to `src/components/triage/` in a future cleanup pass.
-
-### 1.3 Rename Hook Files
-| Current | New |
-|---------|-----|
-| `src/hooks/useFocusQueue.ts` | `src/hooks/useTriageQueue.ts` |
-| `src/hooks/useFocusTriageActions.ts` | `src/hooks/useTriageActions.ts` |
-| `src/hooks/useFocusReadingActions.ts` | `src/hooks/useTriageReadingActions.ts` |
-
----
-
-## Part 2: Update Routing and Navigation
-
-### 2.1 App.tsx Route Changes
-```tsx
-// Before
-<Route path="/priority" element={<Navigate to="/focus" replace />} />
-<Route path="/focus" element={<FocusQueue />} />
-
-// After
-<Route path="/priority" element={<Navigate to="/triage" replace />} />
-<Route path="/focus" element={<Navigate to="/triage" replace />} />
-<Route path="/triage" element={<TriageQueue />} />
+Update width constants:
+```text
+DEFAULT_WIDTH: 720 → 900
+MIN_WIDTH: 600 → 800
+MAX_WIDTH: 1200 → 1400
 ```
 
-### 2.2 NavSidebar.tsx Changes
-Update the navigation item:
+**File: `src/components/inbox/InboxDetailWorkspace.tsx`**
+
+Update action panel width:
+```text
+w-[240px] xl:w-[280px] → w-[320px] xl:w-[380px]
+```
+
+---
+
+## Part 2: Create Inline Action Panel Component
+
+### New Component Structure
+
+Create a new component that replaces `InboxActionRail` with an expandable inline action system.
+
+**New File: `src/components/inbox/InlineActionPanel.tsx`**
+
+This component will:
+1. Display a collapsed "Take Action" section with canonical action buttons
+2. When an action is selected, expand an inline form below the action list
+3. Only one action may be active at a time
+4. Include Confirm and Cancel buttons within the form
+
+### Component Architecture
+
+```text
+InlineActionPanel
+├── ActionHeader (collapsed state)
+│   └── Action buttons: Create Task, Add Note, Link Company, etc.
+├── ActiveActionForm (expanded when action selected)
+│   ├── Form fields based on action type
+│   ├── Confirm button
+│   └── Cancel button
+├── AI Suggestions Section
+│   └── SuggestionCard (clicking prefills the form)
+└── Activity Section (unchanged)
+```
+
+### State Management
+
 ```tsx
-// Before
-{
-  icon: Crosshair,
-  path: "/focus",
-  label: "Focus",
-  active: location.pathname.startsWith("/focus") || location.pathname.startsWith("/priority")
+interface InlineActionPanelState {
+  activeAction: ActionType | null;  // null = collapsed
+  formData: Record<string, unknown>;
+  isSubmitting: boolean;
+  successResult: ActionResult | null;  // For success state with link
 }
 
+type ActionType = 
+  | "create_task"
+  | "add_note"
+  | "link_company"
+  | "create_pipeline"
+  | "save_attachments";
+```
+
+---
+
+## Part 3: Implement Action-Specific Inline Forms
+
+### 3.1 Create Task Form
+
+Reuse form logic from `AddTaskDialog.tsx`:
+- Task title input (prefilled from email subject or suggestion)
+- Initial note textarea
+- Company selector (reuse `CompanySelector` component)
+
+### 3.2 Link Company Form
+
+Adapt from `LinkCompanyModal.tsx`:
+- Search input
+- Scrollable company list (pipeline + portfolio)
+- Selected company indicator
+
+### 3.3 Create Pipeline Company Form
+
+Adapt from `CreatePipelineFromInboxModal.tsx`:
+- Company name input
+- Domain input
+- Stage selector
+- Primary contact fields
+- Notes textarea
+
+### 3.4 Add Note Form
+
+Simple form:
+- Note content textarea
+- Optional: link to company
+
+### 3.5 Save Attachments Form
+
+Adapt from `SaveAttachmentsModal.tsx`:
+- Attachment checkboxes
+- Company selector (if not already linked)
+
+---
+
+## Part 4: Create Inline Form Components
+
+**New File: `src/components/inbox/inline-actions/InlineTaskForm.tsx`**
+
+```tsx
+interface InlineTaskFormProps {
+  emailItem: InboxItem;
+  prefill?: { title?: string; description?: string; companyId?: string };
+  onConfirm: (taskData: TaskCreateData) => Promise<void>;
+  onCancel: () => void;
+}
+```
+
+**New File: `src/components/inbox/inline-actions/InlineLinkCompanyForm.tsx`**
+
+**New File: `src/components/inbox/inline-actions/InlineCreatePipelineForm.tsx`**
+
+**New File: `src/components/inbox/inline-actions/InlineNoteForm.tsx`**
+
+**New File: `src/components/inbox/inline-actions/InlineSaveAttachmentsForm.tsx`**
+
+---
+
+## Part 5: Update InboxDetailWorkspace
+
+**File: `src/components/inbox/InboxDetailWorkspace.tsx`**
+
+Replace `InboxActionRail` with `InlineActionPanel`:
+
+```tsx
+// Before
+<InboxActionRail
+  item={item}
+  onCreateTask={onCreateTask}
+  // ...modal-triggering handlers
+/>
+
 // After
-{
-  icon: Crosshair,
-  path: "/triage",
-  label: "Triage",
-  active: location.pathname.startsWith("/triage") || location.pathname.startsWith("/focus") || location.pathname.startsWith("/priority")
+<InlineActionPanel
+  item={item}
+  attachmentCount={attachmentCount}
+  // Pass data hooks directly for inline operations
+/>
+```
+
+The key change: instead of passing modal-triggering handlers, the panel will handle all operations internally and show success states inline.
+
+---
+
+## Part 6: Success State Component
+
+**New File: `src/components/inbox/inline-actions/ActionSuccessState.tsx`**
+
+After successful action completion:
+- Show checkmark icon + success message
+- Include link to created object (e.g., "View Task →")
+- "Do Another" button to reset form
+- Auto-dismiss after 3 seconds (optional)
+
+```tsx
+interface ActionSuccessStateProps {
+  actionType: ActionType;
+  result: {
+    id: string;
+    name: string;
+    link?: string;
+  };
+  onDismiss: () => void;
+  onDoAnother: () => void;
 }
 ```
 
 ---
 
-## Part 3: Update UI Copy and Labels
+## Part 7: AI Suggestions Integration
 
-### 3.1 Page Header (TriageQueue.tsx)
+**File: `src/components/inbox/InlineActionPanel.tsx`**
+
+When a suggestion is clicked:
+1. Determine the corresponding action type
+2. Set `activeAction` to that type
+3. Prefill form fields from suggestion data
+4. Display rationale and confidence below form fields
+
 ```tsx
-// Before
-<h1 className="text-xl font-semibold text-foreground">Focus</h1>
-<p className="text-sm text-muted-foreground">
-  {isAllClear
-    ? "All clear"
-    : `${counts.total} item${counts.total !== 1 ? "s" : ""} need review`}
-</p>
-
-// After
-<h1 className="text-xl font-semibold text-foreground">Triage</h1>
-<p className="text-sm text-muted-foreground">
-  {isAllClear
-    ? "All clear"
-    : `${counts.total} item${counts.total !== 1 ? "s" : ""} awaiting triage`}
-</p>
+const handleSuggestionSelect = (suggestion: StructuredSuggestion) => {
+  switch (suggestion.type) {
+    case "CREATE_FOLLOW_UP_TASK":
+    case "CREATE_PERSONAL_TASK":
+    case "CREATE_INTRO_TASK":
+      setActiveAction("create_task");
+      setFormData({
+        title: suggestion.title,
+        rationale: suggestion.rationale,
+        confidence: suggestion.confidence,
+      });
+      break;
+    case "LINK_COMPANY":
+      setActiveAction("link_company");
+      setFormData({ preselectedCompanyId: suggestion.company_id });
+      break;
+    // ... other cases
+  }
+};
 ```
 
-Add a subtitle below the header:
-```tsx
-<span className="text-xs text-muted-foreground">
-  Review, enrich, and clear incoming items
-</span>
-```
-
-### 3.2 Summary Panel Header (TriageSummaryPanel.tsx)
-```tsx
-// Before
-<h2 className="font-semibold text-foreground">Focus Command</h2>
-<p className="text-xs text-muted-foreground">
-  {isAllClear
-    ? "Everything is accounted for"
-    : `${counts.total} item${counts.total !== 1 ? "s" : ""} need review`}
-</p>
-
-// After
-<h2 className="font-semibold text-foreground">Triage Queue</h2>
-<p className="text-xs text-muted-foreground">
-  {isAllClear
-    ? "Everything is accounted for"
-    : `${counts.total} item${counts.total !== 1 ? "s" : ""} awaiting judgment`}
-</p>
-```
-
-### 3.3 Empty State (TriageEmptyState.tsx)
-```tsx
-// Before
-<h3 className="text-xl font-semibold text-foreground mb-2">
-  All clear
-</h3>
-<p className="text-sm text-muted-foreground max-w-sm">
-  Everything is accounted for. New items will appear here as they arrive.
-</p>
-
-// After
-<h3 className="text-xl font-semibold text-foreground mb-2">
-  All clear
-</h3>
-<p className="text-sm text-muted-foreground max-w-sm">
-  All items have been triaged. New items will appear here as they arrive.
-</p>
-```
-
-### 3.4 Action Button Tooltips (TriageActionsBar.tsx and TriageItemRow.tsx)
-Update action tooltips to reinforce triage semantics:
-
-| Current | New |
-|---------|-----|
-| "Trusted" | "Trusted (clear from triage)" |
-| "No Action" | "Dismiss (no action needed)" |
-| "Snooze" | "Snooze (review later)" |
-| "Mark trusted" | "Mark trusted (judgment applied)" |
+AI suggestions never auto-confirm. Users must explicitly click "Confirm" after reviewing the prefilled form.
 
 ---
 
-## Part 4: Formalize Triage Invariants
+## Part 8: Update Handler Architecture
 
-### 4.1 Define the Invariant
-An item may only be cleared from Triage if at least one of the following is true:
-1. **Classified**: The item has a `primary_link` (linked to a company, project, etc.)
-2. **Dismissed**: The user has clicked "No Action" (explicitly marking as no action required)
-3. **Trusted**: The user has clicked "Trusted" (confirming it is correct as-is)
-
-Currently, clearing already requires one of these actions, so the invariant is already enforced. The change is primarily semantic - making this explicit in the UI.
-
-### 4.2 Visual Reinforcement of Judgment
-The current quick action buttons already implement this pattern:
-- "Trusted" (checkmark) = judgment applied, clear from triage
-- "Snooze" = defer judgment, remove temporarily
-- "No Action" / "Dismiss" = judgment applied (no action needed), clear from triage
-
-No code changes needed here, but we will update button labels and tooltips to reinforce this.
-
-### 4.3 Add Confirmation Semantics to Clear Actions
-Update the `useTriageActions.ts` hook to use clearer method names internally:
-
-```tsx
-// Rename for clarity (internal implementation unchanged)
-markTrusted → applyTrustedJudgment  // or keep markTrusted
-noAction → applyDismissJudgment     // or keep noAction
+### Current Flow (Modal-Based)
+```text
+User clicks "Create Task" → Opens AddTaskDialog modal → User fills form → Submits → Modal closes
 ```
 
-For this pass, we will keep the existing method names but update comments to document the invariant.
-
----
-
-## Part 5: Update Imports Across Codebase
-
-### Files Requiring Import Updates
-1. `src/App.tsx` - Import renamed page component
-2. `src/pages/TriageQueue.tsx` (formerly FocusQueue.tsx) - Update all component imports
-3. `src/components/dashboard/PriorityPanel.tsx` - If it links to Focus, update to Triage
-4. Any other files that import Focus components
-
----
-
-## Part 6: Update Query Keys
-
-### In useTriageQueue.ts (formerly useFocusQueue.ts)
-```tsx
-// Before
-const queryKey = ["focus_queue", user?.id];
-
-// After
-const queryKey = ["triage_queue", user?.id];
+### New Flow (Inline)
+```text
+User clicks "Create Task" → Form expands inline → User fills/edits → Clicks "Confirm" → Success state shown inline → User can dismiss or do another action
 ```
 
-### In useTriageActions.ts (formerly useFocusTriageActions.ts)
-```tsx
-// Before
-queryClient.invalidateQueries({ queryKey: ["focus_queue"] });
+### Changes to Parent Components
 
-// After
-queryClient.invalidateQueries({ queryKey: ["triage_queue"] });
+**File: `src/pages/Inbox.tsx`**
+
+Remove modal state management for:
+- `isTaskDialogOpen`, `taskPrefill`
+- `linkCompanyItem`
+- `saveAttachmentsItem`
+- `pipelineModalItem`
+
+Remove modal rendering at bottom of component.
+
+**File: `src/components/focus/TriageInboxDrawer.tsx`**
+
+Same cleanup - remove modal state and modal components.
+
+---
+
+## Part 9: File Changes Summary
+
+### New Files
+| File | Purpose |
+|------|---------|
+| `src/components/inbox/InlineActionPanel.tsx` | Main action panel component |
+| `src/components/inbox/inline-actions/InlineTaskForm.tsx` | Task creation form |
+| `src/components/inbox/inline-actions/InlineLinkCompanyForm.tsx` | Company linking form |
+| `src/components/inbox/inline-actions/InlineCreatePipelineForm.tsx` | Pipeline company creation |
+| `src/components/inbox/inline-actions/InlineNoteForm.tsx` | Note creation form |
+| `src/components/inbox/inline-actions/InlineSaveAttachmentsForm.tsx` | Attachment saving form |
+| `src/components/inbox/inline-actions/ActionSuccessState.tsx` | Success state display |
+| `src/components/inbox/inline-actions/index.ts` | Barrel export |
+
+### Modified Files
+| File | Changes |
+|------|---------|
+| `src/components/inbox/GlobalInboxDrawerOverlay.tsx` | Increase width constants |
+| `src/components/focus/TriageInboxDrawer.tsx` | Increase width constants, remove modals |
+| `src/components/inbox/InboxDetailWorkspace.tsx` | Replace ActionRail with InlineActionPanel, update widths |
+| `src/pages/Inbox.tsx` | Remove modal state and rendering |
+| `src/contexts/GlobalInboxDrawerContext.tsx` | Simplify handler interface (fewer modal triggers) |
+
+### Files to Deprecate (can be removed later)
+| File | Reason |
+|------|--------|
+| `src/components/inbox/InboxActionRail.tsx` | Replaced by InlineActionPanel |
+
+Note: Keep `LinkCompanyModal.tsx`, `SaveAttachmentsModal.tsx`, `CreatePipelineFromInboxModal.tsx`, and `AddTaskDialog.tsx` for now as they may be used elsewhere. Mark as candidates for removal in future cleanup.
+
+---
+
+## Part 10: Implementation Order
+
+1. Create inline-actions directory and base components
+2. Build `InlineTaskForm` (most common action)
+3. Build `ActionSuccessState` component
+4. Create `InlineActionPanel` with task form integration
+5. Update `InboxDetailWorkspace` to use new panel
+6. Test task creation flow end-to-end
+7. Build remaining inline forms (link company, pipeline, note, attachments)
+8. Integrate AI suggestions with form prefilling
+9. Update width constants in drawer components
+10. Clean up modal state from parent components
+11. Update handler interfaces
+
+---
+
+## Technical Details
+
+### Form Validation
+Each inline form will handle its own validation:
+- Required field checks before enabling Confirm button
+- Error states displayed inline below fields
+- No blocking alerts
+
+### Keyboard Navigation
+- Escape key cancels active form and returns to collapsed state
+- Enter key submits form (when valid)
+- Tab navigation through form fields
+
+### Animations
+- Use Framer Motion for smooth expand/collapse transitions
+- Match existing glassmorphic design language
+- Subtle fade-in for success state
+
+### Mobile Behavior
+Note from memory: This is a desktop-focused application. The inline action panel will work at 1280px+ widths. On narrower viewports, the drawer may need to be near-full-width to accommodate the wider action panel.
+
+---
+
+## Visual Design
+
+### Collapsed State
+```text
+┌─────────────────────────────────────────┐
+│ TAKE ACTION                             │
+├─────────────────────────────────────────┤
+│ [🗒️ Create Task]  [📝 Add Note]         │
+│ [🏢 Link Company] [💾 Save Files]       │
+│ [➕ Add to Pipeline]                     │
+├─────────────────────────────────────────┤
+│ ─────────────────────────────────────── │
+├─────────────────────────────────────────┤
+│ ✨ SUGGESTED ACTIONS (3)         [AI]   │
+│ ┌───────────────────────────────────┐   │
+│ │ [Task] Follow up on intro         │   │
+│ │ ~5min • medium confidence         │   │
+│ │ [Create] [Edit] [×]               │   │
+│ └───────────────────────────────────┘   │
+└─────────────────────────────────────────┘
+```
+
+### Expanded State (Task Form Active)
+```text
+┌─────────────────────────────────────────┐
+│ TAKE ACTION                             │
+├─────────────────────────────────────────┤
+│ [🗒️ Create Task ●]  [📝] [🏢] [💾]      │
+├─────────────────────────────────────────┤
+│ ┌───────────────────────────────────┐   │
+│ │ Task                              │   │
+│ │ ┌─────────────────────────────┐   │   │
+│ │ │ Follow up on intro          │   │   │
+│ │ └─────────────────────────────┘   │   │
+│ │                                   │   │
+│ │ Initial note (optional)          │   │
+│ │ ┌─────────────────────────────┐   │   │
+│ │ │                             │   │   │
+│ │ └─────────────────────────────┘   │   │
+│ │                                   │   │
+│ │ Company                          │   │
+│ │ [Acme Corp ▾]                    │   │
+│ │                                   │   │
+│ │        [Cancel]  [✓ Confirm]     │   │
+│ └───────────────────────────────────┘   │
+├─────────────────────────────────────────┤
+│ ─────────────────────────────────────── │
+│ ✨ SUGGESTED ACTIONS...                 │
+└─────────────────────────────────────────┘
+```
+
+### Success State
+```text
+┌─────────────────────────────────────────┐
+│ ┌───────────────────────────────────┐   │
+│ │ ✓ Task created                    │   │
+│ │                                   │   │
+│ │ "Follow up on intro"              │   │
+│ │                                   │   │
+│ │ [View Task →]  [Do Another]       │   │
+│ └───────────────────────────────────┘   │
+└─────────────────────────────────────────┘
 ```
 
 ---
 
-## Part 7: Files NOT Changed
+## Non-Goals Preserved
 
-Per the non-goals, these will NOT be modified:
-- Database schema (no changes to `work_items` table)
-- Edge functions (`focus-enrich`, etc.) - names are internal and do not affect UI
-- `useDashboardPipelineFocus.ts` - this refers to "Pipeline Focus" which is a different concept
-- Any downstream surfaces (Inbox, Tasks, Notes, Reading, Pipeline)
-
----
-
-## Implementation Order
-
-1. Rename page file: `FocusQueue.tsx` → `TriageQueue.tsx`
-2. Update routing in `App.tsx`
-3. Update navigation in `NavSidebar.tsx`
-4. Rename hook files and update query keys
-5. Rename component files in `src/components/focus/`
-6. Update all imports in `TriageQueue.tsx`
-7. Update UI copy in all renamed components
-8. Verify build passes
-
----
-
-## Summary
-
-This plan delivers:
-- Complete rename from Focus to Triage across UI, navigation, and routing
-- Updated copy that emphasizes judgment, review, and intentional clearing
-- Preserved existing behavior - no new workflows or complexity
-- Clear documentation of triage invariants through UI semantics
-- Backward-compatible redirects from `/focus` and `/priority` to `/triage`
-
+- No new action types introduced
+- No data schema changes
+- No new modal patterns (removing modals, not adding)
+- No changes to unrelated surfaces
+- Clearing behavior unchanged (separate explicit action)
