@@ -1,289 +1,527 @@
 
-# Tasks UI Overhaul: Premium Work Surface
 
-## Overview
+# Tasks UI Overhaul v2: Premium Work Surface
 
-Transform the Tasks page from an overwhelming backlog view into a **calm, focused, action-oriented work surface** that creates momentum rather than dread. This redesign prioritizes visual hierarchy, inline editing, and session-oriented context while preserving all existing functionality.
+## Problem Summary
 
----
+The first pass implemented visual changes but failed to fundamentally change the mental model. The Tasks page still presents tasks as uniform list rows that feel like a backlog table, not a work surface. Critical missing elements:
 
-## Current State Analysis
-
-### Current Architecture
-- **Page**: `src/pages/Tasks.tsx` - Two-column layout (280px sidebar + main content)
-- **Left Panel**: `TasksSummaryPanel.tsx` - Dense filters, search, view toggles, status/priority chips
-- **Main View**: `TasksMainContent.tsx` wraps `TaskList.tsx` - Flat list of uniform task rows
-- **Task Cards**: `TaskCardContent.tsx`, `TaskCardMetadata.tsx` - Minimal metadata display
-- **Detail**: `TaskDetailsDialog.tsx` - Sheet drawer for deep editing
-
-### Current Issues
-- Default view shows "All Items" - overwhelming
-- Tasks rendered as thin, uniform rows - no visual hierarchy
-- Priority only indicated by checkbox border color - easy to miss
-- No effort estimation visible in UI (data exists in DB but not exposed)
-- Filters dominate the left panel instead of supporting the work surface
-- No session context ("what have I accomplished today?")
+1. **No horizontal "Today" lane** - All tasks in a single vertical list
+2. **No inline actions** - Only completion and delete, no snooze/reschedule/effort/priority edits
+3. **No linked entity context** - Company/project/source email not surfaced on cards
+4. **No effort estimation** - DB columns don't exist, UI shows nothing
+5. **No visual hierarchy** - Cards look nearly identical regardless of urgency
+6. **Sections don't help** - "Due Soon / Next Up / Later" grouping is too abstract
 
 ---
 
-## Architecture Changes
+## Solution Overview
 
-### Layout Structure (Unchanged)
+Transform the Tasks page with:
 
-```text
-+------------------+-----------------------------------+
-|  Left Panel      |   Main Work Surface               |
-|  (280px)         |   (flexible)                      |
-|                  |                                   |
-|  Filters &       |   Header (session context)        |
-|  Navigation      |   Task Input                      |
-|  (redesigned)    |   Grouped Task Cards              |
-|                  |                                   |
-+------------------+-----------------------------------+
+1. **Horizontal "Today" lane** at the top with 3-5 high-priority cards
+2. **Time-based vertical sections** (Due Tomorrow, This Week, Upcoming)
+3. **Rich task cards** with linked entity context, effort chips, and inline actions
+4. **Inline editing** for priority, due date, effort, and status via popovers
+5. **Company/Project/Email context** surfaced directly on cards
+6. **Effort estimation** with new DB columns and inline editing
+
+---
+
+## Database Changes Required
+
+### New Columns on `tasks` Table
+
+```sql
+ALTER TABLE public.tasks
+ADD COLUMN IF NOT EXISTS effort_minutes INTEGER,
+ADD COLUMN IF NOT EXISTS effort_category TEXT CHECK (effort_category IN ('quick', 'medium', 'deep', 'unknown'));
 ```
 
-No new routes. No new modals. Task Detail remains a right-side drawer.
+These columns enable:
+- `effort_minutes`: Numeric estimate (5, 15, 30, 60, etc.)
+- `effort_category`: Derived category for visual treatment
 
 ---
 
 ## Technical Implementation
 
-### 1. Session-Oriented Page Header
+### 1. New Component: TodayTaskCard (Horizontal Mini Card)
 
-**File**: `src/components/tasks/TasksPageHeader.tsx` (NEW)
+**File**: `src/components/tasks/TodayTaskCard.tsx` (NEW)
 
-Replace the generic card header with a session-oriented banner:
+A compact horizontal card for the "Today" lane:
 
 ```text
-+------------------------------------------------------+
-| Your Work                               [+ Add Task] |
-| 12 tasks ready · 4 due soon · 3 completed today      |
-+------------------------------------------------------+
++-----------------------------------------------------------------------+
+| [O] Follow up on Reins deck     OatFi     Today  P1  15m   [..][>]   |
++-----------------------------------------------------------------------+
 ```
 
-Key elements:
-- Title: "Your Work"
-- Dynamic subtext computed from task counts
-- Primary CTA: "Add Task" (triggers QuickTaskInput focus)
-- Optional: Command palette trigger (existing global handler)
+Features:
+- Compact single-row layout
+- Checkbox on left
+- Title (truncated)
+- Entity pill (company logo + name, or project color + name, or "Email" icon)
+- Due badge (Today/Overdue)
+- Priority badge (P1/P2/P3)
+- Effort chip (5m/15m/30m/1h+)
+- Action icons on right (always visible): Snooze, Reschedule, More
 
-### 2. Default View: "Ready to Work"
-
-**File**: `src/hooks/useTaskFiltering.ts`
-
-Add a new computed view that surfaces action-ready tasks:
-
+**Key Props**:
 ```typescript
-// New "ready" filter mode
-if (filters.statusFilter === 'ready') {
-  filtered = filtered.filter(task => {
-    // Include: high/medium priority, due today/upcoming, not completed, not archived
-    const isHighPriority = task.priority === 'high' || task.priority === 'medium';
-    const isDueSoon = task.scheduledFor && isWithinWeek(task.scheduledFor);
-    const isNotDone = task.status !== 'done' && !task.completed;
-    return (isHighPriority || isDueSoon) && isNotDone;
-  });
+interface TodayTaskCardProps {
+  task: EnrichedTask;
+  onComplete: (id: string) => void;
+  onSnooze: (id: string, until: Date) => void;
+  onReschedule: (id: string, date: Date) => void;
+  onUpdatePriority: (id: string, priority: string) => void;
+  onUpdateEffort: (id: string, minutes: number) => void;
+  onClick: (task: Task) => void;
 }
 ```
 
-**File**: `src/pages/Tasks.tsx`
+### 2. New Component: TaskProcessingCard (Enhanced Vertical Card)
 
-Change default state:
-```typescript
-const [statusFilter, setStatusFilter] = useState("ready"); // Was "all"
-```
+**File**: `src/components/tasks/TaskProcessingCard.tsx` (NEW)
 
-### 3. Task Card Redesign
+An enhanced card for the vertical sections:
 
-**File**: `src/components/tasks/TaskWorkCard.tsx` (NEW)
-
-Replace flat rows with elevated, hierarchical cards.
-
-**Card Structure**:
 ```text
 +----------------------------------------------------------+
-| [Checkbox]  Task title goes here                         |
-|             ───────────────────────────────────          |
-|             [Company Logo] OatFi                         |
-|             ───────────────────────────────────          |
-|             Today  ·  P1  ·  15m                [Delete] |
+| [O] Pull together overview of proposed...                |
+|     [OatFi logo] OatFi                                   |
+|     Feb 3  ·  P1  ·  30m                                 |
+|                                     [snooze] [cal] [...]  |
 +----------------------------------------------------------+
 ```
 
-**Visual Hierarchy Rules**:
-| Priority | Card Treatment |
-|----------|----------------|
-| High / Due Today | Stronger contrast, taller padding (py-4), prominent checkbox |
-| Medium | Standard card styling (py-3) |
-| Low / Later | Muted opacity (0.75), compact padding (py-2) |
+Features:
+- Larger checkbox with priority-colored border
+- Multi-line title support
+- Context anchor row (one entity: company > project > email)
+- Metadata row with all badges
+- Hover-reveal action buttons
+- Visual hierarchy: overdue > today > tomorrow > later (opacity/padding)
 
-**Implementation Details**:
-- Checkbox: Large, round button with priority-colored border (existing pattern)
-- Context strip: ONE linked entity (company > project > source)
-- Metadata row: Due date (relative), Priority badge, Effort chip
-- Hover: Subtle elevation + delete button reveal
+### 3. New Component: TodayLane (Horizontal Scrolling Lane)
 
-### 4. Inline Editing Support
+**File**: `src/components/tasks/TodayLane.tsx` (NEW)
 
-**File**: `src/components/tasks/TaskWorkCard.tsx`
-
-Reuse `SuggestionChip` + `Popover` pattern from `InlineTaskForm.tsx`:
+A horizontal lane at the top of the main content:
 
 ```typescript
-// Inline editable chips (click to edit via popover)
-<InlineEditChip
-  label="Due"
-  value={formatTaskDate(task.scheduledFor)}
-  onEdit={(newDate) => onQuickUpdate(task.id, { scheduledFor: newDate })}
->
-  <QuickDatePicks selectedDate={task.scheduledFor} onSelect={handleDateChange} />
-</InlineEditChip>
-
-<InlineEditChip
-  label="Priority"
-  value={task.priority}
-  onEdit={(newPriority) => onQuickUpdate(task.id, { priority: newPriority })}
->
-  <PriorityOptions value={task.priority} onChange={handlePriorityChange} />
-</InlineEditChip>
-```
-
-Editable fields (inline):
-- Completion (checkbox)
-- Due date (popover calendar)
-- Priority (popover options)
-- Expected effort (popover options)
-- Status (popover: To Do / In Progress / Done)
-
-### 5. Expected Effort Integration
-
-**File**: `src/hooks/useTasks.ts`
-
-Extend the Task interface to include effort fields:
-
-```typescript
-export interface Task {
-  // ... existing fields ...
-  effort_minutes?: number | null;
-  effort_category?: 'quick' | 'medium' | 'deep' | 'unknown' | null;
+interface TodayLaneProps {
+  tasks: EnrichedTask[];
+  onComplete: (id: string) => void;
+  onSnooze: (id: string, until: Date) => void;
+  onReschedule: (id: string, date: Date) => void;
+  onUpdatePriority: (id: string, priority: string) => void;
+  onUpdateEffort: (id: string, minutes: number) => void;
+  onClick: (task: Task) => void;
 }
-
-const transformTask = (row: TaskRow & { project?: any; category?: any }): Task => {
-  return {
-    // ... existing mappings ...
-    effort_minutes: row.effort_minutes || null,
-    effort_category: (row.effort_category as 'quick' | 'medium' | 'deep' | 'unknown') || null,
-  };
-};
 ```
 
-**File**: `src/components/task-cards/TaskCardEffort.tsx` (NEW)
-
+**Selection Logic** (rules-based, max 5 cards):
 ```typescript
-const EFFORT_CONFIG = {
-  quick: { label: '5m', color: 'text-emerald-500', icon: Zap },
-  medium: { label: '15m', color: 'text-amber-500', icon: Timer },
-  deep: { label: '1h+', color: 'text-rose-500', icon: Hourglass },
-};
-```
-
-### 6. Visual Grouping (Soft Sections)
-
-**File**: `src/components/tasks/TaskGroupedList.tsx` (NEW)
-
-Group tasks into sections without hard filtering:
-
-```typescript
-const taskGroups = useMemo(() => {
-  const dueSoon = tasks.filter(t => isWithinDays(t.scheduledFor, 2));
-  const nextUp = tasks.filter(t => 
-    !isWithinDays(t.scheduledFor, 2) && 
-    (t.priority === 'high' || t.priority === 'medium')
-  );
-  const later = tasks.filter(t => 
-    !dueSoon.includes(t) && !nextUp.includes(t)
-  );
+const todayTasks = useMemo(() => {
+  // Priority order for selection:
+  // 1. Overdue (sorted by how overdue)
+  // 2. Due today (sorted by priority)
+  // 3. Highest priority (high) due tomorrow
+  // 4. Shortest effort as tiebreaker
   
-  return [
-    { label: 'Due Soon', tasks: dueSoon },
-    { label: 'Next Up', tasks: nextUp },
-    { label: 'Later', tasks: later },
-  ].filter(g => g.tasks.length > 0);
+  const candidates = tasks.filter(t => !t.completed && !t.archived_at);
+  
+  const overdue = candidates.filter(isOverdue).sort(byMostOverdue);
+  const dueToday = candidates.filter(isDueToday).sort(byPriority);
+  const highPriorityTomorrow = candidates
+    .filter(t => isDueTomorrow(t) && t.priority === 'high')
+    .sort(byEffort);
+  
+  // Combine and take first 5
+  return [...overdue, ...dueToday, ...highPriorityTomorrow]
+    .slice(0, 5);
 }, [tasks]);
 ```
 
-Section rendering:
-- Subtle label header (11px uppercase, muted)
-- Sections collapse when empty
-- Optional: show completion count per section
+### 4. New Component: InlineTaskActions
 
-### 7. Completion Feedback
+**File**: `src/components/tasks/InlineTaskActions.tsx` (NEW)
 
-**File**: `src/components/tasks/TaskWorkCard.tsx`
-
-Enhance the existing confetti pattern:
-- Animate card collapse (Framer Motion `exit` animation)
-- Show brief "Done" state before removal
-- Update session stats ("3 completed today")
+Reusable inline action buttons with popovers:
 
 ```typescript
-<motion.div
-  layout
-  exit={{ opacity: 0, height: 0, transition: { duration: 0.2 } }}
->
-  {/* Card content */}
-</motion.div>
+interface InlineTaskActionsProps {
+  task: Task;
+  onSnooze: (until: Date) => void;
+  onReschedule: (date: Date) => void;
+  onUpdatePriority: (priority: string) => void;
+  onUpdateEffort: (minutes: number, category: string) => void;
+  onArchive: () => void;
+  onDelete: () => void;
+  variant: 'compact' | 'full'; // compact for TodayLane, full for sections
+}
 ```
 
-### 8. Filter Panel Redesign
+Leverages existing patterns:
+- `useSnooze` hook for snooze functionality
+- `SuggestionChip` pattern from `InlineTaskForm.tsx` for popovers
+- `QuickDatePicks` component for date selection
+- `PriorityOptions` component for priority selection
 
-**File**: `src/components/tasks/TasksSummaryPanel.tsx`
-
-Reduce visual dominance:
-
-**Changes**:
-- Remove heavy border from main container
-- Use spacing/grouping instead of borders between sections
-- Collapse rarely-used filters behind "More filters" toggle:
-  - Always visible: Status, Priority
-  - Collapsed: Category, Project, Sort
-- Lighten chip styling (reduce active state contrast)
-- Add "Ready to Work" as primary filter option
-
-**New Panel Structure**:
-```text
-+-----------------------------+
-| [Search input]              |
-+-----------------------------+
-| VIEW                        |
-| [Ready to Work] [All]       |
-+-----------------------------+
-| STATUS                      |
-| To Do · In Progress · Done  |
-+-----------------------------+
-| PRIORITY                    |
-| High · Medium · Low         |
-+-----------------------------+
-| [More filters...]           |
-|   Category: All             |
-|   Project: All              |
-|   Sort by: Date             |
-+-----------------------------+
-| VIEW MODE                   |
-| [List] [Kanban]             |
-+-----------------------------+
+**New EffortOptions Component**:
+```typescript
+function EffortOptions({ 
+  value, 
+  onChange 
+}: { 
+  value?: number; 
+  onChange: (minutes: number, category: string) => void 
+}) {
+  const options = [
+    { minutes: 5, label: '5m', category: 'quick' },
+    { minutes: 15, label: '15m', category: 'quick' },
+    { minutes: 30, label: '30m', category: 'medium' },
+    { minutes: 60, label: '1h', category: 'deep' },
+    { minutes: 120, label: '2h+', category: 'deep' },
+  ];
+  // ... render buttons
+}
 ```
 
-### 9. Kanban View (De-emphasized)
+### 5. New Hook: useEnrichedTasks
 
-**File**: `src/components/tasks/TasksKanbanView.tsx`
+**File**: `src/hooks/useEnrichedTasks.ts` (NEW)
 
-Minor adjustments:
-- Rename columns: "Ready" / "Doing" / "Done Today"
-- Reduce card density (increase spacing)
-- Apply same `TaskWorkCard` component for consistency
+Enriches tasks with company data for display:
 
-No major changes - Kanban becomes secondary view.
+```typescript
+export interface EnrichedTask extends Task {
+  linkedEntity?: {
+    type: 'portfolio' | 'pipeline' | 'project' | 'email';
+    id: string;
+    name: string;
+    logo_url?: string | null;
+    color?: string;
+  };
+}
+
+export function useEnrichedTasks(tasks: Task[]) {
+  // Fetch all portfolio companies
+  const { companies: portfolioCompanies } = useDashboardPortfolioCompanies();
+  // Fetch all pipeline companies
+  const { companies: pipelineCompanies } = useDashboardPipelineFocus();
+  
+  const enrichedTasks = useMemo(() => {
+    const portfolioMap = new Map(portfolioCompanies.map(c => [c.id, c]));
+    const pipelineMap = new Map(pipelineCompanies.map(c => [c.id, c]));
+    
+    return tasks.map(task => {
+      let linkedEntity: EnrichedTask['linkedEntity'] = undefined;
+      
+      // Priority: pipeline_company > company > project > email
+      if (task.pipeline_company_id) {
+        const company = pipelineMap.get(task.pipeline_company_id);
+        if (company) {
+          linkedEntity = {
+            type: 'pipeline',
+            id: company.id,
+            name: company.company_name,
+            logo_url: company.logo_url,
+          };
+        }
+      } else if (task.company_id) {
+        const company = portfolioMap.get(task.company_id);
+        if (company) {
+          linkedEntity = {
+            type: 'portfolio',
+            id: company.id,
+            name: company.name,
+            logo_url: company.logo_url,
+          };
+        }
+      } else if (task.project) {
+        linkedEntity = {
+          type: 'project',
+          id: task.project.id,
+          name: task.project.name,
+          color: task.project.color,
+        };
+      } else if (task.source_inbox_item_id) {
+        linkedEntity = {
+          type: 'email',
+          id: task.source_inbox_item_id,
+          name: 'From email',
+        };
+      }
+      
+      return { ...task, linkedEntity };
+    });
+  }, [tasks, portfolioCompanies, pipelineCompanies]);
+  
+  return enrichedTasks;
+}
+```
+
+### 6. Update TaskGroupedList: Time-Based Sections
+
+**File**: `src/components/tasks/TaskGroupedList.tsx` (MODIFY)
+
+Change from abstract sections to time-based sections:
+
+```typescript
+const taskGroups = useMemo(() => {
+  const groups: TaskGroup[] = [];
+  const assigned = new Set<string>();
+  
+  // 1. Due Tomorrow
+  const dueTomorrow = tasks.filter(t => {
+    if (assigned.has(t.id)) return false;
+    if (isDueTomorrow(t.scheduledFor)) {
+      assigned.add(t.id);
+      return true;
+    }
+    return false;
+  });
+  if (dueTomorrow.length > 0) {
+    groups.push({ 
+      label: 'Due Tomorrow', 
+      sublabel: format(addDays(new Date(), 1), 'EEEE'),
+      tasks: dueTomorrow,
+      visualWeight: 'high'
+    });
+  }
+  
+  // 2. This Week (next 5 days, excluding today/tomorrow)
+  const thisWeek = tasks.filter(t => {
+    if (assigned.has(t.id)) return false;
+    if (isWithinDays(t.scheduledFor, 2, 7)) {
+      assigned.add(t.id);
+      return true;
+    }
+    return false;
+  });
+  if (thisWeek.length > 0) {
+    groups.push({ 
+      label: 'This Week', 
+      tasks: thisWeek,
+      visualWeight: 'medium'
+    });
+  }
+  
+  // 3. Upcoming (everything else with a date)
+  const upcoming = tasks.filter(t => {
+    if (assigned.has(t.id)) return false;
+    if (t.scheduledFor) {
+      assigned.add(t.id);
+      return true;
+    }
+    return false;
+  });
+  if (upcoming.length > 0) {
+    groups.push({ 
+      label: 'Upcoming', 
+      tasks: upcoming,
+      visualWeight: 'low'
+    });
+  }
+  
+  // 4. No Date (backlog)
+  const noDate = tasks.filter(t => !assigned.has(t.id));
+  if (noDate.length > 0) {
+    groups.push({ 
+      label: 'No Date', 
+      tasks: noDate,
+      visualWeight: 'muted'
+    });
+  }
+  
+  return groups;
+}, [tasks]);
+```
+
+### 7. Update Tasks.tsx: Integrate New Components
+
+**File**: `src/pages/Tasks.tsx` (MODIFY)
+
+Main content structure:
+
+```typescript
+// Use enriched tasks
+const enrichedTasks = useEnrichedTasks(filteredTasks);
+
+// Separate Today tasks from rest
+const { todayTasks, remainingTasks } = useMemo(() => {
+  // Today lane selection logic
+  const candidates = enrichedTasks.filter(t => !t.completed);
+  const today = selectTodayTasks(candidates, 5);
+  const todayIds = new Set(today.map(t => t.id));
+  const remaining = enrichedTasks.filter(t => !todayIds.has(t.id));
+  return { todayTasks: today, remainingTasks: remaining };
+}, [enrichedTasks]);
+
+// Render
+return (
+  <div className="space-y-5">
+    {/* Quick Add Input */}
+    <QuickTaskInput onAddTask={handleAddTask_click} />
+    
+    {/* Today Lane */}
+    {todayTasks.length > 0 && (
+      <TodayLane
+        tasks={todayTasks}
+        onComplete={handleCompleteTask}
+        onSnooze={handleSnoozeTask}
+        onReschedule={handleRescheduleTask}
+        onUpdatePriority={(id, p) => quickInlineUpdate(id, { priority: p })}
+        onUpdateEffort={(id, m, c) => quickInlineUpdate(id, { effort_minutes: m, effort_category: c })}
+        onClick={handleTaskClick}
+      />
+    )}
+    
+    {/* Time-Based Sections */}
+    <TaskGroupedList
+      tasks={remainingTasks}
+      onTaskComplete={handleCompleteTask}
+      onTaskDelete={handleDeleteTask}
+      onTaskClick={handleTaskClick}
+      onSnooze={handleSnoozeTask}
+      onReschedule={handleRescheduleTask}
+      onUpdatePriority={(id, p) => quickInlineUpdate(id, { priority: p })}
+      onUpdateEffort={(id, m, c) => quickInlineUpdate(id, { effort_minutes: m, effort_category: c })}
+    />
+  </div>
+);
+```
+
+### 8. Update useTasksManager: Add Snooze/Reschedule Handlers
+
+**File**: `src/hooks/useTasksManager.tsx` (MODIFY)
+
+Add new handlers:
+
+```typescript
+const { snooze } = useSnooze();
+
+const handleSnoozeTask = async (id: string, until: Date) => {
+  await snooze('task', id, until);
+  // Optimistic update handled by useSnooze
+};
+
+const handleRescheduleTask = (id: string, date: Date) => {
+  updateTask(id, { scheduled_for: date.toISOString() });
+};
+
+const handleUpdateEffort = (id: string, minutes: number, category: string) => {
+  updateTask(id, { effort_minutes: minutes, effort_category: category });
+};
+
+return {
+  // ... existing returns
+  handleSnoozeTask,
+  handleRescheduleTask,
+  handleUpdateEffort,
+};
+```
+
+### 9. New Component: EntityPill (Linked Entity Display)
+
+**File**: `src/components/tasks/EntityPill.tsx` (NEW)
+
+Displays the linked entity with appropriate styling:
+
+```typescript
+interface EntityPillProps {
+  entity: EnrichedTask['linkedEntity'];
+  onClick?: () => void;
+  size?: 'sm' | 'md';
+}
+
+export function EntityPill({ entity, onClick, size = 'sm' }: EntityPillProps) {
+  if (!entity) return null;
+  
+  const iconSize = size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4';
+  
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5",
+        "bg-muted/50 hover:bg-muted transition-colors text-xs",
+        "max-w-[140px] truncate"
+      )}
+    >
+      {entity.type === 'email' ? (
+        <Mail className={cn(iconSize, "text-sky-500 flex-shrink-0")} />
+      ) : entity.logo_url ? (
+        <img 
+          src={entity.logo_url} 
+          className={cn(iconSize, "rounded-sm object-contain flex-shrink-0")} 
+          alt="" 
+        />
+      ) : entity.color ? (
+        <div 
+          className={cn(iconSize, "rounded-sm flex-shrink-0")} 
+          style={{ backgroundColor: entity.color }} 
+        />
+      ) : (
+        <Building2 className={cn(iconSize, "text-muted-foreground flex-shrink-0")} />
+      )}
+      <span className="truncate text-muted-foreground">{entity.name}</span>
+    </button>
+  );
+}
+```
+
+### 10. Update TaskCardEffort: Support Inline Editing
+
+**File**: `src/components/task-cards/TaskCardEffort.tsx` (MODIFY)
+
+Make effort chip interactive:
+
+```typescript
+interface TaskCardEffortProps {
+  effortMinutes?: number | null;
+  effortCategory?: 'quick' | 'medium' | 'deep' | 'unknown' | null;
+  editable?: boolean;
+  onEdit?: (minutes: number, category: string) => void;
+  className?: string;
+}
+
+export function TaskCardEffort({ 
+  effortMinutes, 
+  effortCategory, 
+  editable = false,
+  onEdit,
+  className 
+}: TaskCardEffortProps) {
+  // ... existing logic
+  
+  if (editable && onEdit) {
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button className={cn(baseStyles, config.className, "cursor-pointer", className)}>
+            <Icon className="h-2.5 w-2.5" />
+            {displayLabel}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-auto p-2">
+          <EffortOptions value={effortMinutes} onChange={onEdit} />
+        </PopoverContent>
+      </Popover>
+    );
+  }
+  
+  return (
+    <span className={cn(baseStyles, config.className, className)}>
+      <Icon className="h-2.5 w-2.5" />
+      {displayLabel}
+    </span>
+  );
+}
+```
 
 ---
 
@@ -291,65 +529,94 @@ No major changes - Kanban becomes secondary view.
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/components/tasks/TasksPageHeader.tsx` | CREATE | Session-oriented header with dynamic stats |
-| `src/components/tasks/TaskWorkCard.tsx` | CREATE | Premium elevated task card with inline editing |
-| `src/components/tasks/TaskGroupedList.tsx` | CREATE | Soft section grouping for task list |
-| `src/components/task-cards/TaskCardEffort.tsx` | CREATE | Effort chip component |
-| `src/components/tasks/InlineEditChip.tsx` | CREATE | Reusable inline edit pattern |
-| `src/hooks/useTasks.ts` | MODIFY | Add effort_minutes, effort_category to Task type |
-| `src/hooks/useTaskFiltering.ts` | MODIFY | Add "ready" filter mode |
-| `src/pages/Tasks.tsx` | MODIFY | Update default filter, integrate new components |
-| `src/components/tasks/TasksSummaryPanel.tsx` | MODIFY | Lighter styling, collapsible filters, Ready view |
-| `src/components/tasks/TasksMainContent.tsx` | MODIFY | Use TaskGroupedList instead of flat TaskList |
-| `src/components/tasks/TasksKanbanView.tsx` | MODIFY | Rename columns, use TaskWorkCard |
+| **Database Migration** | CREATE | Add `effort_minutes` and `effort_category` columns to tasks |
+| `src/components/tasks/TodayTaskCard.tsx` | CREATE | Compact horizontal card for Today lane |
+| `src/components/tasks/TaskProcessingCard.tsx` | CREATE | Enhanced vertical card with inline actions |
+| `src/components/tasks/TodayLane.tsx` | CREATE | Horizontal scrolling lane with selection logic |
+| `src/components/tasks/InlineTaskActions.tsx` | CREATE | Reusable inline action buttons with popovers |
+| `src/components/tasks/EntityPill.tsx` | CREATE | Linked entity display component |
+| `src/hooks/useEnrichedTasks.ts` | CREATE | Enrich tasks with company/project data |
+| `src/components/tasks/TaskGroupedList.tsx` | MODIFY | Time-based sections (Tomorrow, This Week, Upcoming) |
+| `src/components/task-cards/TaskCardEffort.tsx` | MODIFY | Add editable mode with popover |
+| `src/pages/Tasks.tsx` | MODIFY | Integrate TodayLane, enriched tasks, new handlers |
+| `src/hooks/useTasksManager.tsx` | MODIFY | Add snooze, reschedule, effort handlers |
+| `src/hooks/useTasks.ts` | MODIFY | Map new effort columns from DB |
 
 ---
 
-## Styling Guidelines
+## Visual Hierarchy Rules
 
-All new components follow Casper's glassmorphic aesthetic:
+```text
+OVERDUE:
+- Red left border (2px)
+- Extra padding (py-4)
+- Larger checkbox (7x7)
+- Full opacity
 
-```typescript
-// Card base styling
-className={cn(
-  "rounded-2xl p-4 transition-all duration-200",
-  "bg-white/60 dark:bg-white/[0.04]",
-  "border border-white/20 dark:border-white/[0.08]",
-  "backdrop-blur-sm",
-  "hover:bg-white/80 dark:hover:bg-white/[0.08]",
-  "hover:shadow-sm hover:-translate-y-0.5"
-)}
+DUE TODAY:
+- Amber left border (2px)
+- Standard padding (py-3)
+- Standard checkbox (6x6)
+- Full opacity
 
-// Priority hierarchy
-const getPriorityStyles = (priority: string, isOverdue: boolean) => {
-  if (isOverdue || priority === 'high') {
-    return "py-4 border-l-2 border-l-red-500";
-  }
-  if (priority === 'medium') {
-    return "py-3";
-  }
-  return "py-2 opacity-75";
-};
+DUE TOMORROW:
+- No left border
+- Standard padding (py-3)
+- Standard checkbox (6x6)
+- Full opacity
+
+LATER:
+- No left border
+- Compact padding (py-2.5)
+- Smaller checkbox (5x5)
+- Reduced opacity (0.8)
+
+NO DATE:
+- No left border
+- Compact padding (py-2)
+- Muted styling
+- Reduced opacity (0.7)
 ```
 
 ---
 
-## Success Metrics (Post-Implementation)
+## Styling Guidelines (Glassmorphic Premium)
 
-After implementation, the Tasks page should:
-1. Open to a curated "Ready to Work" view, not "All Items"
-2. Visually emphasize high-priority and due-soon tasks
-3. Allow completing, rescheduling, and re-prioritizing without opening Task Detail
-4. Show session progress ("3 completed today")
-5. Feel inviting rather than overwhelming, even with 50+ tasks
+```typescript
+// Card base
+const cardBase = cn(
+  "rounded-xl transition-all duration-200",
+  "bg-white/60 dark:bg-white/[0.04]",
+  "border border-white/20 dark:border-white/[0.08]",
+  "backdrop-blur-sm",
+  "hover:bg-white/80 dark:hover:bg-white/[0.08]",
+  "hover:shadow-sm"
+);
+
+// Today lane card (horizontal)
+const todayCard = cn(
+  cardBase,
+  "flex items-center gap-3 px-3 py-2",
+  "min-w-[280px] max-w-[320px]"
+);
+
+// Processing card (vertical)
+const processingCard = cn(
+  cardBase,
+  "p-4 space-y-2 cursor-pointer",
+  "hover:-translate-y-0.5"
+);
+```
 
 ---
 
-## What Stays the Same
+## Success Criteria
 
-- All existing routes
-- Database schema (only reading existing effort_* columns)
-- Task Detail drawer (Sheet) for deep editing
-- All filter/sort logic (just adding new "ready" mode)
-- Kanban view (minor styling updates only)
-- Mobile responsive behavior (uses existing `useIsDesktop` patterns)
+After implementation:
+1. Opening Tasks shows a horizontal "Today" lane with 3-5 priority tasks
+2. Each card shows linked entity context (company logo/project/email indicator)
+3. Users can complete, snooze, reschedule, change priority, and set effort without opening Task Detail
+4. Time-based sections (Tomorrow, This Week, Upcoming) replace abstract groupings
+5. Visual hierarchy makes urgent tasks immediately scannable
+6. The page feels like a "knock these out" work surface, not a backlog database
+
