@@ -50,7 +50,7 @@ import { usePipeline } from "@/hooks/usePipeline";
 import { supabase } from "@/integrations/supabase/client";
 import type { CreatePipelineCompanyMetadata } from "@/types/inboxSuggestions";
 import { copyInboxAttachmentToPipeline } from "@/lib/inbox/copyAttachmentToCompany";
-import { buildTaskDraftFromEmail, buildCommitmentDraftFromSuggestion } from "@/lib/inbox/buildTaskDraft";
+import { buildTaskDraftFromEmail, buildCommitmentDraftFromSuggestion, buildPipelineDraftFromSuggestion, buildManualPipelineDraft } from "@/lib/inbox";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { InboxItem } from "@/types/inbox";
@@ -209,8 +209,15 @@ export function InlineActionPanel({
   const handleSelectAction = (action: ActionType) => {
     setActiveAction(action);
     setSuccessResult(null);
-    setPrefillData({});
     setActiveSuggestion(null);
+    
+    // Pre-populate with smart defaults for pipeline creation
+    if (action === "create_pipeline") {
+      const draft = buildManualPipelineDraft(item);
+      setPrefillData({ ...draft });
+    } else {
+      setPrefillData({});
+    }
   };
 
   const handleCancelAction = () => {
@@ -511,15 +518,11 @@ export function InlineActionPanel({
         });
         break;
       case "CREATE_PIPELINE_COMPANY": {
+        // Use the new draft builder for smarter prefills
+        const pipelineDraft = buildPipelineDraftFromSuggestion(item, suggestion);
         setActiveAction("create_pipeline");
-        const metadata = suggestion.metadata as unknown as CreatePipelineCompanyMetadata | undefined;
         setPrefillData({
-          companyName: metadata?.extracted_company_name || "",
-          domain: metadata?.extracted_domain || "",
-          contactName: metadata?.primary_contact_name || "",
-          contactEmail: metadata?.primary_contact_email || "",
-          notes: metadata?.notes_summary || "",
-          source: metadata?.intro_source || "",
+          ...pipelineDraft,
           rationale: suggestion.rationale,
           confidence: suggestion.confidence,
         });
