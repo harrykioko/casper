@@ -1,185 +1,165 @@
 
 
-# Fix: Overly Aggressive Company Name Matching in Suggestions
+# Align Task Categories in Email Drawer with Standard Categories
 
 ## Problem
 
-When an email arrives from "Sandbox Wealth" (ray@sandboxwealth.com), the AI suggestion system incorrectly suggests "Link to Sandbox Wealth" pointing to a company called "Wealth" (wealth.com) that exists in the database.
+The inline task creation form in the email drawer uses a hardcoded list of categories that does not match the standard categories defined in the database.
 
-This happens because:
-1. The database has a pipeline company named "Wealth" with domain "wealth.com"
-2. The name matching logic at line 164 uses `searchText.includes(companyNameLower)`
-3. This matches "wealth" as a substring of "Sandbox Wealth"
-4. The AI receives "Wealth" as a candidate and suggests linking to it
+**Current hardcoded list** (in `InlineTaskForm.tsx`):
+- Personal, Admin, Investing, Travel, Work
 
-The correct behavior: Since "Sandbox Wealth" (sandboxwealth.com) is a different company than "Wealth" (wealth.com), the system should suggest **CREATE_PIPELINE_COMPANY** instead.
+**Standard categories** (from database):
+- General, Personal, Pipeline, Portfolio
 
----
-
-## Root Cause
-
-```typescript
-// Line 164 - Current logic
-if (companyNameLower.length >= 3 && searchText.includes(companyNameLower)) {
-```
-
-This simple substring match catches partial word matches:
-- "Wealth" matches inside "Sandbox Wealth" (wrong)
-- "Box" would match inside "Sandbox" (wrong)
-- "Tech" would match inside "TechCrunch" (wrong)
+The inference logic in `buildTaskDraft.ts` also maps email intents to the old category names.
 
 ---
 
 ## Solution
 
-Implement stricter matching logic with multiple safeguards:
-
-1. **Word boundary matching**: Use regex word boundaries to prevent substring false positives
-2. **Domain mismatch check**: If sender domain differs from candidate domain, do not match on name alone
-3. **Exact vs partial disambiguation**: Require exact name match or high fuzzy threshold
-4. **Short name penalty**: Reduce score for short company names that are more likely to false-match
+Update both the UI component and the inference logic to use the standard category set, leveraging the existing `useCategories` hook to fetch from the database.
 
 ---
 
 ## Technical Changes
 
-### File: `supabase/functions/inbox-suggest-v2/index.ts`
+### 1. Update CategoryOptions Component
 
-#### 1. Add Generic Domain List (for domain exclusion)
+**File: `src/components/inbox/inline-actions/InlineTaskForm.tsx`**
 
-```typescript
-const GENERIC_EMAIL_DOMAINS = new Set([
-  "gmail.com", "googlemail.com",
-  "yahoo.com", "ymail.com",
-  "outlook.com", "hotmail.com", "live.com", "msn.com",
-  "icloud.com", "me.com", "mac.com",
-  "aol.com",
-  "protonmail.com", "proton.me",
-  "zoho.com", "mail.com", "fastmail.com",
-]);
-
-function isGenericEmailDomain(domain: string | null): boolean {
-  if (!domain) return false;
-  return GENERIC_EMAIL_DOMAINS.has(domain.toLowerCase());
-}
-```
-
-#### 2. Replace Loose Name Matching with Word Boundary Matching
-
-Replace lines 159-174:
+Replace the hardcoded array with the `useCategories` hook:
 
 ```typescript
-// Name mentions in subject/body - with word boundary check
-const searchText = `${subject} ${bodySnippet.slice(0, 500)}`.toLowerCase();
+// Before (line 197)
+const categories = ["Personal", "Admin", "Investing", "Travel", "Work"];
 
-for (const company of companies) {
-  if (candidateMap.has(company.id)) continue;
-  
-  const companyNameLower = company.name.toLowerCase().trim();
-  
-  // Skip very short names (high false positive risk)
-  if (companyNameLower.length < 4) continue;
-  
-  // Use word boundary regex to prevent partial matches
-  // "Wealth" should not match "Sandbox Wealth" unless it's the complete word
-  const wordBoundaryPattern = new RegExp(`\\b${escapeRegex(companyNameLower)}\\b`, "i");
-  
-  if (wordBoundaryPattern.test(searchText)) {
-    // Additional check: if sender has a professional domain, verify it doesn't conflict
-    const senderDomainNormalized = normalizeDomain(senderDomain);
-    const companyDomainNormalized = normalizeDomain(company.primary_domain);
-    
-    // If both have domains and they differ significantly, skip this match
-    // (prevents "Wealth" from matching email about "Sandbox Wealth")
-    if (
-      senderDomainNormalized && 
-      !isGenericEmailDomain(senderDomainNormalized) &&
-      companyDomainNormalized && 
-      senderDomainNormalized !== companyDomainNormalized &&
-      !senderDomainNormalized.includes(companyDomainNormalized) &&
-      !companyDomainNormalized.includes(senderDomainNormalized)
-    ) {
-      // Sender domain is professional but different from company domain
-      // This is likely a different company (sandboxwealth.com vs wealth.com)
-      continue;
-    }
-    
-    candidateMap.set(company.id, {
-      id: company.id,
-      name: company.name,
-      type: company.type,
-      primary_domain: company.primary_domain,
-      match_score: 75,
-      match_reason: "name_mention",
-    });
+// After
+import { useCategories } from "@/hooks/useCategories";
+
+function CategoryOptions({ 
+  value, 
+  onChange 
+}: { 
+  value?: string; 
+  onChange: (val: string) => void 
+}) {
+  const { categories, loading } = useCategories();
+
+  if (loading) {
+    return <div className="text-xs text-muted-foreground p-2">Loading...</div>;
   }
+
+  return (
+    <div className="flex flex-col gap-1">
+      {categories.map((cat) => (
+        <button
+          key={cat.id}
+          type="button"
+          onClick={() => onChange(cat.name)}
+          className={cn(
+            "text-left px-2 py-1 text-xs rounded hover:bg-muted transition-colors",
+            value === cat.name && "bg-muted font-medium"
+          )}
+        >
+          {cat.name}
+          {value === cat.name && <span className="ml-1 text-muted-foreground">*</span>}
+        </button>
+      ))}
+    </div>
+  );
 }
 ```
 
-#### 3. Add Regex Escape Helper
+### 2. Update Category Inference Logic
+
+**File: `src/lib/inbox/buildTaskDraft.ts`**
+
+Update `inferCategoryFromIntent` to use the standard categories and add smart inference based on company type:
 
 ```typescript
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Before (lines 73-87)
+function inferCategoryFromIntent(
+  type?: string,
+  extractedCategories?: string[] | null
+): string | undefined {
+  if (type === "CREATE_PERSONAL_TASK") return "Personal";
+  if (extractedCategories?.includes("personal")) return "Personal";
+  if (extractedCategories?.includes("admin")) return "Admin";
+  if (extractedCategories?.includes("investing")) return "Investing";
+  if (extractedCategories?.includes("travel")) return "Travel";
+  return undefined;
+}
+
+// After
+function inferCategoryFromIntent(
+  type?: string,
+  extractedCategories?: string[] | null,
+  companyType?: "portfolio" | "pipeline" | null
+): string | undefined {
+  // Map suggestion type to category
+  if (type === "CREATE_PERSONAL_TASK") return "Personal";
+  
+  // Infer from company type (if email is linked to a company)
+  if (companyType === "portfolio") return "Portfolio";
+  if (companyType === "pipeline") return "Pipeline";
+  
+  // Check extracted categories from AI
+  if (extractedCategories?.includes("personal")) return "Personal";
+  if (extractedCategories?.includes("portfolio")) return "Portfolio";
+  if (extractedCategories?.includes("pipeline")) return "Pipeline";
+  if (extractedCategories?.includes("investing")) return "Portfolio"; // Legacy mapping
+  if (extractedCategories?.includes("admin")) return "General";
+  if (extractedCategories?.includes("travel")) return "Personal";
+  if (extractedCategories?.includes("work")) return "General";
+  
+  return undefined;
 }
 ```
 
-#### 4. Improve System Prompt Guidance
-
-Update the CREATE_PIPELINE_COMPANY rules in buildSystemPrompt():
+Update the function call in `buildTaskDraftFromEmail` to pass company type:
 
 ```typescript
-## CREATE_PIPELINE_COMPANY Rules
-
-When suggesting CREATE_PIPELINE_COMPANY (for intro emails with no existing company match):
-- This should be HIGH priority when subject contains "Intro", "Introduction", "Meet", "Connecting you"
-- IMPORTANT: If candidate_companies contains a partial match (e.g., "Wealth" for "Sandbox Wealth"), 
-  verify the domains match. If sender domain differs from candidate domain, suggest CREATE_PIPELINE_COMPANY instead of LINK_COMPANY.
-- Extract company details and include in metadata:
-  - extracted_company_name: The company name (from signature, subject line, or email body)
-  ...
+// In buildTaskDraftFromEmail, update the call (around line 138)
+const inferredCategory = inferCategoryFromIntent(
+  suggestion?.type,
+  item.extractedCategories,
+  draft.companyType || item.relatedCompanyType  // Pass company type for smarter inference
+);
 ```
-
-Add new rule:
-
-```typescript
-10. CRITICAL: Do not suggest LINK_COMPANY if the sender's email domain differs from the candidate company's domain.
-    Example: Email from ray@sandboxwealth.com should NOT link to "Wealth" (wealth.com) - these are different companies.
-    In such cases, suggest CREATE_PIPELINE_COMPANY with the correct company name.
-```
-
----
-
-## Expected Behavior After Fix
-
-For the email from Ray Denis (ray@sandboxwealth.com) about "Sandbox Wealth Investor Update":
-
-Before:
-- Candidate matching finds "Wealth" (substring match in "Sandbox Wealth")
-- AI suggests: "Link to Sandbox Wealth" pointing to wrong company
-
-After:
-- Word boundary check passes (Wealth is a complete word)
-- Domain check fails: sandboxwealth.com != wealth.com
-- Candidate is excluded
-- AI suggests: "Create New Pipeline Company: Sandbox Wealth"
 
 ---
 
 ## Files Changed
 
-| File | Action | Description |
-|------|--------|-------------|
-| `supabase/functions/inbox-suggest-v2/index.ts` | Modify | Add generic domain list, word boundary matching, domain conflict check, and updated prompt rules |
+| File | Change |
+|------|--------|
+| `src/components/inbox/inline-actions/InlineTaskForm.tsx` | Use `useCategories` hook instead of hardcoded array in `CategoryOptions` component |
+| `src/lib/inbox/buildTaskDraft.ts` | Update `inferCategoryFromIntent` to use standard categories (General, Personal, Pipeline, Portfolio) and add company-type-based inference |
 
 ---
 
-## Edge Cases Handled
+## Category Mapping Summary
 
-1. **Exact word match but different domain**: "Wealth" in "Sandbox Wealth" - excluded due to domain mismatch
-2. **Subdomain relationships**: "app.acme.com" vs "acme.com" - allowed (domain includes check)
-3. **Generic sender domains**: Gmail/Yahoo senders fall back to name matching only
-4. **Very short company names**: Names < 4 characters skipped to prevent false positives
-5. **Special characters**: Regex escaping prevents injection issues
+| Email Context | Inferred Category |
+|--------------|-------------------|
+| Personal task suggestion | Personal |
+| Email linked to portfolio company | Portfolio |
+| Email linked to pipeline company | Pipeline |
+| Extracted "personal" label | Personal |
+| Extracted "portfolio" or "investing" | Portfolio |
+| Extracted "pipeline" | Pipeline |
+| Extracted "admin" or "work" | General |
+| Extracted "travel" | Personal |
+| No match | No category (user selects) |
 
+---
+
+## Result
+
+After this change:
+- The category dropdown in the email drawer will show: General, Personal, Pipeline, Portfolio
+- Tasks created from emails linked to portfolio companies will auto-suggest "Portfolio"
+- Tasks created from emails linked to pipeline companies will auto-suggest "Pipeline"
+- Categories will stay in sync with the database-backed `categories` table
 
