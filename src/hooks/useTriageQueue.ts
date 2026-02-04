@@ -261,6 +261,22 @@ export function useTriageQueue() {
 
   const isAllClear = data ? data.items.length === 0 : false;
 
+  // Optimistic remove - instantly remove item from cache before mutation completes
+  const optimisticRemove = useCallback(
+    (workItemId: string) => {
+      queryClient.setQueryData(queryKey, (oldData: { items: TriageQueueItem[]; counts: TriageCounts } | undefined) => {
+        if (!oldData) return oldData;
+        const newItems = oldData.items.filter((item: TriageQueueItem) => item.id !== workItemId);
+        return {
+          ...oldData,
+          items: newItems,
+          counts: computeCounts(newItems),
+        };
+      });
+    },
+    [queryClient, queryKey]
+  );
+
   return {
     items: filteredItems,
     allItems: data?.items || [],
@@ -273,6 +289,7 @@ export function useTriageQueue() {
     setEffortFilter,
     clearFilters,
     refetch,
+    optimisticRemove,
   };
 }
 
