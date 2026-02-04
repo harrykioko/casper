@@ -1,73 +1,149 @@
 
-# Smarter Task + Commitment Creation from Email Drawer
 
-## Status: IMPLEMENTED
+# Fix: Track Obligation Button Not Working
 
-All phases have been completed:
+## Problem
 
-- Phase 1: Types and Draft Schema - DONE
-- Phase 2: Improved Initial Note Logic - DONE  
-- Phase 3: Task Prefill Logic - DONE
-- Phase 4: Redesigned Inline Task Form - DONE
-- Phase 5: Commitment Creation Support - DONE
-- Phase 6: Suggestion Card Integration - DONE
-- Phase 7: Update Task Creation Handler - DONE
+Clicking the "Track Obligation" button in the inbox drawer does nothing because the `InlineCommitmentForm` is conditionally rendered only when **both**:
+
+1. `activeAction === "create_commitment"` 
+2. `activeSuggestion` is truthy
+
+When clicking the button directly, `activeSuggestion` is `null`, so the form never appears.
 
 ---
 
-## Files Created/Modified
+## Root Cause
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/types/emailActionDrafts.ts` | Created | TaskDraft and CommitmentDraft type definitions with confidence levels |
-| `src/lib/inbox/buildTaskNote.ts` | Created | Utility to build clean notes from extraction (avoids signatures) |
-| `src/lib/inbox/buildTaskDraft.ts` | Created | Prefill logic with date parsing and category/priority inference |
-| `src/lib/inbox/index.ts` | Created | Barrel export for inbox utilities |
-| `src/components/inbox/inline-actions/InlineTaskForm.tsx` | Rewritten | Compact chip-based form with progressive disclosure and popovers |
-| `src/components/inbox/inline-actions/InlineCommitmentForm.tsx` | Created | Inline commitment creation form for CREATE_WAITING_ON suggestions |
-| `src/components/inbox/inline-actions/ActionSuccessState.tsx` | Updated | Added create_commitment action type |
-| `src/components/inbox/inline-actions/index.ts` | Updated | Exported InlineCommitmentForm |
-| `src/components/inbox/InlineActionPanel.tsx` | Updated | Wired commitment action, updated suggestion routing with draft builders |
+```tsx
+// Line 593 - Current condition
+{activeAction === "create_commitment" && activeSuggestion && (
+  <InlineCommitmentForm ... />
+)}
+```
+
+The form was designed primarily for AI suggestions, not for manual button activation.
 
 ---
 
-## Key Features
+## Solution
 
-### Smart Task Prefills
-- Due date parsing from suggestion hints (today, tomorrow, end of week, next Monday, etc.)
-- Priority inference based on due date proximity (within 2 days = high)
-- Category inference from suggestion type and extracted categories
-- Company prefill from linked company or suggestion
+Make the `InlineCommitmentForm` work without requiring a suggestion by:
 
-### Clean Initial Notes
-- Uses AI-extracted summary and key points instead of raw email body
-- Explicitly avoids signatures, disclaimers, and tracking URLs
-- Falls back to cleaned text snippet if no extraction available
-
-### Compact UI with Suggestion Chips
-- Only shows populated fields as editable chips
-- Clicking a chip opens a popover editor (calendar, priority dropdown, etc.)
-- Progressive disclosure: "Add note" and "Add details..." expand on demand
-- Confidence indicators: "(Suggested)" or "(Linked)" labels on chips
-
-### Commitment Creation
-- New "Track Obligation" action in the drawer
-- Prefills from CREATE_WAITING_ON suggestion metadata
-- Option to also create a linked task
-- Uses destructive accent color for visual distinction
+1. Making the `suggestion` prop optional
+2. Creating a fallback draft builder for manual creation
+3. Removing the `activeSuggestion` requirement from the render condition
 
 ---
 
-## Success Criteria Met
+## Technical Changes
 
-1. "Make anniversary dinner reservation" creates a task with:
-   - Clean initial note from extraction (no signature) ✓
-   - Category suggested as "Personal" (from intent) ✓
-   - Priority suggested based on due date proximity ✓
-   - Due date suggested from hint (editable chip) ✓
+### 1. Update InlineCommitmentForm Props
 
-2. Users can edit suggested values quickly via chip popovers ✓
+**File: `src/components/inbox/inline-actions/InlineCommitmentForm.tsx`**
 
-3. Commitments can be created when promises exist via CREATE_WAITING_ON suggestion ✓
+Make `suggestion` optional and provide sensible defaults when creating manually:
 
-4. All flows remain inline within the email drawer and require explicit confirmation ✓
+```typescript
+interface InlineCommitmentFormProps {
+  emailItem: InboxItem;
+  suggestion?: StructuredSuggestion | null; // Now optional
+  onConfirm: (data: CommitmentFormData) => Promise<void>;
+  onCancel: () => void;
+}
+```
+
+Update the draft initialization to handle missing suggestion:
+
+```typescript
+// Build draft - with or without suggestion
+const initialDraft = suggestion 
+  ? buildCommitmentDraftFromSuggestion(emailItem, suggestion)
+  : buildManualCommitmentDraft(emailItem);
+```
+
+### 2. Add Manual Draft Builder
+
+**File: `src/lib/inbox/buildTaskDraft.ts`**
+
+Add a new function for creating a commitment draft without a suggestion:
+
+```typescript
+export function buildManualCommitmentDraft(item: InboxItem): CommitmentDraft {
+  return {
+    title: "",
+    content: item.preview || item.subject || "",
+    context: buildCommitmentContextFromEmail(item),
+    counterpartyName: item.senderName || "",
+    direction: "owed_to_me",
+    dueDate: null,
+    companyId: item.relatedCompanyId || undefined,
+    companyName: item.relatedCompanyName || undefined,
+    companyType: item.relatedCompanyType || undefined,
+    sourceEmailId: item.id,
+    alsoCreateTask: false,
+  };
+}
+```
+
+### 3. Fix Render Condition
+
+**File: `src/components/inbox/InlineActionPanel.tsx`**
+
+Remove the `activeSuggestion` requirement:
+
+```tsx
+// Before
+{activeAction === "create_commitment" && activeSuggestion && (
+
+// After  
+{activeAction === "create_commitment" && (
+```
+
+And update the component invocation to pass optional suggestion:
+
+```tsx
+<InlineCommitmentForm
+  emailItem={item}
+  suggestion={activeSuggestion}  // Can be null now
+  onConfirm={handleConfirmCommitment}
+  onCancel={handleCancelAction}
+/>
+```
+
+### 4. Hide Rationale Block When No Suggestion
+
+**File: `src/components/inbox/inline-actions/InlineCommitmentForm.tsx`**
+
+Only show the rationale block when there is a suggestion with rationale:
+
+```tsx
+{/* Rationale from suggestion - only if present */}
+{suggestion?.rationale && (
+  <div className="p-2 rounded bg-background/80 border border-border">
+    <p className="text-[10px] text-muted-foreground italic">
+      {suggestion.rationale}
+    </p>
+  </div>
+)}
+```
+
+---
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `src/components/inbox/inline-actions/InlineCommitmentForm.tsx` | Make `suggestion` optional, add fallback defaults, conditionally show rationale |
+| `src/lib/inbox/buildTaskDraft.ts` | Add `buildManualCommitmentDraft()` function |
+| `src/components/inbox/InlineActionPanel.tsx` | Remove `activeSuggestion` requirement from render condition |
+
+---
+
+## Result
+
+After this fix:
+- Clicking "Track Obligation" button opens an empty commitment form pre-filled with sender info
+- Clicking a CREATE_WAITING_ON suggestion still opens the form with AI-extracted data and rationale
+- Both paths lead to the same inline form experience
+
