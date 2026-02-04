@@ -1,5 +1,6 @@
-// Shared email extraction logic using OpenAI
+// Shared email extraction logic using OpenAI v2
 // Can be called from email-extract-structured (user triggered) or email-inbox-ingest (auto)
+// v2 adds thread-aware extraction and stricter next_step consistency
 
 // Collapse long URLs to [link: domain]
 export function collapseUrls(text: string): string {
@@ -37,29 +38,35 @@ export interface ExtractionResult {
   categories: string[];
   entities: Array<{ name: string; type: string; confidence: number }>;
   people: Array<{ name: string; email: string | null; confidence: number }>;
+  extraction_basis?: 'latest' | 'thread';
 }
 
-// Validate and normalize extraction result
+// Validate and normalize extraction result with stricter v2 rules
 export function validateExtraction(result: unknown): ExtractionResult {
   const r = result as Record<string, unknown>;
   
   // Validate summary
   const summary = typeof r.summary === "string" ? r.summary : "";
   
-  // Validate key_points (3-7 items)
+  // Validate key_points (3-6 items for v2)
   let keyPoints = Array.isArray(r.key_points) 
-    ? r.key_points.filter((p): p is string => typeof p === "string")
+    ? r.key_points.filter((p): p is string => typeof p === "string" && p.trim().length > 0)
     : [];
-  if (keyPoints.length < 3) keyPoints = keyPoints.concat(Array(3 - keyPoints.length).fill(""));
-  if (keyPoints.length > 7) keyPoints = keyPoints.slice(0, 7);
-  keyPoints = keyPoints.filter(p => p.trim().length > 0);
+  if (keyPoints.length > 6) keyPoints = keyPoints.slice(0, 6);
   
-  // Validate next_step
+  // Validate next_step with v2 strict enforcement
   const nextStep = r.next_step as Record<string, unknown> | undefined;
-  const validNextStep = {
-    label: typeof nextStep?.label === "string" ? nextStep.label : "No action required",
-    is_action_required: typeof nextStep?.is_action_required === "boolean" ? nextStep.is_action_required : false,
-  };
+  let isActionRequired = typeof nextStep?.is_action_required === "boolean" ? nextStep.is_action_required : false;
+  let label = typeof nextStep?.label === "string" ? nextStep.label : "";
+  
+  // v2 STRICT RULE: If no action required, label must be exactly "No action required"
+  if (!isActionRequired) {
+    label = "No action required";
+  } else if (!label || label.trim().length === 0) {
+    label = "Review and respond";
+  }
+  
+  const validNextStep = { label, is_action_required: isActionRequired };
   
   // Validate categories
   const validCategories = ["update", "request", "intro", "scheduling", "follow_up", "finance", "other"];
@@ -115,13 +122,13 @@ export const extractionTool = {
         key_points: {
           type: "array",
           items: { type: "string" },
-          description: "3-7 key bullet points from the email",
+          description: "3-6 key bullet points from the email, max 12 words each",
         },
         next_step: {
           type: "object",
           properties: {
-            label: { type: "string", description: "What action is required, if any" },
-            is_action_required: { type: "boolean", description: "Whether action is required" },
+            label: { type: "string", description: "What action is required. If no action, MUST be 'No action required'" },
+            is_action_required: { type: "boolean", description: "Whether any follow-up, reply, or action is needed" },
           },
           required: ["label", "is_action_required"],
         },
@@ -175,29 +182,46 @@ export interface EmailContext {
   toEmail: string | null;
   receivedAt: string;
   cleanedText: string;
+  threadCleanText?: string | null;
+  threadMessageCount?: number;
 }
 
-// Call OpenAI for extraction
+// Call OpenAI for extraction (v2 with thread awareness)
 export async function extractStructuredSummary(
   openaiApiKey: string,
   context: EmailContext
 ): Promise<ExtractionResult> {
+  // Determine which text to use for extraction
+  const useThread = context.threadCleanText && (context.threadMessageCount || 0) >= 2;
+  const extractionText = useThread ? context.threadCleanText! : context.cleanedText;
+  const extractionBasis = useThread ? 'thread' : 'latest';
+
   const systemPrompt = `You are an assistant that extracts structured summaries from business emails.
 Output must be valid JSON matching the schema exactly.
 Do not include markdown or commentary.`;
 
-  const userPrompt = `You are given a business email. Produce a structured extraction that helps the user quickly decide whether action is required.
+  const threadContext = useThread 
+    ? `\nThis is a multi-message email thread with ${context.threadMessageCount} messages. Summarize the full conversation, noting key decisions from earlier messages. The "next step" should reflect the current state of the conversation.\n`
+    : '';
 
-Rules:
-- Ignore email signatures, disclaimers, tracking footers, and repeated quoted threads.
-- Do not copy raw URLs. If a link is important, mention only the domain in plain text.
-- Keep summary factual and concise (1-2 sentences max).
-- Key points should be short and specific. No more than 12 words each when possible.
-- If the email requires no action, set next_step.is_action_required=false and next_step.label="No action required".
-- Extract entities and people that are explicitly referenced or strongly implied.
+  const userPrompt = `You are given a business email. Produce a structured extraction that helps the user quickly decide whether action is required.
+${threadContext}
+STRICT RULES:
+- If next_step.is_action_required is FALSE, next_step.label MUST be exactly "No action required"
+- If the email implies ANY of the following, is_action_required MUST be TRUE:
+  - Follow-up requested
+  - Meeting scheduling or confirmation needed
+  - Review or approval requested
+  - Reply expected
+  - Deliverable or action item mentioned
+- Key points: 3-6 bullets, factual, concise (max 12 words each)
+- Never imply commitments in summary or bullets if is_action_required is false
+- Ignore email signatures, disclaimers, tracking footers, and repeated quoted threads
+- Do not copy raw URLs. If a link is important, mention only the domain in plain text
+- Keep summary factual and concise (1-2 sentences max)
 
 Constraints:
-- key_points: 3 to 7 items
+- key_points: 3 to 6 items
 - categories: choose from: ["update","request","intro","scheduling","follow_up","finance","other"]
 - entities.type: choose from: ["company","bank","fund","product","tool","person","other"]
 - confidence: number between 0 and 1
@@ -209,7 +233,7 @@ To: ${context.toEmail || "unknown"}
 Date: ${context.receivedAt}
 
 Email content:
-${context.cleanedText}`;
+${extractionText}`;
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -251,5 +275,8 @@ ${context.cleanedText}`;
     throw new Error("OpenAI returned invalid JSON");
   }
 
-  return validateExtraction(extractedData);
+  const validated = validateExtraction(extractedData);
+  validated.extraction_basis = extractionBasis;
+  
+  return validated;
 }

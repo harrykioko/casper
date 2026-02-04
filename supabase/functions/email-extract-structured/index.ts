@@ -59,10 +59,10 @@ serve(async (req) => {
       });
     }
 
-    // Fetch inbox item (RLS ensures ownership)
+    // Fetch inbox item (RLS ensures ownership) - include thread context
     const { data: item, error: fetchError } = await supabase
       .from("inbox_items")
-      .select("id, subject, from_name, from_email, to_email, received_at, text_body, cleaned_text, display_subject, display_from_name, display_from_email")
+      .select("id, subject, from_name, from_email, to_email, received_at, text_body, cleaned_text, display_subject, display_from_name, display_from_email, thread_clean_text, thread_message_count")
       .eq("id", inbox_item_id)
       .single();
 
@@ -84,13 +84,18 @@ serve(async (req) => {
     }
 
     const cleanedText = cleanEmailForExtraction(rawText);
+    const threadCleanText = item.thread_clean_text ? cleanEmailForExtraction(item.thread_clean_text) : null;
+    const threadMessageCount = item.thread_message_count || 1;
     const subject = item.display_subject || item.subject;
     const fromName = item.display_from_name || item.from_name || "";
     const fromEmail = item.display_from_email || item.from_email;
 
-    console.log(`Extracting structured summary for inbox item ${inbox_item_id}`);
+    console.log(`Extracting structured summary for inbox item ${inbox_item_id}`, {
+      hasThreadContext: !!threadCleanText,
+      threadMessageCount,
+    });
 
-    // Call shared extraction function
+    // Call shared extraction function (v2 with thread support)
     const validated = await extractStructuredSummary(openaiApiKey, {
       subject,
       fromName,
@@ -98,11 +103,16 @@ serve(async (req) => {
       toEmail: item.to_email,
       receivedAt: item.received_at,
       cleanedText,
+      threadCleanText,
+      threadMessageCount,
     });
 
-    console.log(`Extraction successful for ${inbox_item_id}:`, JSON.stringify(validated));
+    console.log(`Extraction successful for ${inbox_item_id}:`, {
+      extractionBasis: validated.extraction_basis,
+      isActionRequired: validated.next_step.is_action_required,
+    });
 
-    // Persist to database
+    // Persist to database (v2 with extraction_basis)
     const { error: updateError } = await supabase
       .from("inbox_items")
       .update({
@@ -112,7 +122,8 @@ serve(async (req) => {
         extracted_entities: validated.entities,
         extracted_people: validated.people,
         extracted_categories: validated.categories,
-        extraction_version: "v1",
+        extraction_version: "v2",
+        extraction_basis: validated.extraction_basis || 'latest',
         extracted_at: new Date().toISOString(),
       })
       .eq("id", inbox_item_id);

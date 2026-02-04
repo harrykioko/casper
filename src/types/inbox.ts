@@ -47,6 +47,11 @@ export interface InboxItem {
   extractedCategories?: string[] | null;
   extractionVersion?: string | null;
   extractedAt?: string | null;
+  
+  // Thread context (v2)
+  threadCleanText?: string | null;
+  threadMessageCount?: number | null;
+  extractionBasis?: 'latest' | 'thread' | null;
 }
 
 export interface InboxAttachment {

@@ -48,17 +48,19 @@ export function StructuredSummaryCard({
   entities,
   people,
 }: StructuredSummaryCardProps) {
-  const [isEntitiesExpanded, setIsEntitiesExpanded] = useState(false);
+  const [isMetadataExpanded, setIsMetadataExpanded] = useState(false);
 
   const hasEntities = entities.length > 0;
   const hasPeople = people.length > 0;
   const hasMetadata = hasEntities || hasPeople;
+  const hasCategories = categories.length > 0;
+  const hasFooter = hasCategories || hasMetadata;
 
   return (
-    <div className="space-y-4">
+    <div className="rounded-lg border border-border/50 bg-card/30 divide-y divide-border/30">
       {/* Overview Section */}
-      <div className="rounded-lg border border-border bg-card/50 p-4">
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-2">
+      <div className="p-3">
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-1.5">
           Overview
         </h3>
         <p className="text-sm text-foreground leading-relaxed">{summary}</p>
@@ -66,15 +68,17 @@ export function StructuredSummaryCard({
 
       {/* Key Points Section */}
       {keyPoints.length > 0 && (
-        <div className="rounded-lg border border-border bg-card/50 p-4">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-3">
+        <div className="p-3">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-2">
             Key Points
           </h3>
-          <ul className="space-y-2">
+          <ul className="space-y-1.5 pl-4">
             {keyPoints.map((point, index) => (
-              <li key={index} className="flex items-start gap-2 text-sm text-foreground">
-                <span className="text-muted-foreground mt-1.5 text-[8px]">●</span>
-                <span className="leading-relaxed">{point}</span>
+              <li 
+                key={index} 
+                className="text-sm text-foreground leading-relaxed list-disc marker:text-muted-foreground/60"
+              >
+                {point}
               </li>
             ))}
           </ul>
@@ -82,111 +86,100 @@ export function StructuredSummaryCard({
       )}
 
       {/* Next Step Section */}
-      <div className="rounded-lg border border-border bg-card/50 p-4">
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-2">
+      <div className="p-3">
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-1.5">
           Next Step
         </h3>
-        <div className="flex items-start gap-2">
+        <div className="flex items-center gap-2">
           {nextStep.isActionRequired ? (
-            <Circle className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+            <Circle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
           ) : (
-            <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 flex-shrink-0" />
           )}
-          <div>
-            <p className="text-sm text-foreground leading-relaxed">{nextStep.label}</p>
-            {nextStep.isActionRequired ? (
-              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                Action required
-              </span>
-            ) : (
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                No action required
-              </span>
-            )}
-          </div>
+          <span className="text-sm text-foreground">{nextStep.label}</span>
         </div>
       </div>
 
-      {/* Categories */}
-      {categories.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {categories.map((category) => (
-            <Badge
-              key={category}
-              variant="secondary"
-              className={cn(
-                "text-[10px] font-medium capitalize border-0",
-                categoryColors[category] || categoryColors.other
-              )}
-            >
-              {category.replace("_", " ")}
-            </Badge>
-          ))}
-        </div>
-      )}
+      {/* Footer: Categories + Metadata */}
+      {hasFooter && (
+        <div className="p-3">
+          <div className="flex items-center flex-wrap gap-2">
+            {/* Category badges */}
+            {categories.map((category) => (
+              <Badge
+                key={category}
+                variant="secondary"
+                className={cn(
+                  "text-[10px] font-medium capitalize border-0 px-2 py-0.5",
+                  categoryColors[category] || categoryColors.other
+                )}
+              >
+                {category.replace("_", " ")}
+              </Badge>
+            ))}
 
-      {/* Entities and People Footer */}
-      {hasMetadata && (
-        <Collapsible open={isEntitiesExpanded} onOpenChange={setIsEntitiesExpanded}>
-          <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full">
-            <ChevronDown
-              className={cn(
-                "h-3.5 w-3.5 transition-transform",
-                isEntitiesExpanded && "rotate-180"
-              )}
-            />
-            <span>
-              {hasEntities && `${entities.length} ${entities.length === 1 ? "entity" : "entities"}`}
-              {hasEntities && hasPeople && " / "}
-              {hasPeople && `${people.length} ${people.length === 1 ? "person" : "people"}`}
-            </span>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-3 space-y-3">
-            {/* Entities */}
-            {hasEntities && (
-              <div>
-                <h4 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-2">
-                  Entities
-                </h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {entities.map((entity, index) => {
-                    const config = entityTypeConfig[entity.type] || entityTypeConfig.other;
-                    const Icon = config.icon;
-                    return (
-                      <span
-                        key={index}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/50 border border-border text-xs"
-                      >
-                        <Icon className={cn("h-3 w-3", config.color)} />
-                        <span className="text-foreground">{entity.name}</span>
-                      </span>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* People */}
-            {hasPeople && (
-              <div>
-                <h4 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-2">
-                  People
-                </h4>
-                <div className="flex flex-wrap gap-1.5">
-                  {people.map((person, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/50 border border-border text-xs"
-                    >
-                      <User className="h-3 w-3 text-rose-600 dark:text-rose-400" />
-                      <span className="text-foreground">{person.name}</span>
+            {/* Entity/People count chips (expandable) */}
+            {hasMetadata && (
+              <Collapsible open={isMetadataExpanded} onOpenChange={setIsMetadataExpanded}>
+                <CollapsibleTrigger className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted/50">
+                  <ChevronDown
+                    className={cn(
+                      "h-3 w-3 transition-transform",
+                      isMetadataExpanded && "rotate-180"
+                    )}
+                  />
+                  {hasEntities && (
+                    <span className="inline-flex items-center gap-0.5">
+                      <Building2 className="h-3 w-3" />
+                      {entities.length}
                     </span>
-                  ))}
-                </div>
-              </div>
+                  )}
+                  {hasPeople && (
+                    <span className="inline-flex items-center gap-0.5">
+                      <User className="h-3 w-3" />
+                      {people.length}
+                    </span>
+                  )}
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2 space-y-2">
+                  {/* Entities */}
+                  {hasEntities && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {entities.map((entity, index) => {
+                        const config = entityTypeConfig[entity.type] || entityTypeConfig.other;
+                        const Icon = config.icon;
+                        return (
+                          <span
+                            key={index}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/50 border border-border/50 text-xs"
+                          >
+                            <Icon className={cn("h-3 w-3", config.color)} />
+                            <span className="text-foreground">{entity.name}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* People */}
+                  {hasPeople && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {people.map((person, index) => (
+                        <span
+                          key={index}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/50 border border-border/50 text-xs"
+                        >
+                          <User className="h-3 w-3 text-rose-600 dark:text-rose-400" />
+                          <span className="text-foreground">{person.name}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </CollapsibleContent>
+              </Collapsible>
             )}
-          </CollapsibleContent>
-        </Collapsible>
+          </div>
+        </div>
       )}
     </div>
   );

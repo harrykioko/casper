@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
 import { createClient as createSupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractBrief } from "../_shared/email-cleaner.ts";
+import { parseEmailThread } from "../_shared/thread-parser.ts";
 import { cleanEmailForExtraction, extractStructuredSummary } from "../_shared/email-extraction.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -94,9 +95,15 @@ serve(async (req) => {
       senderName
     );
 
+    // ============ Thread Parsing (v2) ============
+    // Parse cleaned text for thread context
+    const threadResult = parseEmailThread(cleanedResult.cleanedText);
+
     console.log("Email cleaning complete", {
       originalLength: textBody.length,
       cleanedLength: cleanedResult.cleanedText.length,
+      threadMessageCount: threadResult.messageCount,
+      hasThreadContext: !!threadResult.threadCleanText,
       signals: cleanedResult.signals,
       displaySubject: cleanedResult.displaySubject,
       displayFromEmail: cleanedResult.displayFromEmail,
@@ -119,6 +126,10 @@ serve(async (req) => {
       display_from_email: cleanedResult.displayFromEmail,
       display_from_name: cleanedResult.displayFromName,
       
+      // Thread context (v2)
+      thread_clean_text: threadResult.threadCleanText,
+      thread_message_count: threadResult.messageCount > 1 ? threadResult.messageCount : null,
+      
       // Summary
       summary: cleanedResult.summary,
       summary_source: 'heuristic',
@@ -130,7 +141,7 @@ serve(async (req) => {
       // Signals
       is_forwarded: cleanedResult.signals.isForwarded,
       forwarded_by_email: cleanedResult.signals.isForwarded ? senderEmail : null,
-      has_thread: cleanedResult.signals.hasThread,
+      has_thread: cleanedResult.signals.hasThread || threadResult.messageCount > 1,
       has_disclaimer: cleanedResult.signals.hasDisclaimer,
       has_calendar: cleanedResult.signals.hasCalendar,
       
@@ -194,7 +205,10 @@ serve(async (req) => {
     let extractionSuccess = false;
     if (OPENAI_API_KEY && cleanedResult.cleanedText) {
       try {
-        console.log("Starting automatic extraction for inbox item:", inboxItemId);
+        console.log("Starting automatic extraction for inbox item:", inboxItemId, {
+          hasThreadContext: !!threadResult.threadCleanText,
+          threadMessageCount: threadResult.messageCount,
+        });
         
         const emailContext = {
           subject: cleanedResult.displaySubject || smtpSubject,
@@ -203,11 +217,14 @@ serve(async (req) => {
           toEmail: toEmail,
           receivedAt: new Date().toISOString(),
           cleanedText: cleanEmailForExtraction(cleanedResult.cleanedText),
+          // v2: Include thread context if available
+          threadCleanText: threadResult.threadCleanText ? cleanEmailForExtraction(threadResult.threadCleanText) : null,
+          threadMessageCount: threadResult.messageCount,
         };
 
         const extraction = await extractStructuredSummary(OPENAI_API_KEY, emailContext);
 
-        // Persist extraction to inbox_items
+        // Persist extraction to inbox_items (v2 with extraction_basis)
         const { error: extractError } = await supabaseClient
           .from("inbox_items")
           .update({
@@ -217,7 +234,8 @@ serve(async (req) => {
             extracted_entities: extraction.entities,
             extracted_people: extraction.people,
             extracted_categories: extraction.categories,
-            extraction_version: "v1",
+            extraction_version: "v2",
+            extraction_basis: extraction.extraction_basis || 'latest',
             extracted_at: new Date().toISOString(),
           })
           .eq("id", inboxItemId);
@@ -226,7 +244,9 @@ serve(async (req) => {
           console.error("Failed to persist extraction:", extractError);
         } else {
           extractionSuccess = true;
-          console.log("Automatic extraction completed for inbox item:", inboxItemId);
+          console.log("Automatic extraction completed for inbox item:", inboxItemId, {
+            extractionBasis: extraction.extraction_basis,
+          });
         }
       } catch (extractErr) {
         console.error("Automatic extraction failed:", extractErr);

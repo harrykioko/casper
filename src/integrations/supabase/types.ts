@@ -665,6 +665,7 @@ export type Database = {
           extracted_next_step: Json | null
           extracted_people: Json | null
           extracted_summary: string | null
+          extraction_basis: string | null
           extraction_version: string | null
           forwarded_by_email: string | null
           from_email: string
@@ -691,6 +692,8 @@ export type Database = {
           summary_source: string | null
           summary_updated_at: string | null
           text_body: string | null
+          thread_clean_text: string | null
+          thread_message_count: number | null
           to_email: string | null
           updated_at: string
         }
@@ -709,6 +712,7 @@ export type Database = {
           extracted_next_step?: Json | null
           extracted_people?: Json | null
           extracted_summary?: string | null
+          extraction_basis?: string | null
           extraction_version?: string | null
           forwarded_by_email?: string | null
           from_email: string
@@ -735,6 +739,8 @@ export type Database = {
           summary_source?: string | null
           summary_updated_at?: string | null
           text_body?: string | null
+          thread_clean_text?: string | null
+          thread_message_count?: number | null
           to_email?: string | null
           updated_at?: string
         }
@@ -753,6 +759,7 @@ export type Database = {
           extracted_next_step?: Json | null
           extracted_people?: Json | null
           extracted_summary?: string | null
+          extraction_basis?: string | null
           extraction_version?: string | null
           forwarded_by_email?: string | null
           from_email?: string
@@ -779,6 +786,8 @@ export type Database = {
           summary_source?: string | null
           summary_updated_at?: string | null
           text_body?: string | null
+          thread_clean_text?: string | null
+          thread_message_count?: number | null
           to_email?: string | null
           updated_at?: string
         }
