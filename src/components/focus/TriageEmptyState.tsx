@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
 
-export function FocusEmptyState() {
+export function TriageEmptyState() {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -15,7 +15,7 @@ export function FocusEmptyState() {
         All clear
       </h3>
       <p className="text-sm text-muted-foreground max-w-sm">
-        Everything is accounted for. New items will appear here as they arrive.
+        All items have been triaged. New items will appear here as they arrive.
       </p>
     </motion.div>
   );

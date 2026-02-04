@@ -1,37 +1,32 @@
 import { InboxContentPane } from "./InboxContentPane";
-import { InboxActionRail } from "./InboxActionRail";
+import { InlineActionPanel } from "./InlineActionPanel";
 import type { InboxItem } from "@/types/inbox";
-import type { StructuredSuggestion } from "@/types/inboxSuggestions";
 import type { InboxAttachment } from "@/hooks/useInboxAttachments";
 
 interface InboxDetailWorkspaceProps {
   item: InboxItem;
   onClose: () => void;
-  onCreateTask: (item: InboxItem, suggestionTitle?: string) => void;
   onMarkComplete: (id: string) => void;
   onArchive: (id: string) => void;
   onSnooze?: (id: string, until: Date) => void;
-  onAddNote?: (item: InboxItem) => void;
-  onLinkCompany?: (item: InboxItem) => void;
-  onSaveAttachments?: (item: InboxItem) => void;
-  onApproveSuggestion?: (item: InboxItem, suggestion: StructuredSuggestion) => void;
   onSaveAttachmentToCompany?: (attachment: InboxAttachment) => void;
   onUnlinkCompany?: (id: string) => void;
   attachmentCount?: number;
   hideCloseButton?: boolean;
+  // Legacy props - no longer used but kept for compatibility
+  onCreateTask?: (item: InboxItem, suggestionTitle?: string) => void;
+  onAddNote?: (item: InboxItem) => void;
+  onLinkCompany?: (item: InboxItem) => void;
+  onSaveAttachments?: (item: InboxItem) => void;
+  onApproveSuggestion?: (item: InboxItem, suggestion: any) => void;
 }
 
 export function InboxDetailWorkspace({
   item,
   onClose,
-  onCreateTask,
   onMarkComplete,
   onArchive,
   onSnooze,
-  onAddNote,
-  onLinkCompany,
-  onSaveAttachments,
-  onApproveSuggestion,
   onSaveAttachmentToCompany,
   onUnlinkCompany,
   attachmentCount = 0,
@@ -50,18 +45,13 @@ export function InboxDetailWorkspace({
         />
       </div>
       
-      {/* Right: Action Rail (sticky within its container) */}
-      <div className="w-[240px] xl:w-[280px] flex-shrink-0 border-l border-border overflow-y-auto">
-        <InboxActionRail
+      {/* Right: Inline Action Panel (wider, supports forms) */}
+      <div className="w-[320px] xl:w-[380px] flex-shrink-0 border-l border-border overflow-hidden">
+        <InlineActionPanel
           item={item}
-          onCreateTask={onCreateTask}
           onMarkComplete={onMarkComplete}
           onArchive={onArchive}
           onSnooze={onSnooze}
-          onAddNote={onAddNote}
-          onLinkCompany={onLinkCompany}
-          onSaveAttachments={onSaveAttachments}
-          onApproveSuggestion={onApproveSuggestion}
           attachmentCount={attachmentCount}
         />
       </div>

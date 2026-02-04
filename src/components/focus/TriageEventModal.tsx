@@ -19,7 +19,7 @@ import { useCalendarEventLinking } from "@/hooks/useCalendarEventLinking";
 import { useCalendarFollowups } from "@/hooks/useCalendarFollowups";
 import type { CompanySearchResult } from "@/types/calendarLinking";
 import { supabase } from "@/integrations/supabase/client";
-import { FocusTriageBar } from "./FocusTriageBar";
+import { TriageActionsBar } from "./TriageActionsBar";
 
 interface CalendarEvent {
   id: string;
@@ -56,10 +56,10 @@ const QUICK_CHIPS = [
 ];
 
 /**
- * Self-contained Focus event modal with integrated triage bar.
+ * Self-contained Triage event modal with integrated triage bar.
  * Mirrors EventDetailsModal content but adds the triage bar inside the Dialog.
  */
-export function FocusEventModal({
+export function TriageEventModal({
   event,
   isOpen,
   onClose,
@@ -231,7 +231,7 @@ export function FocusEventModal({
               className="relative rounded-2xl bg-muted/30 backdrop-blur-xl border border-muted/40 shadow-lg overflow-hidden"
             >
               {/* Triage bar at the top of the modal */}
-              <FocusTriageBar
+              <TriageActionsBar
                 onMarkTrusted={() => { onMarkTrusted(); onClose(); }}
                 onSnooze={(until) => { onSnooze(until); onClose(); }}
                 onNoAction={() => { onNoAction(); onClose(); }}

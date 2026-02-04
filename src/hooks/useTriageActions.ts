@@ -4,49 +4,57 @@ import { useWorkItemActions } from "./useWorkItemActions";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Wraps useWorkItemActions with a unified API for Focus triage.
- * Invalidates both work_queue and focus_queue query keys.
+ * Wraps useWorkItemActions with a unified API for Triage.
+ * Invalidates work_queue and triage_queue query keys.
+ * 
+ * TRIAGE INVARIANT: An item may only be cleared from Triage if at least one of:
+ * 1. Classified: The item has a primary_link (linked to a company, project, etc.)
+ * 2. Dismissed: User clicked "No Action" (explicitly marking as no action required)
+ * 3. Trusted: User clicked "Trusted" (confirming it is correct as-is)
  */
-export function useFocusTriageActions() {
+export function useTriageActions() {
   const queryClient = useQueryClient();
   const actions = useWorkItemActions();
 
-  const invalidateFocus = useCallback(() => {
+  const invalidateTriage = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["work_queue"] });
-    queryClient.invalidateQueries({ queryKey: ["focus_queue"] });
+    queryClient.invalidateQueries({ queryKey: ["triage_queue"] });
     queryClient.invalidateQueries({ queryKey: ["commitments"] });
   }, [queryClient]);
 
+  /** Mark item as trusted (judgment applied) - clears from triage */
   const markTrusted = useCallback(
     (workItemId: string) => {
       actions.markTrusted(workItemId);
-      setTimeout(invalidateFocus, 100);
+      setTimeout(invalidateTriage, 100);
     },
-    [actions, invalidateFocus]
+    [actions, invalidateTriage]
   );
 
+  /** Snooze item (defer judgment, review later) */
   const snooze = useCallback(
     (workItemId: string, until: Date) => {
       actions.snooze(workItemId, until);
-      setTimeout(invalidateFocus, 100);
+      setTimeout(invalidateTriage, 100);
     },
-    [actions, invalidateFocus]
+    [actions, invalidateTriage]
   );
 
+  /** Dismiss item (no action needed) - clears from triage */
   const noAction = useCallback(
     (workItemId: string) => {
       actions.noAction(workItemId);
-      setTimeout(invalidateFocus, 100);
+      setTimeout(invalidateTriage, 100);
     },
-    [actions, invalidateFocus]
+    [actions, invalidateTriage]
   );
 
   const linkEntity = useCallback(
     (params: Parameters<typeof actions.linkEntity>[0]) => {
       actions.linkEntity(params);
-      setTimeout(invalidateFocus, 100);
+      setTimeout(invalidateTriage, 100);
     },
-    [actions, invalidateFocus]
+    [actions, invalidateTriage]
   );
 
   const resolve = useCallback(
@@ -65,9 +73,9 @@ export function useFocusTriageActions() {
         .update({ status: "completed", completed_at: now, resolved_at: now })
         .eq("id", commitmentId);
       actions.markTrusted(workItemId);
-      setTimeout(invalidateFocus, 100);
+      setTimeout(invalidateTriage, 100);
     },
-    [actions, invalidateFocus]
+    [actions, invalidateTriage]
   );
 
   const delegateCommitment = useCallback(
@@ -84,9 +92,9 @@ export function useFocusTriageActions() {
         })
         .eq("id", commitmentId);
       actions.markTrusted(workItemId);
-      setTimeout(invalidateFocus, 100);
+      setTimeout(invalidateTriage, 100);
     },
-    [actions, invalidateFocus]
+    [actions, invalidateTriage]
   );
 
   const markWaitingOn = useCallback(
@@ -95,9 +103,9 @@ export function useFocusTriageActions() {
         .from("commitments")
         .update({ status: "waiting_on" })
         .eq("id", commitmentId);
-      setTimeout(invalidateFocus, 100);
+      setTimeout(invalidateTriage, 100);
     },
-    [invalidateFocus]
+    [invalidateTriage]
   );
 
   const breakCommitment = useCallback(
@@ -108,9 +116,9 @@ export function useFocusTriageActions() {
         .update({ status: "broken", resolved_at: now })
         .eq("id", commitmentId);
       actions.markTrusted(workItemId);
-      setTimeout(invalidateFocus, 100);
+      setTimeout(invalidateTriage, 100);
     },
-    [actions, invalidateFocus]
+    [actions, invalidateTriage]
   );
 
   const cancelCommitment = useCallback(
@@ -121,9 +129,9 @@ export function useFocusTriageActions() {
         .update({ status: "cancelled", resolved_at: now })
         .eq("id", commitmentId);
       actions.markTrusted(workItemId);
-      setTimeout(invalidateFocus, 100);
+      setTimeout(invalidateTriage, 100);
     },
-    [actions, invalidateFocus]
+    [actions, invalidateTriage]
   );
 
   return {

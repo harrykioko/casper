@@ -7,9 +7,9 @@ import { useGlobalInboxDrawer } from "@/contexts/GlobalInboxDrawerContext";
 import { InboxDetailWorkspace } from "./InboxDetailWorkspace";
 
 const STORAGE_KEY = "casper:inbox-drawer:width";
-const DEFAULT_WIDTH = 720;
-const MIN_WIDTH = 600;
-const MAX_WIDTH = 1200;
+const DEFAULT_WIDTH = 900;
+const MIN_WIDTH = 800;
+const MAX_WIDTH = 1400;
 
 export function GlobalInboxDrawerOverlay() {
   const { isOpen, item, handlers, closeDrawer } = useGlobalInboxDrawer();
@@ -80,7 +80,7 @@ export function GlobalInboxDrawerOverlay() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[9997] bg-black/20 dark:bg-black/40"
+            className="fixed inset-0 z-[48] bg-black/20 dark:bg-black/40"
             onClick={closeDrawer}
           />
 
@@ -91,7 +91,7 @@ export function GlobalInboxDrawerOverlay() {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed inset-y-0 right-0 z-[9998] flex"
+            className="fixed inset-y-0 right-0 z-[49] flex"
             style={{ width }}
           >
             {/* Resize Handle */}
