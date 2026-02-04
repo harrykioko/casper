@@ -16,7 +16,7 @@ interface TriageTaskDrawerProps {
   open: boolean;
   onClose: () => void;
   task: Task | null;
-  onUpdateTask: (id: string, updates: Partial<Task>) => void;
+  onUpdateTask: (task: any) => void;  // Expects full task object for useTasksManager.handleUpdateTask
   onDeleteTask: (id: string) => void;
   onArchiveTask?: (id: string) => void;
   onUnarchiveTask?: (id: string) => void;
@@ -65,7 +65,8 @@ export function TriageTaskDrawer({
     if (!task) return;
     const updatedTask = createUpdatedTask();
     if (!updatedTask) return;
-    onUpdateTask(task.id, updatedTask);
+    // Pass the full task object with id - useTasksManager.handleUpdateTask expects this format
+    onUpdateTask(updatedTask);
     onClose();
     toast({ title: "Task updated", description: "Your task has been successfully updated." });
   };

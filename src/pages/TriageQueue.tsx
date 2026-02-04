@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Crosshair, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { useIsDesktop } from "@/hooks/use-mobile";
 import { useTriageQueue, type TriageQueueItem } from "@/hooks/useTriageQueue";
 import { useTriageActions } from "@/hooks/useTriageActions";
 import { useTriageReadingActions } from "@/hooks/useTriageReadingActions";
-import { useTasks } from "@/hooks/useTasks";
+import { useTasksManager } from "@/hooks/useTasksManager";
 import { useInboxItems } from "@/hooks/useInboxItems";
 import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
 import { TriageSummaryPanel } from "@/components/focus/TriageSummaryPanel";
@@ -45,7 +45,7 @@ export default function TriageQueue() {
   const readingActions = useTriageReadingActions();
 
   // Source data hooks (for fetching full records when opening drawers)
-  const { tasks, updateTask, deleteTask, archiveTask, unarchiveTask } = useTasks();
+  const { tasks, handleUpdateTask, handleDeleteTask, handleArchiveTask, handleUnarchiveTask } = useTasksManager();
   const { inboxItems, markComplete, archive: archiveInbox } = useInboxItems();
   const { events } = useOutlookCalendar();
   const { commitments } = useCommitments({ status: ['open', 'waiting_on', 'delegated'] });
@@ -392,10 +392,10 @@ export default function TriageQueue() {
         open={!!taskDrawerItem}
         onClose={closeAllDrawers}
         task={taskDrawerItem}
-        onUpdateTask={updateTask}
-        onDeleteTask={deleteTask}
-        onArchiveTask={archiveTask}
-        onUnarchiveTask={unarchiveTask}
+        onUpdateTask={handleUpdateTask}
+        onDeleteTask={handleDeleteTask}
+        onArchiveTask={handleArchiveTask}
+        onUnarchiveTask={handleUnarchiveTask}
         onMarkTrusted={handleTrusted}
         onSnooze={handleSnooze}
         onNoAction={handleNoAction}
