@@ -1,170 +1,197 @@
 
-# Add Quick Actions for Calendar Events in Triage
 
-## Overview
+# Optimistic Updates for Triage Quick Actions
 
-This plan adds hover-revealed quick actions to calendar event items in the Triage queue, matching the existing patterns for emails, reading items, and commitments. This allows users to quickly clear most calendar items without opening the modal.
+## Problem
+
+Quick actions in the Triage queue feel sluggish because the UI waits for the database operation to complete before updating the list. When processing multiple items, this delay makes it hard to move quickly through the queue.
+
+**Current Flow:**
+```text
+User clicks action → API call → Wait... → Invalidate queries → Refetch → UI updates
+                              ~300-500ms delay
+```
+
+**Desired Flow:**
+```text
+User clicks action → UI updates instantly → API call runs in background
+                     0ms perceived delay
+```
 
 ---
 
-## Current State
+## Solution Overview
 
-Calendar events currently show no quick actions on hover:
+Implement optimistic updates at the `useTriageQueue` hook level by:
 
-```text
-[Calendar Icon] Meeting Title              about 1 hour ago
-               [Unlinked] [~15m]
-```
-
-While other source types (emails, reading, commitments) already have hover actions:
-
-- **Email**: Mark Trusted, Snooze dropdown, No Action
-- **Reading**: Open Link, Queue, Up Next, Archive, Snooze
-- **Commitment**: Mark Complete, Snooze
-
----
-
-## Proposed Solution
-
-Add three quick actions for calendar events on hover:
-
-1. **Trusted** (checkmark) - Mark as trusted and clear from triage
-2. **Snooze** (clock with dropdown) - Defer to later
-3. **No Action** (x-circle) - Dismiss from triage
-
-```text
-[Calendar Icon] Meeting Title          [✓] [🕐▾] [✕]  about 1 hour ago
-               [Unlinked] [~15m]
-```
+1. Exposing an `optimisticRemove` function that immediately removes an item from the cache
+2. Using React Query's `setQueryData` to update the cache before the mutation completes
+3. Handling rollback if the mutation fails (though this is rare)
 
 ---
 
 ## Implementation Details
 
-### 1. Add Calendar Event Handler Props to TriageItemRow
+### 1. Add Optimistic Update Function to useTriageQueue
 
-**File: `src/components/focus/TriageItemRow.tsx`**
+**File: `src/hooks/useTriageQueue.ts`**
 
-Add new props for calendar quick actions:
+Add a new function that can instantly remove items from the cached queue:
 
 ```typescript
-interface TriageItemRowProps {
-  // ... existing props
-  // Calendar event quick action handlers
-  onCalendarTrusted?: (workItemId: string) => void;
-  onCalendarNoAction?: (workItemId: string) => void;
-  // onSnooze already exists and is shared
+const optimisticRemove = useCallback(
+  (workItemId: string) => {
+    queryClient.setQueryData(queryKey, (oldData: any) => {
+      if (!oldData) return oldData;
+      const newItems = oldData.items.filter((item: TriageQueueItem) => item.id !== workItemId);
+      return {
+        ...oldData,
+        items: newItems,
+        counts: computeCounts(newItems),
+      };
+    });
+  },
+  [queryClient, queryKey]
+);
+```
+
+Return this function from the hook:
+
+```typescript
+return {
+  items: filteredItems,
+  allItems: data?.items || [],
+  counts: data?.counts || emptyCounts(),
+  isLoading,
+  isAllClear,
+  filters,
+  toggleSourceType,
+  toggleReasonCode,
+  setEffortFilter,
+  clearFilters,
+  refetch,
+  optimisticRemove, // NEW
+};
+```
+
+### 2. Update useTriageActions to Accept Optimistic Callback
+
+**File: `src/hooks/useTriageActions.ts`**
+
+Modify the hook to accept an optional `onOptimisticRemove` callback that gets called immediately:
+
+```typescript
+export function useTriageActions(onOptimisticRemove?: (workItemId: string) => void) {
+  // ... existing code
+
+  const markTrusted = useCallback(
+    (workItemId: string) => {
+      onOptimisticRemove?.(workItemId); // Instant UI update
+      actions.markTrusted(workItemId);
+      setTimeout(invalidateTriage, 100);
+    },
+    [actions, invalidateTriage, onOptimisticRemove]
+  );
+
+  const snooze = useCallback(
+    (workItemId: string, until: Date) => {
+      onOptimisticRemove?.(workItemId); // Instant UI update
+      actions.snooze(workItemId, until);
+      setTimeout(invalidateTriage, 100);
+    },
+    [actions, invalidateTriage, onOptimisticRemove]
+  );
+
+  const noAction = useCallback(
+    (workItemId: string) => {
+      onOptimisticRemove?.(workItemId); // Instant UI update
+      actions.noAction(workItemId);
+      setTimeout(invalidateTriage, 100);
+    },
+    [actions, invalidateTriage, onOptimisticRemove]
+  );
+
+  // Similarly for commitment actions...
 }
 ```
 
-### 2. Add Calendar Quick Actions Block
+### 3. Update useTriageReadingActions for Optimistic Updates
 
-In the same file, add a new conditional block after the commitment actions:
+**File: `src/hooks/useTriageReadingActions.ts`**
 
-```tsx
-{/* Calendar Event Quick Actions - visible on hover */}
-{isCalendarEvent && (
-  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-6 w-6 rounded-full"
-      onClick={handleCalendarTrusted}
-      title="Mark trusted"
-    >
-      <Check className="h-3.5 w-3.5 text-muted-foreground" />
-    </Button>
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 rounded-full"
-          title="Snooze"
-        >
-          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-        <DropdownMenuItem onClick={(e) => handleSnooze(addHours(new Date(), 3), e)}>
-          3 hours
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={(e) => handleSnooze(startOfTomorrow(), e)}>
-          Tomorrow
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={(e) => handleSnooze(nextMonday(new Date()), e)}>
-          Next week
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={(e) => handleSnooze(addDays(new Date(), 30), e)}>
-          30 days
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-6 w-6 rounded-full"
-      onClick={handleCalendarNoAction}
-      title="No action (dismiss)"
-    >
-      <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
-    </Button>
-  </div>
-)}
-```
-
-Add handler functions:
+Same pattern - accept optional callback:
 
 ```typescript
-const isCalendarEvent = item.source_type === "calendar_event";
+export function useTriageReadingActions(onOptimisticRemove?: (workItemId: string) => void) {
+  // ...
 
-const handleCalendarTrusted = (e: React.MouseEvent) => {
-  e.stopPropagation();
-  onCalendarTrusted?.(item.id);
-};
+  const keepAsQueued = async (readingItemId: string, workItemId: string) => {
+    onOptimisticRemove?.(workItemId); // Instant UI update
+    
+    await supabase
+      .from("reading_items")
+      .update({
+        processing_status: "queued",
+        processed_at: new Date().toISOString(),
+      })
+      .eq("id", readingItemId);
 
-const handleCalendarNoAction = (e: React.MouseEvent) => {
-  e.stopPropagation();
-  onCalendarNoAction?.(item.id);
-};
+    await resolveWorkItem(workItemId);
+    invalidate();
+    toast.success("Added to queue");
+  };
+
+  // Same for markUpNext, archiveFromFocus...
+}
 ```
 
-### 3. Wire Handlers in TriageQueue Page
+### 4. Wire Up in TriageQueue Page
 
 **File: `src/pages/TriageQueue.tsx`**
 
-Add callback handlers for calendar events:
+Pass the optimistic remove function to the action hooks:
 
 ```typescript
-// Calendar quick action handlers
-const handleCalendarTrusted = useCallback(
-  (workItemId: string) => {
-    triageActions.markTrusted(workItemId);
-    advanceToNext();
-  },
-  [triageActions, advanceToNext]
-);
+const {
+  items,
+  counts,
+  isLoading,
+  isAllClear,
+  filters,
+  toggleSourceType,
+  toggleReasonCode,
+  setEffortFilter,
+  clearFilters,
+  optimisticRemove, // NEW
+} = useTriageQueue();
 
-const handleCalendarNoAction = useCallback(
-  (workItemId: string) => {
-    triageActions.noAction(workItemId);
-    advanceToNext();
-  },
-  [triageActions, advanceToNext]
-);
+const triageActions = useTriageActions(optimisticRemove); // Pass callback
+const readingActions = useTriageReadingActions(optimisticRemove); // Pass callback
 ```
 
-Pass props to TriageItemRow:
+### 5. Simplify advanceToNext Logic
 
-```tsx
-<TriageItemRow
-  key={item.id}
-  item={item}
-  // ... existing props
-  onCalendarTrusted={handleCalendarTrusted}
-  onCalendarNoAction={handleCalendarNoAction}
-  onSnooze={(id, until) => triageActions.snooze(id, until)}
-/>
+Since items are removed optimistically, the `advanceToNext` function no longer needs to find the next item - the current selected item will naturally become the next one. However, we should update selection state:
+
+```typescript
+const advanceToNext = useCallback(() => {
+  if (!selectedItem) return;
+  // Clear selection - the next item will be at the same position
+  // after optimistic removal
+  setSelectedItem(null);
+}, [selectedItem]);
+```
+
+Or keep the current behavior but make it work with the updated items list:
+
+```typescript
+// The items list will be updated optimistically, so we can rely on it
+const advanceToNext = useCallback(() => {
+  if (!selectedItem) return;
+  // After optimistic removal, the item is already gone from the list
+  // Just clear the selection since drawers will close anyway
+  setSelectedItem(null);
+}, [selectedItem]);
 ```
 
 ---
@@ -173,36 +200,45 @@ Pass props to TriageItemRow:
 
 | File | Action | Description |
 |------|--------|-------------|
-| `src/components/focus/TriageItemRow.tsx` | Modify | Add calendar event quick actions and handlers |
-| `src/pages/TriageQueue.tsx` | Modify | Add calendar action callbacks and pass to TriageItemRow |
+| `src/hooks/useTriageQueue.ts` | Modify | Add `optimisticRemove` function using `queryClient.setQueryData` |
+| `src/hooks/useTriageActions.ts` | Modify | Accept `onOptimisticRemove` callback, call it before mutations |
+| `src/hooks/useTriageReadingActions.ts` | Modify | Accept `onOptimisticRemove` callback, call it before mutations |
+| `src/pages/TriageQueue.tsx` | Modify | Wire optimisticRemove to action hooks |
 
 ---
 
-## Visual Result
+## User Experience Improvement
 
-**Before (calendar events):**
-```text
-[📅] Meeting Title                                    1 hour ago
-     [Unlinked] [~15m]
-```
+**Before (current):**
+1. Click "Mark Trusted" on item
+2. Wait 300-500ms
+3. Item disappears
+4. Click next item
+5. Repeat...
 
-**After (on hover):**
-```text
-[📅] Meeting Title              [✓] [🕐▾] [✕]        1 hour ago
-     [Unlinked] [~15m]
-```
+**After (optimistic):**
+1. Click "Mark Trusted" on item
+2. Item disappears instantly
+3. Already moving to next item
+4. Super fast triage flow!
 
-Where:
-- `[✓]` = Mark Trusted (emerald hover)
-- `[🕐▾]` = Snooze dropdown (same as other types)
-- `[✕]` = No Action / Dismiss (muted)
+---
+
+## Error Handling
+
+In the rare case a mutation fails:
+- The `setTimeout(invalidateTriage, 100)` will refetch the queue
+- This will restore any items that failed to update
+- User sees a toast error explaining what went wrong
+- No data loss - items just reappear in the queue
 
 ---
 
 ## Technical Notes
 
-- Reuses existing `onSnooze` prop which is already passed to TriageItemRow
-- Follows exact same pattern as email quick actions (Trusted + Snooze + No Action)
-- Uses `e.stopPropagation()` to prevent row click from opening modal
-- Uses existing `triageActions.markTrusted()` and `triageActions.noAction()` from the hook
-- No new database changes or backend modifications needed
+- Uses React Query's `setQueryData` for instant cache updates
+- Maintains the same mutation logic - just adds optimistic UI layer
+- Counts are recalculated when items are removed to keep summary panel in sync
+- Works with all quick action types: email, calendar, reading, commitment, task
+- No changes to database schema or edge functions required
+
