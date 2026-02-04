@@ -57,7 +57,7 @@ export function StructuredSummaryCard({
   const hasFooter = hasCategories || hasMetadata;
 
   return (
-    <div className="rounded-lg border border-border/50 bg-card/30 divide-y divide-border/30">
+    <div className="rounded-lg border border-border/50 bg-white/70 dark:bg-card/50 divide-y divide-border/30">
       {/* Overview Section */}
       <div className="p-3">
         <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-1.5">
@@ -74,10 +74,10 @@ export function StructuredSummaryCard({
           </h3>
           <ul className="space-y-1.5 pl-4">
             {keyPoints.map((point, index) => (
-              <li 
-                key={index} 
-                className="text-sm text-foreground leading-relaxed list-disc marker:text-muted-foreground/60"
-              >
+            <li 
+              key={index} 
+              className="text-sm text-foreground/90 font-normal leading-relaxed list-disc marker:text-muted-foreground/60"
+            >
                 {point}
               </li>
             ))}
