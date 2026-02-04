@@ -3,7 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { ProcessingStatus, ContentType, ReadingPriority, ReadLaterBucket } from "@/types/readingItem";
 
-export function useTriageReadingActions() {
+/**
+ * @param onOptimisticRemove - Optional callback for optimistic UI updates (instant removal from list)
+ */
+export function useTriageReadingActions(onOptimisticRemove?: (workItemId: string) => void) {
   const queryClient = useQueryClient();
 
   const invalidate = () => {
@@ -24,6 +27,7 @@ export function useTriageReadingActions() {
   };
 
   const keepAsQueued = async (readingItemId: string, workItemId: string) => {
+    onOptimisticRemove?.(workItemId); // Instant UI update
     await supabase
       .from("reading_items")
       .update({
@@ -38,6 +42,7 @@ export function useTriageReadingActions() {
   };
 
   const markUpNext = async (readingItemId: string, workItemId: string, bucket?: ReadLaterBucket) => {
+    onOptimisticRemove?.(workItemId); // Instant UI update
     await supabase
       .from("reading_items")
       .update({
@@ -53,6 +58,7 @@ export function useTriageReadingActions() {
   };
 
   const markSignal = async (readingItemId: string, workItemId: string) => {
+    onOptimisticRemove?.(workItemId); // Instant UI update
     await supabase
       .from("reading_items")
       .update({
@@ -67,6 +73,7 @@ export function useTriageReadingActions() {
   };
 
   const archiveFromFocus = async (readingItemId: string, workItemId: string) => {
+    onOptimisticRemove?.(workItemId); // Instant UI update
     const now = new Date().toISOString();
     await supabase
       .from("reading_items")

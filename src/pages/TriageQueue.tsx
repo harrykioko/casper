@@ -39,10 +39,11 @@ export default function TriageQueue() {
     toggleReasonCode,
     setEffortFilter,
     clearFilters,
+    optimisticRemove,
   } = useTriageQueue();
 
-  const triageActions = useTriageActions();
-  const readingActions = useTriageReadingActions();
+  const triageActions = useTriageActions(optimisticRemove);
+  const readingActions = useTriageReadingActions(optimisticRemove);
 
   // Source data hooks (for fetching full records when opening drawers)
   const { tasks, handleUpdateTask, handleDeleteTask, handleArchiveTask, handleUnarchiveTask } = useTasksManager();
@@ -59,13 +60,12 @@ export default function TriageQueue() {
   const [genericSheetItem, setGenericSheetItem] = useState<TriageQueueItem | null>(null);
   const [readingSheetItem, setReadingSheetItem] = useState<TriageQueueItem | null>(null);
 
-  // Auto-advance to next item after triage
+  // Auto-advance to next item after triage (simplified for optimistic updates)
   const advanceToNext = useCallback(() => {
-    if (!selectedItem) return;
-    const currentIndex = items.findIndex(i => i.id === selectedItem.id);
-    const nextItem = items[currentIndex + 1] || items[currentIndex - 1] || null;
-    setSelectedItem(nextItem);
-  }, [selectedItem, items]);
+    // With optimistic updates, the item is already removed from the list
+    // Just clear selection since drawers will close anyway
+    setSelectedItem(null);
+  }, []);
 
   // Open the appropriate drawer for a selected item
   const handleItemClick = useCallback(
@@ -238,11 +238,11 @@ export default function TriageQueue() {
   }, [selectedItem, commitmentDrawerItem, triageActions, closeAllDrawers, advanceToNext]);
 
   const handleCommitmentWaitingOn = useCallback(() => {
-    if (!commitmentDrawerItem) return;
-    triageActions.markWaitingOn(commitmentDrawerItem.id);
+    if (!commitmentDrawerItem || !selectedItem) return;
+    triageActions.markWaitingOn(commitmentDrawerItem.id, selectedItem.id);
     closeAllDrawers();
     advanceToNext();
-  }, [commitmentDrawerItem, triageActions, closeAllDrawers, advanceToNext]);
+  }, [commitmentDrawerItem, selectedItem, triageActions, closeAllDrawers, advanceToNext]);
 
   const handleCommitmentFollowUp = useCallback(() => {
     // Navigate to create a follow-up task
