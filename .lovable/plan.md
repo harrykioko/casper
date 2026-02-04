@@ -1,253 +1,332 @@
 
+# Structured Email Extraction and Summary View Implementation
 
-# Fix Task Triage Entry Criteria and Task Update Persistence
+## Overview
 
-## Problem Summary
-
-The user has identified **two distinct issues**:
-
-1. **Wrong Triage Entry Criteria**: Tasks with deadlines (`scheduled_for`) and other enrichment context are appearing in the Triage queue when they shouldn't. The current logic only checks if a task is "unlinked" (no project/company), but doesn't consider whether the task is already enriched with useful metadata.
-
-2. **Task Updates Not Persisting**: When editing a task in the Triage drawer (adding project, category, deadline, company), clicking "Save Changes" doesn't actually persist these updates to the database. The task remains unchanged in the main Tasks list.
+This plan replaces the noisy raw email display with a Cabana-style structured summary view featuring AI-extracted content: overview, key points, next step indicator, and entity/people metadata. The original email remains accessible via a collapsed section.
 
 ---
 
-## Root Cause Analysis
+## Database Changes
 
-### Issue 1: Triage Entry Criteria Too Broad
+### Add Extraction Columns to `inbox_items`
 
-**Current trigger logic** (in `supabase/migrations/20260130200000_focus_auto_ingest_triggers.sql`):
+**Migration: `supabase/migrations/[timestamp]_add_email_extraction_columns.sql`**
+
 ```sql
-IF NEW.project_id IS NULL AND NEW.company_id IS NULL AND NEW.pipeline_company_id IS NULL THEN
-  -- Create work_item with 'unlinked_company' reason
+ALTER TABLE public.inbox_items
+ADD COLUMN IF NOT EXISTS extracted_summary text,
+ADD COLUMN IF NOT EXISTS extracted_key_points jsonb,
+ADD COLUMN IF NOT EXISTS extracted_next_step jsonb,
+ADD COLUMN IF NOT EXISTS extracted_entities jsonb,
+ADD COLUMN IF NOT EXISTS extracted_people jsonb,
+ADD COLUMN IF NOT EXISTS extracted_categories text[],
+ADD COLUMN IF NOT EXISTS extraction_version text DEFAULT 'v1',
+ADD COLUMN IF NOT EXISTS extracted_at timestamptz;
 ```
 
-**Problem**: This only checks for entity links, ignoring whether the task has:
-- A `scheduled_for` date (deadline)
-- A `priority` set
-- A `category_id` assigned
-
-Tasks with these properties are already "enriched" and shouldn't require triage just because they lack a company/project link.
-
-### Issue 2: Task Update Data Transformation Bug
-
-**The flow**:
-1. `TriageTaskDrawer.tsx` calls `useTaskDetails()` hook which tracks form state
-2. On save, it calls `createUpdatedTask()` which returns a `Task` object with:
-   - `project: { id, name, color }` (object)
-   - `category: "Category Name"` (string name)
-3. `TriageQueue.tsx` passes this to `updateTask(id, updates)` from raw `useTasks` hook
-4. `transformTaskForDatabase()` runs and:
-   - Looks for `projectId` (camelCase) → not found, so `project_id` never set
-   - The `project` object is passed through to Supabase → rejected as invalid column
-   - Deletes `category` string → but never resolves it to `category_id`
-
-**Contrast with Tasks page**: The Tasks page uses `useTasksManager.tsx` which:
-- Correctly extracts `project?.id` to `project_id`
-- Calls `getCategoryIdByName(category)` to resolve to `category_id`
+| Column | Type | Description |
+|--------|------|-------------|
+| `extracted_summary` | text | 1-2 sentence overview |
+| `extracted_key_points` | jsonb | Array of 3-7 bullet strings |
+| `extracted_next_step` | jsonb | `{label, is_action_required}` |
+| `extracted_entities` | jsonb | `[{name, type, confidence}]` |
+| `extracted_people` | jsonb | `[{name, email, confidence}]` |
+| `extracted_categories` | text[] | update, request, intro, scheduling, follow_up, finance, other |
+| `extraction_version` | text | Prompt version (default 'v1') |
+| `extracted_at` | timestamptz | When extraction completed |
 
 ---
 
-## Solution
+## Backend Implementation
 
-### Part 1: Smarter Triage Entry Criteria
+### New Edge Function: `email-extract-structured`
 
-Update the PostgreSQL trigger to skip creating work_items for tasks that are already "enriched" with metadata.
+**File: `supabase/functions/email-extract-structured/index.ts`**
 
-**New criteria**: Only create a work_item if the task:
-1. Has no project link AND no company link AND no pipeline company link, **AND**
-2. Has no `scheduled_for` date (deadline), **AND**
-3. Has no `priority` set
+**Flow:**
+1. Authenticate user via JWT
+2. Fetch inbox item (verify ownership)
+3. Prepare cleaned text with URL collapsing
+4. Call OpenAI gpt-4o-mini with tool calling for strict JSON schema
+5. Validate and normalize response
+6. Persist to inbox_items table
+7. Return extraction for immediate UI update
 
-If a task has a deadline or priority, it's considered "planned" and doesn't need triage.
+**Key Features:**
 
-**File: New migration** `supabase/migrations/[timestamp]_smarter_task_triage_criteria.sql`
+- **URL Collapsing**: Replace long URLs (40+ chars) with `[link: domain]`
+- **Tool Calling**: Use OpenAI function calling for guaranteed JSON structure
+- **Validation**: Ensure 3-7 key points, clamp confidence values 0-1
+- **Retry Logic**: On invalid JSON, retry with stricter instructions
 
-```sql
-CREATE OR REPLACE FUNCTION public.trigger_ingest_task()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  -- Only create work_item for tasks that are:
-  -- 1. Not linked to a project or company
-  -- 2. Not already enriched with deadline or priority
-  IF NEW.project_id IS NULL 
-     AND NEW.company_id IS NULL 
-     AND NEW.pipeline_company_id IS NULL
-     AND NEW.scheduled_for IS NULL
-     AND NEW.priority IS NULL
-  THEN
-    INSERT INTO public.work_items (created_by, source_type, source_id, status, reason_codes, priority)
-    VALUES (
-      NEW.created_by,
-      'task',
-      NEW.id,
-      'needs_review',
-      ARRAY['unlinked_company'],
-      2
-    )
-    ON CONFLICT (source_type, source_id, created_by) DO NOTHING;
-  END IF;
-  RETURN NEW;
-END;
-$$;
-```
-
-Also update the backfill logic in `useBackfillWorkItems.ts` to match:
-
+**OpenAI Tool Schema:**
 ```typescript
-// Only backfill tasks that are unlinked AND unenriched
-if (!task.project_id && !task.company_id && !task.pipeline_company_id 
-    && !task.scheduled_for && !task.priority) {
-  const result = await ensureWorkItem("task", task.id, userId);
-  if (result?.isNew) created++;
+{
+  name: "extract_structured_summary",
+  parameters: {
+    summary: { type: "string" },
+    key_points: { type: "array", items: { type: "string" } },
+    next_step: { 
+      type: "object",
+      properties: {
+        label: { type: "string" },
+        is_action_required: { type: "boolean" }
+      }
+    },
+    categories: { type: "array", items: { enum: ["update","request",...] } },
+    entities: { type: "array", items: { name, type, confidence } },
+    people: { type: "array", items: { name, email?, confidence } }
+  }
 }
 ```
 
-### Part 2: Add Auto-Exit Trigger When Task Becomes Enriched
-
-Create a new trigger that marks work_items as "trusted" when a task gets enriched (project linked, deadline set, etc.).
-
-**File: New migration** (same file as above)
-
-```sql
-CREATE OR REPLACE FUNCTION public.trigger_auto_exit_enriched_task()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-BEGIN
-  -- If task now has a link or enrichment, exit from triage
-  IF (NEW.project_id IS NOT NULL AND OLD.project_id IS NULL)
-     OR (NEW.company_id IS NOT NULL AND OLD.company_id IS NULL)
-     OR (NEW.pipeline_company_id IS NOT NULL AND OLD.pipeline_company_id IS NULL)
-     OR (NEW.scheduled_for IS NOT NULL AND OLD.scheduled_for IS NULL)
-  THEN
-    UPDATE public.work_items
-    SET status = 'trusted',
-        trusted_at = now(),
-        reviewed_at = now(),
-        last_touched_at = now(),
-        updated_at = now(),
-        reason_codes = ARRAY[]::text[]
-    WHERE source_type = 'task'
-      AND source_id = NEW.id
-      AND created_by = NEW.created_by
-      AND status NOT IN ('trusted', 'ignored');
-  END IF;
-  RETURN NEW;
-END;
-$$;
-
-DROP TRIGGER IF EXISTS trg_auto_exit_enriched_task ON public.tasks;
-CREATE TRIGGER trg_auto_exit_enriched_task
-  AFTER UPDATE ON public.tasks
-  FOR EACH ROW
-  EXECUTE FUNCTION public.trigger_auto_exit_enriched_task();
+**Config Update: `supabase/config.toml`**
+```toml
+[functions.email-extract-structured]
+verify_jwt = false
 ```
 
-### Part 3: Fix Task Update Persistence in Triage Drawer
+---
 
-Update `TriageTaskDrawer.tsx` to properly transform the task data before calling `updateTask`.
+## Frontend Implementation
 
-**File: `src/components/focus/TriageTaskDrawer.tsx`**
+### Type Updates
 
-Current flow:
+**File: `src/types/inbox.ts`**
+
+Add to InboxItem interface:
 ```typescript
-const handleSave = () => {
-  const updatedTask = createUpdatedTask();
-  onUpdateTask(task.id, updatedTask); // Passes raw Task object
-};
+// Structured extraction (AI-generated)
+extractedSummary?: string | null;
+extractedKeyPoints?: string[] | null;
+extractedNextStep?: { label: string; isActionRequired: boolean } | null;
+extractedEntities?: Array<{ name: string; type: string; confidence: number }> | null;
+extractedPeople?: Array<{ name: string; email?: string | null; confidence: number }> | null;
+extractedCategories?: string[] | null;
+extractionVersion?: string | null;
+extractedAt?: string | null;
 ```
 
-New flow using proper transformation:
+### Hook Updates
+
+**File: `src/hooks/useInboxItems.ts`**
+
+Update `InboxItemRow` interface:
 ```typescript
-const handleSave = async () => {
-  if (!task) return;
-  
-  // Build the proper database update payload
-  const updates = {
-    content,
-    status,
-    completed: status === "done",
-    priority,
-    scheduled_for: scheduledFor?.toISOString() || null,
-    project_id: selectedProject?.id || null,
-    company_id: companyLink?.type === 'portfolio' ? companyLink.id : null,
-    pipeline_company_id: companyLink?.type === 'pipeline' ? companyLink.id : null,
-  };
-  
-  onUpdateTask(task.id, updates);
-  onClose();
-  toast({ title: "Task updated" });
-};
+// Add after existing fields
+extracted_summary?: string | null;
+extracted_key_points?: unknown[] | null;
+extracted_next_step?: { label: string; is_action_required: boolean } | null;
+extracted_entities?: unknown[] | null;
+extracted_people?: unknown[] | null;
+extracted_categories?: string[] | null;
+extraction_version?: string | null;
+extracted_at?: string | null;
 ```
 
-**Alternative approach**: Modify `TriageQueue.tsx` to use `useTasksManager` instead of raw `useTasks`:
+Update `transformRow()` function to map snake_case to camelCase.
+
+### New Hook: `useEmailExtraction`
+
+**File: `src/hooks/useEmailExtraction.ts`**
 
 ```typescript
-// Before
-const { tasks, updateTask, deleteTask, archiveTask, unarchiveTask } = useTasks();
+export function useEmailExtraction() {
+  const queryClient = useQueryClient();
 
-// After
-const { tasks, handleUpdateTask, handleArchiveTask, handleUnarchiveTask, handleDeleteTask } = useTasksManager();
-```
-
-Then pass `handleUpdateTask` to the drawer, which already handles the transformation correctly.
-
-### Part 4: Handle Category Resolution
-
-The category field needs to be resolved from name to ID. Two options:
-
-**Option A: Add category resolution in the drawer**
-Import `useCategories` and resolve before save:
-
-```typescript
-const { getCategoryIdByName } = useCategories();
-
-const handleSave = () => {
-  const categoryId = category ? getCategoryIdByName(category) : null;
-  
-  onUpdateTask(task.id, {
-    // ... other fields
-    category_id: categoryId,
+  const extractMutation = useMutation({
+    mutationFn: async (inboxItemId: string) => {
+      const { data, error } = await supabase.functions.invoke("email-extract-structured", {
+        body: { inbox_item_id: inboxItemId },
+      });
+      if (error) throw error;
+      return data.extraction;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inbox_items"] });
+      toast.success("Summary generated");
+    },
+    onError: () => {
+      toast.error("Failed to generate summary. Try again.");
+    },
   });
-};
+
+  return {
+    extract: extractMutation.mutate,
+    extractAsync: extractMutation.mutateAsync,
+    isExtracting: extractMutation.isPending,
+    error: extractMutation.error,
+    lastResult: extractMutation.data,
+  };
+}
 ```
 
-**Option B: Use `useTasksManager` (recommended)**
-Since `useTasksManager.handleUpdateTask` already handles this, switching to it is cleaner.
+### New Component: `StructuredSummaryCard`
+
+**File: `src/components/inbox/StructuredSummaryCard.tsx`**
+
+**Layout Sections:**
+1. **Overview** - 1-2 sentence summary in a card
+2. **Key Points** - Bulleted list (3-7 items)
+3. **Next Step** - Checkbox icon with action indicator
+4. **Categories** - Muted badge chips
+5. **Footer Metadata** - Entities and People with type-based colors
+
+**Placeholder Component for Missing Extraction:**
+```tsx
+export function GenerateSummaryPlaceholder({ onGenerate, isGenerating, error }) {
+  return (
+    <div className="rounded-lg border border-dashed border-muted-foreground/30 bg-muted/20 p-6 text-center">
+      <Wand2 className="h-5 w-5 mx-auto text-muted-foreground mb-2" />
+      <p className="text-sm text-muted-foreground mb-1">Generate a structured summary</p>
+      <p className="text-xs text-muted-foreground/70 mb-3">
+        Creates an overview, key points, and extracts entities for action workflows.
+      </p>
+      <Button size="sm" onClick={onGenerate} disabled={isGenerating}>
+        {isGenerating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+        Generate summary
+      </Button>
+    </div>
+  );
+}
+```
+
+### Updated Component: `InboxContentPane`
+
+**File: `src/components/inbox/InboxContentPane.tsx`**
+
+**Changes:**
+
+1. Import new components and hook:
+```typescript
+import { StructuredSummaryCard, GenerateSummaryPlaceholder } from "./StructuredSummaryCard";
+import { useEmailExtraction } from "@/hooks/useEmailExtraction";
+```
+
+2. Add extraction hook and local state for immediate updates:
+```typescript
+const { extract, isExtracting, error: extractionError, lastResult } = useEmailExtraction();
+const [localExtraction, setLocalExtraction] = useState<ExtractionResult | null>(null);
+```
+
+3. Replace email body section with conditional rendering:
+```tsx
+{/* Scrollable Body */}
+<div className="flex-1 overflow-y-auto p-5">
+  {/* Structured Summary (when available) */}
+  {item.extractedAt || localExtraction ? (
+    <StructuredSummaryCard
+      summary={localExtraction?.summary || item.extractedSummary!}
+      keyPoints={localExtraction?.keyPoints || item.extractedKeyPoints!}
+      nextStep={localExtraction?.nextStep || item.extractedNextStep!}
+      categories={localExtraction?.categories || item.extractedCategories || []}
+      entities={localExtraction?.entities || item.extractedEntities || []}
+      people={localExtraction?.people || item.extractedPeople || []}
+    />
+  ) : (
+    <GenerateSummaryPlaceholder
+      onGenerate={async () => {
+        const result = await extractAsync(item.id);
+        setLocalExtraction(result);
+      }}
+      isGenerating={isExtracting}
+      error={extractionError}
+    />
+  )}
+
+  {/* Attachments Section */}
+  <div className="mt-6">
+    <InboxAttachmentsSection ... />
+  </div>
+
+  {/* Linked Entities Section */}
+  {item.relatedCompanyId && ( ... )}
+
+  {/* View Original Email (collapsed) */}
+  <Collapsible open={isRawOpen} onOpenChange={setIsRawOpen} className="mt-6">
+    <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isRawOpen ? 'rotate-180' : ''}`} />
+      View original email
+    </CollapsibleTrigger>
+    <CollapsibleContent className="mt-3">
+      <div className="border-l-2 border-muted pl-4 py-2">
+        <pre className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground font-mono overflow-x-auto">
+          {bodyContent}
+        </pre>
+      </div>
+    </CollapsibleContent>
+  </Collapsible>
+</div>
+```
 
 ---
 
-## Files Changed
+## Files Changed Summary
 
-| File | Changes |
-|------|---------|
-| `supabase/migrations/[timestamp]_smarter_task_triage.sql` | Create - New trigger logic for smarter triage entry + auto-exit on enrichment |
-| `src/hooks/useBackfillWorkItems.ts` | Modify - Add `scheduled_for` and `priority` checks to task backfill filter |
-| `src/components/focus/TriageTaskDrawer.tsx` | Modify - Fix `handleSave` to properly transform data before calling update |
-| `src/pages/TriageQueue.tsx` | Modify - Switch from `useTasks` to `useTasksManager` for consistent task handling |
-
----
-
-## Technical Notes
-
-- The existing `trigger_auto_exit_task` handles completed/archived tasks
-- The new `trigger_auto_exit_enriched_task` handles linked/scheduled tasks
-- Both triggers check `status NOT IN ('trusted', 'ignored')` to avoid redundant updates
-- The backfill query needs to fetch `scheduled_for` and `priority` columns (currently only fetches `id, project_id, company_id, pipeline_company_id`)
-- Using `useTasksManager` in TriageQueue provides consistency with the Tasks page and handles all edge cases
+| File | Action | Description |
+|------|--------|-------------|
+| `supabase/migrations/[timestamp]_add_email_extraction_columns.sql` | Create | Add 8 new columns for extraction data |
+| `supabase/functions/email-extract-structured/index.ts` | Create | Edge function for AI extraction |
+| `supabase/config.toml` | Modify | Add function config entry |
+| `src/types/inbox.ts` | Modify | Add extraction fields to InboxItem |
+| `src/hooks/useInboxItems.ts` | Modify | Update InboxItemRow and transformRow |
+| `src/hooks/useEmailExtraction.ts` | Create | Hook for triggering extraction |
+| `src/components/inbox/StructuredSummaryCard.tsx` | Create | Structured summary display + placeholder |
+| `src/components/inbox/InboxContentPane.tsx` | Modify | Integrate summary card, rearrange sections |
 
 ---
 
-## Expected Behavior After Fix
+## Visual Design
 
-1. **New tasks with deadlines or priorities** → Don't appear in Triage queue
-2. **Editing task in Triage** (adding project, deadline, category) → Persists to database immediately
-3. **Task with deadline added in Triage** → Automatically exits Triage queue
-4. **Task with project linked in Triage** → Automatically exits Triage queue
-5. **Tasks list reflects changes** → Updates immediately visible
+**Structured Summary Card:**
+```text
++--------------------------------------------------+
+| OVERVIEW                                         |
+| Discussing meetings with Fulton and UMB at AOBA  |
+| for FISPAN outreach.                             |
++--------------------------------------------------+
+| KEY POINTS                                       |
+| - Meetings with Fulton and UMB at AOBA confirmed |
+| - Elizabeth Cronenweth (UMB) has retired         |
+| - Fulton is a greenfield prospect for intros     |
++--------------------------------------------------+
+| NEXT STEP                                        |
+| [o] Bring up FISPAN in meetings with UMB/Fulton  |
+|     Action required                              |
++--------------------------------------------------+
+| Update | Scheduling                               |
++--------------------------------------------------+
+| [Building] Fulton - UMB                          |
+| [Person] Eric Schwartz - Elizabeth Cronenweth    |
++--------------------------------------------------+
+```
 
+**Styling Details:**
+- Section headers: `text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground`
+- Cards: `rounded-lg border border-border bg-card/50 p-4`
+- Entity colors by type: company=blue, bank=emerald, fund=purple, product=orange
+- Action required: amber accent, No action: emerald checkmark
+
+---
+
+## Error Handling
+
+**Edge Function:**
+- Invalid JSON from OpenAI: retry once with stricter prompt
+- Retry failure: return error, do not persist partial data
+- All errors logged with full context
+
+**UI:**
+- Show inline error with "Try again" button
+- Never block access to original email
+- Loading state: disable button, show spinner
+
+---
+
+## Cost and Performance
+
+- **On-demand only**: No automatic extraction on drawer open
+- **Cached in DB**: No re-extraction on subsequent opens
+- **Model**: gpt-4o-mini (~$0.0002 per extraction)
+- **Versioning**: extraction_version allows future prompt updates
