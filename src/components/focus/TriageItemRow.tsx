@@ -47,6 +47,9 @@ interface TriageItemRowProps {
   onEmailNoAction?: (workItemId: string, sourceId: string) => void;
   // Commitment quick action handlers
   onCommitmentComplete?: (workItemId: string, sourceId: string) => void;
+  // Calendar event quick action handlers
+  onCalendarTrusted?: (workItemId: string) => void;
+  onCalendarNoAction?: (workItemId: string) => void;
   // Shared
   onSnooze?: (workItemId: string, until: Date) => void;
 }
@@ -93,6 +96,8 @@ export function TriageItemRow({
   onEmailTrusted,
   onEmailNoAction,
   onCommitmentComplete,
+  onCalendarTrusted,
+  onCalendarNoAction,
   onSnooze,
 }: TriageItemRowProps) {
   const Icon = SOURCE_ICONS[item.source_type] || Mail;
@@ -103,6 +108,7 @@ export function TriageItemRow({
   const isReading = item.source_type === "reading";
   const isEmail = item.source_type === "email";
   const isCommitment = item.source_type === "commitment";
+  const isCalendarEvent = item.source_type === "calendar_event";
 
   const handleOpenLink = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -146,6 +152,17 @@ export function TriageItemRow({
   const handleEmailNoAction = (e: React.MouseEvent) => {
     e.stopPropagation();
     onEmailNoAction?.(item.id, item.source_id);
+  };
+
+  // Calendar event handlers
+  const handleCalendarTrusted = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onCalendarTrusted?.(item.id);
+  };
+
+  const handleCalendarNoAction = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onCalendarNoAction?.(item.id);
   };
 
   return (
@@ -329,6 +346,56 @@ export function TriageItemRow({
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+              </div>
+            )}
+
+            {/* Calendar Event Quick Actions - visible on hover */}
+            {isCalendarEvent && (
+              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 rounded-full"
+                  onClick={handleCalendarTrusted}
+                  title="Mark trusted"
+                >
+                  <Check className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 rounded-full"
+                      title="Snooze"
+                    >
+                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem onClick={(e) => handleSnooze(addHours(new Date(), 3), e as any)}>
+                      3 hours
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => handleSnooze(startOfTomorrow(), e as any)}>
+                      Tomorrow
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => handleSnooze(nextMonday(new Date()), e as any)}>
+                      Next week
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => handleSnooze(addDays(new Date(), 30), e as any)}>
+                      30 days
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 rounded-full"
+                  onClick={handleCalendarNoAction}
+                  title="No action (dismiss)"
+                >
+                  <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
               </div>
             )}
           </div>
