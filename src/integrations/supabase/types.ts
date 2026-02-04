@@ -658,6 +658,14 @@ export type Database = {
           display_from_name: string | null
           display_snippet: string | null
           display_subject: string | null
+          extracted_at: string | null
+          extracted_categories: string[] | null
+          extracted_entities: Json | null
+          extracted_key_points: Json | null
+          extracted_next_step: Json | null
+          extracted_people: Json | null
+          extracted_summary: string | null
+          extraction_version: string | null
           forwarded_by_email: string | null
           from_email: string
           from_name: string | null
@@ -694,6 +702,14 @@ export type Database = {
           display_from_name?: string | null
           display_snippet?: string | null
           display_subject?: string | null
+          extracted_at?: string | null
+          extracted_categories?: string[] | null
+          extracted_entities?: Json | null
+          extracted_key_points?: Json | null
+          extracted_next_step?: Json | null
+          extracted_people?: Json | null
+          extracted_summary?: string | null
+          extraction_version?: string | null
           forwarded_by_email?: string | null
           from_email: string
           from_name?: string | null
@@ -730,6 +746,14 @@ export type Database = {
           display_from_name?: string | null
           display_snippet?: string | null
           display_subject?: string | null
+          extracted_at?: string | null
+          extracted_categories?: string[] | null
+          extracted_entities?: Json | null
+          extracted_key_points?: Json | null
+          extracted_next_step?: Json | null
+          extracted_people?: Json | null
+          extracted_summary?: string | null
+          extraction_version?: string | null
           forwarded_by_email?: string | null
           from_email?: string
           from_name?: string | null
