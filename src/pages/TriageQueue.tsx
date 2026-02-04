@@ -274,6 +274,23 @@ export default function TriageQueue() {
     [triageActions, advanceToNext]
   );
 
+  // Calendar event quick action handlers
+  const handleCalendarTrusted = useCallback(
+    (workItemId: string) => {
+      triageActions.markTrusted(workItemId);
+      advanceToNext();
+    },
+    [triageActions, advanceToNext]
+  );
+
+  const handleCalendarNoAction = useCallback(
+    (workItemId: string) => {
+      triageActions.noAction(workItemId);
+      advanceToNext();
+    },
+    [triageActions, advanceToNext]
+  );
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -365,6 +382,8 @@ export default function TriageQueue() {
                     onEmailTrusted={handleEmailTrusted}
                     onEmailNoAction={handleEmailNoAction}
                     onCommitmentComplete={handleCommitmentQuickComplete}
+                    onCalendarTrusted={handleCalendarTrusted}
+                    onCalendarNoAction={handleCalendarNoAction}
                     onSnooze={(id, until) => triageActions.snooze(id, until)}
                   />
                 ))}
