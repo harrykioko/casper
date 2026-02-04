@@ -1,75 +1,200 @@
 
-# Email Summary Card UI Polish
+
+# Add Quick Actions for Tasks in Triage
 
 ## Overview
 
-Simple UI refinements to make the email summary card feel calmer and more professional:
-
-1. **Whiter background** - Increase opacity of the card background to make it stand out subtly without being overwhelming
-2. **Unbold key points** - Remove font-weight from bullet text for a calmer reading experience
+Add hover-revealed quick actions to task items in the Triage queue, following the same pattern as emails and calendar events. This enables rapid processing of tasks without opening the drawer.
 
 ---
 
-## Changes
+## Current State
 
-### File: `src/components/inbox/StructuredSummaryCard.tsx`
+Tasks currently show no quick actions on hover:
 
-**1. Whiter card background (line 60)**
-
-Current:
-```tsx
-<div className="rounded-lg border border-border/50 bg-card/30 divide-y divide-border/30">
+```text
+[ListTodo Icon] Task Title              about 1 hour ago
+               [Unlinked]
 ```
 
-Updated:
-```tsx
-<div className="rounded-lg border border-border/50 bg-white/70 dark:bg-card/50 divide-y divide-border/30">
+While emails and calendar events already have: Trusted + Snooze + No Action
+
+---
+
+## Proposed Quick Actions for Tasks
+
+1. **Trusted** (checkmark) - Mark as trusted and clear from triage (promotes task out of inbox)
+2. **Snooze** (clock with dropdown) - Defer to later
+3. **No Action** (x-circle) - Dismiss from triage (promotes task out of inbox)
+
+```text
+[ListTodo Icon] Task Title          [✓] [🕐▾] [✕]  about 1 hour ago
+               [Unlinked]
 ```
 
-This gives a subtle white tint in light mode and slightly more opaque card in dark mode.
+---
 
-**2. Unbold key points text (line 77-82)**
+## Implementation Details
 
-Current:
-```tsx
-<li 
-  key={index} 
-  className="text-sm text-foreground leading-relaxed list-disc marker:text-muted-foreground/60"
->
-  {point}
-</li>
+### 1. Add Task Handler Props to TriageItemRow
+
+**File: `src/components/focus/TriageItemRow.tsx`**
+
+Add new props in the interface (around line 53):
+
+```typescript
+// Task quick action handlers
+onTaskTrusted?: (workItemId: string) => void;
+onTaskNoAction?: (workItemId: string) => void;
+// onSnooze already exists and is shared
 ```
 
-Updated:
-```tsx
-<li 
-  key={index} 
-  className="text-sm text-foreground/90 font-normal leading-relaxed list-disc marker:text-muted-foreground/60"
->
-  {point}
-</li>
+### 2. Add Task Quick Actions Block
+
+In the same file, add handler functions after the calendar handlers:
+
+```typescript
+const isTask = item.source_type === "task";
+
+const handleTaskTrusted = (e: React.MouseEvent) => {
+  e.stopPropagation();
+  onTaskTrusted?.(item.id);
+};
+
+const handleTaskNoAction = (e: React.MouseEvent) => {
+  e.stopPropagation();
+  onTaskNoAction?.(item.id);
+};
 ```
 
-Adding `font-normal` explicitly ensures no bold weight, and `text-foreground/90` slightly softens the text for a calmer appearance.
+Add the quick action block after the calendar event block (after line 400):
+
+```tsx
+{/* Task Quick Actions - visible on hover */}
+{isTask && (
+  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-6 w-6 rounded-full"
+      onClick={handleTaskTrusted}
+      title="Mark trusted"
+    >
+      <Check className="h-3.5 w-3.5 text-muted-foreground" />
+    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 rounded-full"
+          title="Snooze"
+        >
+          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem onClick={(e) => handleSnooze(addHours(new Date(), 3), e as any)}>
+          3 hours
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={(e) => handleSnooze(startOfTomorrow(), e as any)}>
+          Tomorrow
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={(e) => handleSnooze(nextMonday(new Date()), e as any)}>
+          Next week
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={(e) => handleSnooze(addDays(new Date(), 30), e as any)}>
+          30 days
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-6 w-6 rounded-full"
+      onClick={handleTaskNoAction}
+      title="No action (dismiss)"
+    >
+      <XCircle className="h-3.5 w-3.5 text-muted-foreground" />
+    </Button>
+  </div>
+)}
+```
+
+### 3. Wire Handlers in TriageQueue Page
+
+**File: `src/pages/TriageQueue.tsx`**
+
+Add callback handlers (after the calendar handlers around line 292):
+
+```typescript
+// Task quick action handlers
+const handleTaskTrusted = useCallback(
+  (workItemId: string) => {
+    triageActions.markTrusted(workItemId);
+    advanceToNext();
+  },
+  [triageActions, advanceToNext]
+);
+
+const handleTaskNoAction = useCallback(
+  (workItemId: string) => {
+    triageActions.noAction(workItemId);
+    advanceToNext();
+  },
+  [triageActions, advanceToNext]
+);
+```
+
+Pass props to TriageItemRow (in the render around line 386):
+
+```tsx
+<TriageItemRow
+  key={item.id}
+  item={item}
+  // ... existing props
+  onTaskTrusted={handleTaskTrusted}
+  onTaskNoAction={handleTaskNoAction}
+/>
+```
+
+---
+
+## Files Changed Summary
+
+| File | Action | Description |
+|------|--------|-------------|
+| `src/components/focus/TriageItemRow.tsx` | Modify | Add task quick action props, handlers, and UI block |
+| `src/pages/TriageQueue.tsx` | Modify | Add task action callbacks and pass to TriageItemRow |
 
 ---
 
 ## Visual Result
 
-**Before:**
-- Card blends into background too much
-- Bold key points feel heavy
+**Before (tasks):**
+```text
+[📝] Task Title                                    1 hour ago
+     [Unlinked]
+```
 
-**After:**
-- Card has subtle white/light background that stands out gently
-- Key points have normal weight, calmer reading experience
-- Same structure, same logic - just refined visual presence
+**After (on hover):**
+```text
+[📝] Task Title              [✓] [🕐▾] [✕]        1 hour ago
+     [Unlinked]
+```
+
+Where:
+- `[✓]` = Mark Trusted (clears from triage, promotes task)
+- `[🕐▾]` = Snooze dropdown (defer to later)
+- `[✕]` = No Action / Dismiss (clears from triage, promotes task)
 
 ---
 
-## Files Changed
+## Technical Notes
 
-| File | Lines | Change |
-|------|-------|--------|
-| `src/components/inbox/StructuredSummaryCard.tsx` | 60 | Whiter background: `bg-white/70 dark:bg-card/50` |
-| `src/components/inbox/StructuredSummaryCard.tsx` | 79 | Unbold bullets: add `font-normal`, soften to `text-foreground/90` |
+- Matches exact pattern used for emails and calendar events
+- Uses existing `onSnooze` prop already passed to TriageItemRow
+- Both Trusted and No Action will call the existing triage actions which also promote tasks out of inbox (`is_quick_task: false`)
+- Uses optimistic updates already implemented - actions will feel instant
+- No database or backend changes required
+
