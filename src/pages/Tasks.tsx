@@ -17,7 +17,7 @@ import { InboxSection } from "@/components/tasks/InboxSection";
 import { TaskDetailsDialog } from "@/components/modals/TaskDetailsDialog";
 import { TasksSummaryPanel } from "@/components/tasks/TasksSummaryPanel";
 import { TasksPageHeader } from "@/components/tasks/TasksPageHeader";
-import { TodayLane } from "@/components/tasks/TodayLane";
+import { UpNextSection } from "@/components/tasks/UpNextSection";
 import { cn } from "@/lib/utils";
 
 export default function Tasks() {
@@ -89,20 +89,20 @@ export default function Tasks() {
   // Enrich tasks with company/project data
   const enrichedTasks = useEnrichedTasks(filteredTasks);
 
-  // Get IDs of tasks shown in TodayLane to exclude from main list
-  const todayTaskIds = useMemo(() => {
-    // Selection logic matching TodayLane
+  // Get IDs of tasks shown in UpNext to exclude from main list
+  const upNextTaskIds = useMemo(() => {
+    // Selection logic matching UpNextSection
     const candidates = enrichedTasks.filter(t => !t.completed && !t.archived_at);
     const seen = new Set<string>();
     
-    // Priority selection logic (matches TodayLane)
+    // Priority selection logic (matches UpNextSection)
     const isOverdue = (d?: string) => d && new Date(d) < new Date() && !isToday(new Date(d));
     const isToday = (d: Date) => {
       const today = new Date();
       return d.toDateString() === today.toDateString();
     };
     const isDueToday = (d?: string) => d && isToday(new Date(d));
-    const isTomorrow = (d?: string) => {
+    const isDueTomorrow = (d?: string) => {
       if (!d) return false;
       const date = new Date(d);
       const tomorrow = new Date();
@@ -112,17 +112,17 @@ export default function Tasks() {
 
     // Get overdue + today + high priority tomorrow
     candidates.forEach(t => {
-      if (seen.size >= 5) return;
-      if (isOverdue(t.scheduledFor) || isDueToday(t.scheduledFor) || (isTomorrow(t.scheduledFor) && t.priority === 'high')) {
+      if (seen.size >= 3) return;
+      if (isOverdue(t.scheduledFor) || isDueToday(t.scheduledFor) || (isDueTomorrow(t.scheduledFor) && t.priority === 'high')) {
         seen.add(t.id);
       }
     });
 
     // Fill with high priority no date if needed
-    if (seen.size < 5) {
+    if (seen.size < 3) {
       candidates
         .filter(t => !t.scheduledFor && t.priority === 'high' && !seen.has(t.id))
-        .slice(0, 5 - seen.size)
+        .slice(0, 3 - seen.size)
         .forEach(t => seen.add(t.id));
     }
 
@@ -273,21 +273,18 @@ export default function Tasks() {
                     />
                   )}
 
-                  {/* Today Lane - horizontal strip of priority tasks */}
-                  <TodayLane
+                  {/* Up Next - Hero cards for top priority tasks */}
+                  <UpNextSection
                     tasks={enrichedTasks}
                     onComplete={handleCompleteTask}
                     onSnooze={handleSnoozeTask}
-                    onReschedule={handleRescheduleTask}
-                    onUpdatePriority={handleUpdatePriority}
-                    onUpdateEffort={handleUpdateEffort}
                     onClick={handleTaskClick}
                   />
 
                   {/* Time-based sections */}
                   <TasksMainContent
                     regularTasks={enrichedTasks}
-                    todayTaskIds={todayTaskIds}
+                    todayTaskIds={upNextTaskIds}
                     onTaskComplete={handleCompleteTask}
                     onTaskDelete={handleDeleteTask}
                     onUpdateTaskStatus={handleUpdateTaskStatus}

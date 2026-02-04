@@ -2,13 +2,13 @@ import { useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Calendar, Clock, CalendarDays, CalendarRange } from "lucide-react";
 import type { EnrichedTask } from "@/hooks/useEnrichedTasks";
-import { TaskProcessingCard } from "./TaskProcessingCard";
+import { TaskRowCard } from "./TaskRowCard";
 import { parseISO, isToday, isTomorrow, isPast, differenceInDays, addDays, format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface TaskGroupedListProps {
   tasks: EnrichedTask[];
-  excludeIds?: Set<string>; // Tasks to exclude (e.g., already in Today lane)
+  excludeIds?: Set<string>; // Tasks to exclude (e.g., already in Up Next)
   onTaskComplete: (id: string) => void;
   onTaskDelete: (id: string) => void;
   onTaskClick: (task: EnrichedTask) => void;
@@ -24,7 +24,7 @@ interface TaskGroup {
   label: string;
   sublabel?: string;
   tasks: EnrichedTask[];
-  visualWeight: 'high' | 'medium' | 'low' | 'muted';
+  variant: 'prominent' | 'default' | 'muted';
   icon: typeof Calendar;
   iconColor: string;
 }
@@ -75,7 +75,7 @@ export function TaskGroupedList({
     const groups: TaskGroup[] = [];
     const assigned = new Set<string>();
 
-    // Filter out excluded tasks (already in Today lane)
+    // Filter out excluded tasks (already in Up Next)
     const availableTasks = tasks.filter(t => !excludeIds.has(t.id));
 
     // 1. Overdue
@@ -97,9 +97,9 @@ export function TaskGroupedList({
         id: 'overdue',
         label: 'Overdue',
         tasks: overdue,
-        visualWeight: 'high',
+        variant: 'prominent',
         icon: Clock,
-        iconColor: 'text-destructive',
+        iconColor: 'text-rose-500',
       });
     }
 
@@ -118,7 +118,7 @@ export function TaskGroupedList({
         id: 'today',
         label: 'Today',
         tasks: dueToday,
-        visualWeight: 'high',
+        variant: 'prominent',
         icon: Calendar,
         iconColor: 'text-amber-500',
       });
@@ -140,7 +140,7 @@ export function TaskGroupedList({
         label: 'Tomorrow',
         sublabel: format(addDays(new Date(), 1), 'EEEE'),
         tasks: dueTomorrow,
-        visualWeight: 'medium',
+        variant: 'default',
         icon: CalendarDays,
         iconColor: 'text-sky-500',
       });
@@ -165,7 +165,7 @@ export function TaskGroupedList({
         id: 'this-week',
         label: 'This Week',
         tasks: thisWeek,
-        visualWeight: 'medium',
+        variant: 'default',
         icon: CalendarRange,
         iconColor: 'text-muted-foreground',
       });
@@ -190,7 +190,7 @@ export function TaskGroupedList({
         id: 'upcoming',
         label: 'Upcoming',
         tasks: upcoming,
-        visualWeight: 'low',
+        variant: 'muted',
         icon: CalendarRange,
         iconColor: 'text-muted-foreground/60',
       });
@@ -209,7 +209,7 @@ export function TaskGroupedList({
         id: 'no-date',
         label: 'No Date',
         tasks: noDate,
-        visualWeight: 'muted',
+        variant: 'muted',
         icon: Calendar,
         iconColor: 'text-muted-foreground/50',
       });
@@ -240,18 +240,11 @@ export function TaskGroupedList({
       {taskGroups.map((group) => (
         <div key={group.id}>
           {/* Section Header */}
-          <div className="flex items-center gap-2 mb-3">
-            <div className={cn(
-              "flex items-center justify-center w-5 h-5 rounded",
-              group.visualWeight === 'high' && "bg-muted/50",
-              group.visualWeight === 'medium' && "bg-muted/30",
-              (group.visualWeight === 'low' || group.visualWeight === 'muted') && "bg-muted/20"
-            )}>
-              <group.icon className={cn("h-3 w-3", group.iconColor)} />
-            </div>
+          <div className="flex items-center gap-2 mb-2">
+            <group.icon className={cn("h-4 w-4", group.iconColor)} />
             <span className={cn(
-              "text-[11px] font-semibold uppercase tracking-wider",
-              group.visualWeight === 'muted' ? "text-muted-foreground/60" : "text-muted-foreground"
+              "text-xs font-semibold uppercase tracking-wide",
+              group.variant === 'muted' ? "text-muted-foreground/60" : "text-muted-foreground"
             )}>
               {group.label}
             </span>
@@ -260,19 +253,19 @@ export function TaskGroupedList({
                 {group.sublabel}
               </span>
             )}
-            <span className="text-[10px] text-muted-foreground/60">
+            <span className="text-[10px] text-muted-foreground/50 ml-auto">
               {group.tasks.length}
             </span>
           </div>
 
-          {/* Task Cards */}
-          <div className="space-y-2">
+          {/* Task Rows */}
+          <div className="space-y-1.5">
             <AnimatePresence mode="popLayout">
               {group.tasks.map((task) => (
-                <TaskProcessingCard
+                <TaskRowCard
                   key={task.id}
                   task={task}
-                  visualWeight={group.visualWeight}
+                  variant={group.variant}
                   onComplete={onTaskComplete}
                   onDelete={onTaskDelete}
                   onSnooze={onSnooze}
