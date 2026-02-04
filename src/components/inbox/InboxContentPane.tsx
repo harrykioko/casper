@@ -9,6 +9,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cleanEmailContent } from "@/lib/emailCleaners";
 import { InboxAttachmentsSection } from "./InboxAttachmentsSection";
+import { StructuredSummaryCard, GenerateSummaryPlaceholder } from "./StructuredSummaryCard";
+import { useEmailExtraction, type ExtractionResult } from "@/hooks/useEmailExtraction";
 import type { InboxItem } from "@/types/inbox";
 import type { InboxAttachment } from "@/hooks/useInboxAttachments";
 
@@ -28,7 +30,9 @@ export function InboxContentPane({
   onUnlinkCompany,
 }: InboxContentPaneProps) {
   const [isRawOpen, setIsRawOpen] = useState(false);
+  const [localExtraction, setLocalExtraction] = useState<ExtractionResult | null>(null);
   const navigate = useNavigate();
+  const { extractAsync, isExtracting, error: extractionError } = useEmailExtraction();
   
   // Prefer server-cleaned content, fallback to client-side cleaning for old items
   const hasServerCleanedContent = !!item.cleanedText;
@@ -191,10 +195,30 @@ export function InboxContentPane({
 
       {/* Scrollable Body */}
       <div className="flex-1 overflow-y-auto p-5">
-        {/* Email body content - use cleaned text */}
-        <div className="max-w-prose text-[13px] leading-relaxed text-foreground">
-          <p className="whitespace-pre-wrap">{displayBody}</p>
-        </div>
+        {/* Structured Summary (when available) or Generate Placeholder */}
+        {item.extractedAt || localExtraction ? (
+          <StructuredSummaryCard
+            summary={localExtraction?.summary || item.extractedSummary || ""}
+            keyPoints={localExtraction?.keyPoints || item.extractedKeyPoints || []}
+            nextStep={localExtraction?.nextStep || item.extractedNextStep || { label: "No action required", isActionRequired: false }}
+            categories={localExtraction?.categories || item.extractedCategories || []}
+            entities={localExtraction?.entities || item.extractedEntities || []}
+            people={localExtraction?.people || item.extractedPeople || []}
+          />
+        ) : (
+          <GenerateSummaryPlaceholder
+            onGenerate={async () => {
+              try {
+                const result = await extractAsync(item.id);
+                setLocalExtraction(result);
+              } catch {
+                // Error handled by hook
+              }
+            }}
+            isGenerating={isExtracting}
+            error={extractionError}
+          />
+        )}
 
         {/* Attachments Section */}
         <div className="mt-6">
@@ -254,30 +278,28 @@ export function InboxContentPane({
         )}
 
         {/* Collapsible raw/original section - now after Linked Entities */}
-        {hasCleanedContent && (
-          <Collapsible 
-            open={isRawOpen} 
-            onOpenChange={setIsRawOpen}
-            className="mt-6"
-          >
-            <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
-              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isRawOpen ? 'rotate-180' : ''}`} />
-              View original email
-              {signalBadges.length > 0 && (
-                <span className="text-[10px] text-muted-foreground/60 ml-1">
-                  • {signalBadges.map(b => b.label.replace(" stripped", "")).join(", ")}
-                </span>
-              )}
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-3">
-              <div className="border-l-2 border-muted pl-4 py-2">
-                <pre className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground font-mono overflow-x-auto">
-                  {bodyContent}
-                </pre>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
+        <Collapsible 
+          open={isRawOpen} 
+          onOpenChange={setIsRawOpen}
+          className="mt-6"
+        >
+          <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isRawOpen ? 'rotate-180' : ''}`} />
+            View original email
+            {signalBadges.length > 0 && (
+              <span className="text-[10px] text-muted-foreground/60 ml-1">
+                - {signalBadges.map(b => b.label.replace(" stripped", "")).join(", ")}
+              </span>
+            )}
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3">
+            <div className="border-l-2 border-muted pl-4 py-2">
+              <pre className="whitespace-pre-wrap text-xs leading-relaxed text-muted-foreground font-mono overflow-x-auto">
+                {displayBody || bodyContent}
+              </pre>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
       </div>
     </div>
   );

@@ -37,6 +37,16 @@ export interface InboxItem {
   hasThread?: boolean;
   hasDisclaimer?: boolean;
   hasCalendar?: boolean;
+  
+  // Structured extraction (AI-generated)
+  extractedSummary?: string | null;
+  extractedKeyPoints?: string[] | null;
+  extractedNextStep?: { label: string; isActionRequired: boolean } | null;
+  extractedEntities?: Array<{ name: string; type: string; confidence: number }> | null;
+  extractedPeople?: Array<{ name: string; email?: string | null; confidence: number }> | null;
+  extractedCategories?: string[] | null;
+  extractionVersion?: string | null;
+  extractedAt?: string | null;
 }
 
 export interface InboxAttachment {

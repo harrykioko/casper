@@ -42,9 +42,42 @@ interface InboxItemRow {
   has_thread?: boolean;
   has_disclaimer?: boolean;
   has_calendar?: boolean;
+  // Structured extraction fields
+  extracted_summary?: string | null;
+  extracted_key_points?: unknown[] | null;
+  extracted_next_step?: { label: string; is_action_required: boolean } | null;
+  extracted_entities?: unknown[] | null;
+  extracted_people?: unknown[] | null;
+  extracted_categories?: string[] | null;
+  extraction_version?: string | null;
+  extracted_at?: string | null;
 }
 
 function transformRow(row: InboxItemRow): InboxItem {
+  // Transform extracted next step
+  let extractedNextStep: { label: string; isActionRequired: boolean } | null = null;
+  if (row.extracted_next_step) {
+    extractedNextStep = {
+      label: row.extracted_next_step.label,
+      isActionRequired: row.extracted_next_step.is_action_required,
+    };
+  }
+
+  // Transform extracted entities
+  const extractedEntities = Array.isArray(row.extracted_entities)
+    ? (row.extracted_entities as Array<{ name: string; type: string; confidence: number }>)
+    : null;
+
+  // Transform extracted people
+  const extractedPeople = Array.isArray(row.extracted_people)
+    ? (row.extracted_people as Array<{ name: string; email?: string | null; confidence: number }>)
+    : null;
+
+  // Transform extracted key points
+  const extractedKeyPoints = Array.isArray(row.extracted_key_points)
+    ? (row.extracted_key_points as string[])
+    : null;
+
   return {
     id: row.id,
     subject: row.subject,
@@ -81,6 +114,15 @@ function transformRow(row: InboxItemRow): InboxItem {
     hasThread: row.has_thread || false,
     hasDisclaimer: row.has_disclaimer || false,
     hasCalendar: row.has_calendar || false,
+    // Structured extraction (AI-generated)
+    extractedSummary: row.extracted_summary,
+    extractedKeyPoints,
+    extractedNextStep,
+    extractedEntities,
+    extractedPeople,
+    extractedCategories: row.extracted_categories,
+    extractionVersion: row.extraction_version,
+    extractedAt: row.extracted_at,
   };
 }
 
