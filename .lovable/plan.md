@@ -1,165 +1,140 @@
 
+## What’s happening (root cause)
 
-# Align Task Categories in Email Drawer with Standard Categories
+The “Sandbox Wealth” email in the drawer is a forwarded email:
 
-## Problem
+- `from_email` / `from_name` in `inbox_items` are the forwarder (you / Harrison).
+- The real sender is stored in the cleaned “display” fields: `display_from_email = ray@sandboxwealth.com`, `display_from_name = Ray Denis`.
+- The UI correctly shows “Ray Denis … via Harrison” by using `display_*` fields.
 
-The inline task creation form in the email drawer uses a hardcoded list of categories that does not match the standard categories defined in the database.
+However, the **`inbox-suggest-v2` edge function currently uses `from_email`**, so it thinks the sender domain is `canapi.com`. That causes two bad downstream effects:
+1) Candidate matching uses the forwarder’s domain + history and surfaces unrelated “existing companies” (like “Wealth”).
+2) The model then confidently outputs LINK_COMPANY and even describes it as “portfolio” in the rationale, because the whole context is skewed.
 
-**Current hardcoded list** (in `InlineTaskForm.tsx`):
-- Personal, Admin, Investing, Travel, Work
+There is also a second issue: even when the real sender domain is used, the current domain-conflict logic uses `includes()` checks that incorrectly treat `sandboxwealth.com` as “related” to `wealth.com` (because `"sandboxwealth.com".includes("wealth.com") === true`). This allows false matches like “Wealth” when the email is actually about “Sandbox Wealth”.
 
-**Standard categories** (from database):
-- General, Personal, Pipeline, Portfolio
+## Goals for the fix
 
-The inference logic in `buildTaskDraft.ts` also maps email intents to the old category names.
+1) Candidate matching and intent classification should use the **effective sender** (`display_from_email` when present).
+2) Name-mention matching must **not** treat `sandboxwealth.com` as a subdomain of `wealth.com`.
+3) When the model chooses a `company_id`, we should **normalize** `company_name` and `company_type` to the candidate record to prevent incorrect labeling.
 
----
+## Implementation plan
 
-## Solution
+### A) Use “effective” email fields in `inbox-suggest-v2` (forward-aware)
 
-Update both the UI component and the inference logic to use the standard category set, leveraging the existing `useCategories` hook to fetch from the database.
+**File:** `supabase/functions/inbox-suggest-v2/index.ts`
 
----
+1) Update the inbox item fetch to include display/cleaned fields:
+- `display_from_email`, `display_from_name`
+- `display_subject`, `cleaned_text`
+- (optional) `thread_clean_text` if you want better context
 
-## Technical Changes
+2) Compute “effective” values:
+- `effectiveFromEmail = item.display_from_email ?? item.from_email`
+- `effectiveFromName = item.display_from_name ?? item.from_name`
+- `effectiveSubject = item.display_subject ?? item.subject`
+- `effectiveBody = item.thread_clean_text ?? item.cleaned_text ?? item.text_body ?? ""`
 
-### 1. Update CategoryOptions Component
+3) Pass these effective values into:
+- `fetchCandidateCompanies(supabase, effectiveFromEmail, effectiveSubject, effectiveBody)`
+- `callOpenAI(effectiveSubject, effectiveBody, effectiveFromEmail, effectiveFromName, candidates)`
 
-**File: `src/components/inbox/inline-actions/InlineTaskForm.tsx`**
+This ensures forwarded emails behave like “normal” emails for suggestion logic.
 
-Replace the hardcoded array with the `useCategories` hook:
+### B) Fix domain “relatedness” logic (replace `includes` with real subdomain checks)
 
-```typescript
-// Before (line 197)
-const categories = ["Personal", "Admin", "Investing", "Travel", "Work"];
+**File:** `supabase/functions/inbox-suggest-v2/index.ts`
 
-// After
-import { useCategories } from "@/hooks/useCategories";
+1) Add a small helper:
+- `domainsAreSameOrSubdomain(a, b)` returns true only if:
+  - `a === b`, OR
+  - `a.endsWith("." + b)`, OR
+  - `b.endsWith("." + a)`
 
-function CategoryOptions({ 
-  value, 
-  onChange 
-}: { 
-  value?: string; 
-  onChange: (val: string) => void 
-}) {
-  const { categories, loading } = useCategories();
+2) Update the name-mention domain conflict guard:
+- Today it uses `includes()` which is too permissive.
+- Replace it with `domainsAreSameOrSubdomain(senderDomainNormalized, companyDomainNormalized)`.
 
-  if (loading) {
-    return <div className="text-xs text-muted-foreground p-2">Loading...</div>;
-  }
+Result: `sandboxwealth.com` will correctly be treated as NOT related to `wealth.com`.
 
-  return (
-    <div className="flex flex-col gap-1">
-      {categories.map((cat) => (
-        <button
-          key={cat.id}
-          type="button"
-          onClick={() => onChange(cat.name)}
-          className={cn(
-            "text-left px-2 py-1 text-xs rounded hover:bg-muted transition-colors",
-            value === cat.name && "bg-muted font-medium"
-          )}
-        >
-          {cat.name}
-          {value === cat.name && <span className="ml-1 text-muted-foreground">*</span>}
-        </button>
-      ))}
-    </div>
-  );
-}
-```
+### C) Improve domain matching to support true subdomains (optional but recommended)
 
-### 2. Update Category Inference Logic
+**File:** `supabase/functions/inbox-suggest-v2/index.ts`
 
-**File: `src/lib/inbox/buildTaskDraft.ts`**
+Currently, domain matches only fire when company domain exactly equals sender domain.
 
-Update `inferCategoryFromIntent` to use the standard categories and add smart inference based on company type:
+Update the “domain match” block so that if:
+- `senderDomainNormalized === companyDomainNormalized` OR
+- `senderDomainNormalized.endsWith("." + companyDomainNormalized)`
+then it counts as a domain match (high score).
 
-```typescript
-// Before (lines 73-87)
-function inferCategoryFromIntent(
-  type?: string,
-  extractedCategories?: string[] | null
-): string | undefined {
-  if (type === "CREATE_PERSONAL_TASK") return "Personal";
-  if (extractedCategories?.includes("personal")) return "Personal";
-  if (extractedCategories?.includes("admin")) return "Admin";
-  if (extractedCategories?.includes("investing")) return "Investing";
-  if (extractedCategories?.includes("travel")) return "Travel";
-  return undefined;
-}
+This helps real-world cases like `mail.acme.com` matching `acme.com`, without introducing the `includes()` bug.
 
-// After
-function inferCategoryFromIntent(
-  type?: string,
-  extractedCategories?: string[] | null,
-  companyType?: "portfolio" | "pipeline" | null
-): string | undefined {
-  // Map suggestion type to category
-  if (type === "CREATE_PERSONAL_TASK") return "Personal";
-  
-  // Infer from company type (if email is linked to a company)
-  if (companyType === "portfolio") return "Portfolio";
-  if (companyType === "pipeline") return "Pipeline";
-  
-  // Check extracted categories from AI
-  if (extractedCategories?.includes("personal")) return "Personal";
-  if (extractedCategories?.includes("portfolio")) return "Portfolio";
-  if (extractedCategories?.includes("pipeline")) return "Pipeline";
-  if (extractedCategories?.includes("investing")) return "Portfolio"; // Legacy mapping
-  if (extractedCategories?.includes("admin")) return "General";
-  if (extractedCategories?.includes("travel")) return "Personal";
-  if (extractedCategories?.includes("work")) return "General";
-  
-  return undefined;
-}
-```
+### D) Make prior-link history forwarded-aware (avoid “forwarder history” pollution)
 
-Update the function call in `buildTaskDraftFromEmail` to pass company type:
+**File:** `supabase/functions/inbox-suggest-v2/index.ts`
 
-```typescript
-// In buildTaskDraftFromEmail, update the call (around line 138)
-const inferredCategory = inferCategoryFromIntent(
-  suggestion?.type,
-  item.extractedCategories,
-  draft.companyType || item.relatedCompanyType  // Pass company type for smarter inference
-);
-```
+In the “Prior links from same sender” query and comparisons:
+1) Select `display_from_email` in addition to `from_email`.
+2) When comparing sender identity/domain for history, use:
+- `priorEffectiveFromEmail = prior.display_from_email ?? prior.from_email`
+- compare to `effectiveFromEmail` and its domain
 
----
+This prevents the forwarder email (`canapi.com`) from becoming the “sender history” key.
 
-## Files Changed
+### E) Normalize `company_name` and `company_type` based on candidates (prevents “portfolio” mislabel)
 
-| File | Change |
-|------|--------|
-| `src/components/inbox/inline-actions/InlineTaskForm.tsx` | Use `useCategories` hook instead of hardcoded array in `CategoryOptions` component |
-| `src/lib/inbox/buildTaskDraft.ts` | Update `inferCategoryFromIntent` to use standard categories (General, Personal, Pipeline, Portfolio) and add company-type-based inference |
+**File:** `supabase/functions/inbox-suggest-v2/index.ts`
 
----
+Enhance `validateCompanyReferences()`:
 
-## Category Mapping Summary
+- Build a `Map<candidateId, candidate>` from `candidates`.
+- For each suggestion with `company_id`:
+  - If candidate exists:
+    - Force `suggestion.company_name = candidate.name`
+    - Force `suggestion.company_type = candidate.type`
+  - If candidate does not exist:
+    - Clear `company_id`, `company_name`, `company_type` (existing behavior)
 
-| Email Context | Inferred Category |
-|--------------|-------------------|
-| Personal task suggestion | Personal |
-| Email linked to portfolio company | Portfolio |
-| Email linked to pipeline company | Pipeline |
-| Extracted "personal" label | Personal |
-| Extracted "portfolio" or "investing" | Portfolio |
-| Extracted "pipeline" | Pipeline |
-| Extracted "admin" or "work" | General |
-| Extracted "travel" | Personal |
-| No match | No category (user selects) |
+This ensures the UI never reflects a hallucinated “portfolio vs pipeline” type for a known candidate.
 
----
+### F) (Small) Give the model better candidate context
 
-## Result
+**File:** `supabase/functions/inbox-suggest-v2/index.ts`
 
-After this change:
-- The category dropdown in the email drawer will show: General, Personal, Pipeline, Portfolio
-- Tasks created from emails linked to portfolio companies will auto-suggest "Portfolio"
-- Tasks created from emails linked to pipeline companies will auto-suggest "Pipeline"
-- Categories will stay in sync with the database-backed `categories` table
+Update the `candidateList` text to include:
+- `Domain: ${c.primary_domain ?? "null"}`
+- `Match: ${c.match_reason} (${c.match_score})`
 
+This helps the model understand why a candidate is present and reduces “confident but wrong” narrative in rationale.
+
+## How we’ll verify the fix (end-to-end)
+
+1) In `/triage`, open the “Sandbox Wealth Investor Update” email again.
+2) Click **Regenerate** (force) to bypass the 1-hour cache.
+3) Confirm in Suggested Actions:
+   - “Link to Sandbox Wealth” to “Wealth” no longer appears.
+   - A “Create New Pipeline Company: Sandbox Wealth” suggestion appears (or at minimum, “Add to Pipeline” becomes the top relevant recommendation).
+4) Confirm the intent badge is no longer incorrectly anchored on the forwarder’s context (it should not be “Portfolio Update” solely due to forwarder history).
+5) (Dev verification) Check edge logs for `inbox-suggest-v2`:
+   - It should log the effective sender as `ray@sandboxwealth.com`.
+   - Candidate companies should no longer be dominated by `canapi.com` sender-history matches.
+
+## Files to change
+
+- `supabase/functions/inbox-suggest-v2/index.ts`
+  - Use `display_*`/`cleaned_*` fields for effective sender/subject/body
+  - Fix domain relationship logic (no `includes()` for domain comparisons)
+  - Make prior-link history forwarded-aware
+  - Normalize AI outputs (`company_name`, `company_type`) from candidates
+  - Improve candidate context sent to OpenAI
+
+## Risks / edge cases and mitigations
+
+- Risk: Some forwarded emails may not have `display_from_email` populated.
+  - Mitigation: Always fallback to raw `from_email`.
+- Risk: Tightening domain conflict checks could hide legitimate matches for true subdomains.
+  - Mitigation: Use `endsWith("." + domain)` subdomain logic, not strict inequality.
+- Risk: After changes, existing cached suggestions may still show until TTL expires.
+  - Mitigation: Use the existing “Regenerate” button (force) to immediately refresh for the affected email(s).
