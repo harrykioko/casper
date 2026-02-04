@@ -150,6 +150,27 @@ export function buildTaskDraftFromEmail(
 /**
  * Build a CommitmentDraft from email item and CREATE_WAITING_ON suggestion
  */
+/**
+ * Build a CommitmentDraft for manual creation (no AI suggestion)
+ */
+export function buildManualCommitmentDraft(item: InboxItem): CommitmentDraft {
+  return {
+    title: "",
+    content: item.preview || item.subject || "",
+    context: buildCommitmentContextFromEmail(item),
+    counterpartyName: item.senderName || "",
+    direction: "owed_to_me",
+    alsoCreateTask: false,
+    sourceEmailId: item.id,
+    companyId: item.relatedCompanyId || undefined,
+    companyName: item.relatedCompanyName || undefined,
+    companyType: item.relatedCompanyType,
+  };
+}
+
+/**
+ * Build a CommitmentDraft from email item and CREATE_WAITING_ON suggestion
+ */
 export function buildCommitmentDraftFromSuggestion(
   item: InboxItem,
   suggestion: StructuredSuggestion

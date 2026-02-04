@@ -15,7 +15,7 @@ import { format, addDays, nextFriday, nextMonday, startOfTomorrow } from "date-f
 import type { InboxItem } from "@/types/inbox";
 import type { StructuredSuggestion } from "@/types/inboxSuggestions";
 import type { CommitmentDraft, ConfidenceLevel } from "@/types/emailActionDrafts";
-import { buildCommitmentDraftFromSuggestion } from "@/lib/inbox/buildTaskDraft";
+import { buildCommitmentDraftFromSuggestion, buildManualCommitmentDraft } from "@/lib/inbox/buildTaskDraft";
 import { cn } from "@/lib/utils";
 
 export interface CommitmentFormData {
@@ -34,7 +34,7 @@ export interface CommitmentFormData {
 
 interface InlineCommitmentFormProps {
   emailItem: InboxItem;
-  suggestion: StructuredSuggestion;
+  suggestion?: StructuredSuggestion | null;
   onConfirm: (data: CommitmentFormData) => Promise<void>;
   onCancel: () => void;
 }
@@ -91,8 +91,10 @@ export function InlineCommitmentForm({
   onConfirm,
   onCancel,
 }: InlineCommitmentFormProps) {
-  // Build draft from suggestion
-  const initialDraft = buildCommitmentDraftFromSuggestion(emailItem, suggestion);
+  // Build draft - with or without suggestion
+  const initialDraft = suggestion 
+    ? buildCommitmentDraftFromSuggestion(emailItem, suggestion)
+    : buildManualCommitmentDraft(emailItem);
   
   // Form state
   const [title, setTitle] = useState(initialDraft.title);
@@ -152,12 +154,14 @@ export function InlineCommitmentForm({
           Track Obligation
         </div>
 
-        {/* Rationale from suggestion */}
-        <div className="p-2 rounded bg-background/80 border border-border">
-          <p className="text-[10px] text-muted-foreground italic">
-            {suggestion.rationale}
-          </p>
-        </div>
+        {/* Rationale from suggestion - only if present */}
+        {suggestion?.rationale && (
+          <div className="p-2 rounded bg-background/80 border border-border">
+            <p className="text-[10px] text-muted-foreground italic">
+              {suggestion.rationale}
+            </p>
+          </div>
+        )}
 
         {/* Form fields */}
         <div className="space-y-3" onKeyDown={handleKeyDown}>
