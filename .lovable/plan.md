@@ -1,110 +1,48 @@
 
 # Fix Activity Section Not Showing New Items
 
-## Problem
+## Status: ✅ COMPLETED
 
-After creating a pipeline company and a task from the email drawer, nothing shows up in the "Activity" section. This is due to two issues:
+## Problem (Fixed)
 
-1. **Separate state instances**: The `InlineActionPanel` component calls `useTasks()` twice (lines 126 and 149), creating two independent state instances. When a task is created via `createTask`, only that instance's local state updates - the other instance that provides `tasks` for the Activity display remains stale.
+After creating a pipeline company and a task from the email drawer, nothing showed up in the "Activity" section. This was due to two issues:
 
-2. **Missing activity logging**: Actions like creating pipeline companies, linking companies, and adding notes are not being logged to the `inbox_activity` table. The Activity section only shows tasks, missing all other action types.
+1. **Separate state instances**: The `InlineActionPanel` component called `useTasks()` twice, creating two independent state instances.
 
-## Solution
+2. **Missing activity logging**: Actions like creating pipeline companies, linking companies, and adding notes were not being logged to the `inbox_activity` table.
 
-### Part 1: Consolidate `useTasks` calls
+## Solution Implemented
 
-Merge the two separate `useTasks()` calls into a single call to ensure both `createTask` and `tasks` share the same state instance.
+### Part 1: Consolidated `useTasks` calls ✅
 
-**File: `src/components/inbox/InlineActionPanel.tsx`**
-
+Merged the two separate `useTasks()` calls into a single call:
 ```tsx
-// Before (lines 126 and 149):
-const { createTask } = useTasks();
-// ... other code ...
-const { tasks } = useTasks();
-
-// After (single call):
 const { tasks, createTask } = useTasks();
-// Remove the duplicate call on line 149
 ```
 
-### Part 2: Log all actions to `inbox_activity` table
+### Part 2: Added activity logging ✅
 
-Import and use the `useInboxActivity` hook to log all actions for the audit trail. This enables tracking all action types (not just tasks) in the Activity section.
+Added `useInboxActivity` hook and `logActivity` calls after each action:
+- `handleConfirmTask` → logs `create_task`
+- `handleConfirmLinkCompany` → logs `link_company`
+- `handleConfirmSaveAttachments` → logs `save_attachments`
+- `handleConfirmCreatePipeline` → logs `create_pipeline_company`
 
-**File: `src/components/inbox/InlineActionPanel.tsx`**
+### Part 3: Created `useInboxItemActivity` hook ✅
 
-Add import and hook usage:
-```tsx
-import { useInboxActivity } from "@/hooks/useInboxActivity";
-// ...
-const { logActivity } = useInboxActivity();
-```
+New hook fetches activity records from the `inbox_activity` table for display in the Activity section.
 
-Log activity after each successful action:
+### Part 4: Combined activity display ✅
 
-| Action Handler | `logActivity` call |
-|----------------|-------------------|
-| `handleConfirmTask` | `logActivity({ inboxItemId: item.id, actionType: "create_task", targetId: result.id, targetType: "task" })` |
-| `handleConfirmLinkCompany` | `logActivity({ inboxItemId: item.id, actionType: "link_company", targetId: company.id, targetType: company.type })` |
-| `handleConfirmNote` | `logActivity({ inboxItemId: item.id, actionType: "add_note", ... })` |
-| `handleConfirmSaveAttachments` | `logActivity({ inboxItemId: item.id, actionType: "save_attachments", ... })` |
-| `handleConfirmCreatePipeline` | `logActivity({ inboxItemId: item.id, actionType: "create_pipeline_company", targetId: newCompany.id, targetType: "pipeline_company" })` |
-
-### Part 3: Create hook to fetch inbox activity
-
-Create a new hook that fetches activity records from the `inbox_activity` table for a specific inbox item.
-
-**New File: `src/hooks/useInboxItemActivity.ts`**
-
-```tsx
-export function useInboxItemActivity(inboxItemId: string) {
-  // Fetch from inbox_activity table where inbox_item_id matches
-  // Return { activities, loading, refetch }
-}
-```
-
-### Part 4: Display combined activity in the panel
-
-Update the Activity section to combine:
+Updated the Activity section to combine:
 1. Tasks with `source_inbox_item_id` matching the current email
-2. Activity records from `inbox_activity` table
+2. Activity records from `inbox_activity` table (excluding `create_task` to avoid duplicates)
 
-This provides a complete timeline of all actions taken on the email.
+Results are sorted by timestamp descending (newest first).
 
-**File: `src/components/inbox/InlineActionPanel.tsx`**
+### Part 5: Immediate refetch ✅
 
-```tsx
-const { activities, refetch: refetchActivity } = useInboxItemActivity(item.id);
-
-const activityItems = useMemo(() => {
-  const combined = [];
-  
-  // Add task-based activities
-  relatedTasks.forEach(task => { ... });
-  
-  // Add logged activities (pipeline, link, notes, etc.)
-  activities.forEach(activity => { ... });
-  
-  // Sort by timestamp descending
-  return combined.sort((a, b) => b.createdAt - a.createdAt);
-}, [relatedTasks, activities]);
-```
-
-### Part 5: Trigger refetch after actions
-
-After each successful action, call `refetchActivity()` to immediately update the Activity section without waiting for a page refresh.
-
-```tsx
-const handleConfirmTask = async (data) => {
-  const result = await createTask({ ... });
-  if (result) {
-    await logActivity({ ... });
-    refetchActivity(); // Immediately update Activity section
-    handleActionSuccess(...);
-  }
-};
-```
+After each action, `refetchActivity()` is called to immediately update the Activity section.
 
 ---
 
@@ -112,13 +50,6 @@ const handleConfirmTask = async (data) => {
 
 | File | Changes |
 |------|---------|
-| `src/components/inbox/InlineActionPanel.tsx` | Consolidate useTasks calls, add logActivity calls, integrate useInboxItemActivity, update activityItems useMemo |
-| `src/hooks/useInboxItemActivity.ts` | Create new hook to fetch inbox_activity records |
-
----
-
-## Technical Notes
-
-- The `inbox_activity` table already exists with RLS policies for INSERT and SELECT by the creating user
-- Activity types defined in `src/types/inboxActivity.ts` include: `create_task`, `link_company`, `create_pipeline_company`, `add_note`, `save_attachments`
-- The new hook will use React's `useState`/`useEffect` pattern consistent with existing hooks like `useTasks`
+| `src/components/inbox/InlineActionPanel.tsx` | Consolidated useTasks, added logActivity calls, integrated useInboxItemActivity, updated activityItems |
+| `src/hooks/useInboxItemActivity.ts` | Created new hook to fetch inbox_activity records |
+| `src/types/inboxActivity.ts` | Added `add_note` and `save_attachments` action types |
