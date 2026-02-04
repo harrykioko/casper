@@ -590,7 +590,7 @@ export function InlineActionPanel({
             
             {/* Inline Commitment Form */}
             <AnimatePresence>
-              {activeAction === "create_commitment" && activeSuggestion && (
+              {activeAction === "create_commitment" && (
                 <InlineCommitmentForm
                   emailItem={item}
                   suggestion={activeSuggestion}
