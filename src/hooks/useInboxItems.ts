@@ -51,6 +51,10 @@ interface InboxItemRow {
   extracted_categories?: string[] | null;
   extraction_version?: string | null;
   extracted_at?: string | null;
+  // Thread context (v2)
+  thread_clean_text?: string | null;
+  thread_message_count?: number | null;
+  extraction_basis?: string | null;
 }
 
 function transformRow(row: InboxItemRow): InboxItem {
@@ -123,6 +127,10 @@ function transformRow(row: InboxItemRow): InboxItem {
     extractedCategories: row.extracted_categories,
     extractionVersion: row.extraction_version,
     extractedAt: row.extracted_at,
+    // Thread context (v2)
+    threadCleanText: row.thread_clean_text,
+    threadMessageCount: row.thread_message_count,
+    extractionBasis: row.extraction_basis as 'latest' | 'thread' | null,
   };
 }
 

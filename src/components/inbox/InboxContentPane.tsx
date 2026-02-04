@@ -79,16 +79,12 @@ export function InboxContentPane({
     return <Badge variant="outline" className="text-[10px] h-5">Open</Badge>;
   };
 
-  // Signal badges for what was stripped
+  // Signal badges for "View original" trigger
   const signalBadges = [];
   if (item.isForwarded) signalBadges.push({ icon: Forward, label: "Forwarded" });
-  if (item.hasThread) signalBadges.push({ icon: MessageSquareQuote, label: "Thread stripped" });
-  if (item.hasDisclaimer) signalBadges.push({ icon: FileWarning, label: "Disclaimer stripped" });
-  if (item.hasCalendar) signalBadges.push({ icon: Calendar, label: "Calendar stripped" });
-
-  // Check if any cleaning was applied (for showing "View original" toggle)
-  const hasCleanedContent = hasServerCleanedContent || 
-    (clientCleanedEmail?.cleaningApplied?.length || 0) > 0;
+  if (item.hasThread) signalBadges.push({ icon: MessageSquareQuote, label: "Thread" });
+  if (item.hasDisclaimer) signalBadges.push({ icon: FileWarning, label: "Disclaimer" });
+  if (item.hasCalendar) signalBadges.push({ icon: Calendar, label: "Calendar" });
 
   // Handle company click - navigate to the correct page
   const handleCompanyClick = () => {
@@ -108,11 +104,11 @@ export function InboxContentPane({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header Section */}
-      <div className="flex-shrink-0 p-5 border-b border-border">
+      {/* Header Section - tighter padding */}
+      <div className="flex-shrink-0 px-5 py-4 border-b border-border/50">
         {/* Close button - top right (only if not hidden) */}
         {!hideCloseButton && (
-          <div className="flex justify-end mb-3">
+          <div className="flex justify-end mb-2">
             <Button 
               variant="ghost" 
               size="icon" 
@@ -124,9 +120,9 @@ export function InboxContentPane({
           </div>
         )}
 
-        {/* Sender info row - use display fields for original sender */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center flex-shrink-0">
+        {/* Sender info row - compact layout */}
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 rounded-full bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center flex-shrink-0">
             <span className="text-sm font-semibold text-sky-600 dark:text-sky-400">
               {initial}
             </span>
@@ -138,9 +134,24 @@ export function InboxContentPane({
               </span>
               {getStatusBadge()}
             </div>
-            <span className="text-xs text-muted-foreground truncate block">
-              {displayFromEmail}
-            </span>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="truncate">{displayFromEmail}</span>
+              {/* Subtle forwarded indicator */}
+              {showForwardingInfo && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground/70 flex-shrink-0">
+                      <Forward className="h-2.5 w-2.5" />
+                      via {item.senderName?.split(' ')[0]}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="font-medium">Forwarded by {item.senderName}</p>
+                    <p className="text-muted-foreground">{item.senderEmail}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
           </div>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -154,43 +165,10 @@ export function InboxContentPane({
           </Tooltip>
         </div>
 
-        {/* Forwarding info (shows who forwarded it) */}
-        {showForwardingInfo && (
-          <div className="mb-4 p-2.5 rounded-lg bg-muted/30 border border-border">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground mb-1">
-              Forwarded by
-            </p>
-            <p className="text-xs font-medium text-foreground">
-              {item.senderName}
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              {item.senderEmail}
-            </p>
-          </div>
-        )}
-
-        {/* Subject */}
-        <h1 className="text-lg font-semibold text-foreground leading-tight mb-3">
+        {/* Subject - slightly smaller */}
+        <h1 className="text-base font-semibold text-foreground leading-snug">
           {displaySubject}
         </h1>
-
-        {/* Signal badges */}
-        {signalBadges.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {signalBadges.map(({ icon: Icon, label }) => (
-              <Tooltip key={label}>
-                <TooltipTrigger asChild>
-                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted/50 border border-border text-[10px] text-muted-foreground">
-                    <Icon className="h-3 w-3" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{label}</p>
-                </TooltipContent>
-              </Tooltip>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Scrollable Body */}
@@ -230,7 +208,7 @@ export function InboxContentPane({
           />
         </div>
 
-        {/* Linked Entities Section - now before View original email */}
+        {/* Linked Entities Section */}
         {item.relatedCompanyId && (
           <div className="mt-6">
             <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground mb-3">
@@ -277,7 +255,7 @@ export function InboxContentPane({
           </div>
         )}
 
-        {/* Collapsible raw/original section - now after Linked Entities */}
+        {/* Collapsible raw/original section - with signal badges in trigger */}
         <Collapsible 
           open={isRawOpen} 
           onOpenChange={setIsRawOpen}
@@ -285,10 +263,19 @@ export function InboxContentPane({
         >
           <CollapsibleTrigger className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
             <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isRawOpen ? 'rotate-180' : ''}`} />
-            View original email
+            <span>View original email</span>
             {signalBadges.length > 0 && (
-              <span className="text-[10px] text-muted-foreground/60 ml-1">
-                - {signalBadges.map(b => b.label.replace(" stripped", "")).join(", ")}
+              <span className="flex items-center gap-1 ml-1">
+                {signalBadges.map(({ icon: Icon, label }) => (
+                  <Tooltip key={label}>
+                    <TooltipTrigger asChild>
+                      <Icon className="h-3 w-3 text-muted-foreground/50" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{label}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
               </span>
             )}
           </CollapsibleTrigger>
