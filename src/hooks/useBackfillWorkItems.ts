@@ -58,10 +58,10 @@ async function backfill(userId: string): Promise<number> {
     }
   }
 
-  // Backfill tasks: incomplete, not archived, not linked to project or company
+  // Backfill tasks: incomplete, not archived, not linked AND not enriched
   const { data: tasks } = await supabase
     .from("tasks")
-    .select("id, project_id, company_id, pipeline_company_id")
+    .select("id, project_id, company_id, pipeline_company_id, scheduled_for, priority")
     .eq("created_by", userId)
     .or("completed.is.null,completed.eq.false")
     .order("created_at", { ascending: false })
@@ -70,8 +70,9 @@ async function backfill(userId: string): Promise<number> {
   if (tasks) {
     for (const task of tasks) {
       if (existingKeys.has(`task:${task.id}`)) continue;
-      // Only backfill unlinked tasks
-      if (!task.project_id && !task.company_id && !task.pipeline_company_id) {
+      // Only backfill tasks that are unlinked AND unenriched (no deadline/priority)
+      if (!task.project_id && !task.company_id && !task.pipeline_company_id 
+          && !task.scheduled_for && !task.priority) {
         const result = await ensureWorkItem("task", task.id, userId);
         if (result?.isNew) created++;
       }
