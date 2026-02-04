@@ -19,9 +19,9 @@ import type { StructuredSuggestion, CreatePipelineCompanyMetadata } from "@/type
 import type { InboxAttachment } from "@/hooks/useInboxAttachments";
 
 const STORAGE_KEY = "casper:triage-inbox-drawer:width";
-const DEFAULT_WIDTH = 720;
-const MIN_WIDTH = 600;
-const MAX_WIDTH = 1200;
+const DEFAULT_WIDTH = 900;
+const MIN_WIDTH = 800;
+const MAX_WIDTH = 1400;
 
 interface TriageInboxDrawerProps {
   open: boolean;
