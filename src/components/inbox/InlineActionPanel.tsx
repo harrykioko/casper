@@ -12,6 +12,7 @@ import {
   Loader2,
   Wand2,
   Download,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,8 +36,13 @@ import {
   InlineLinkCompanyForm, 
   InlineNoteForm,
   InlineSaveAttachmentsForm,
-  type ActionType 
+  InlineCreatePipelineForm,
+  type ActionType,
+  type PipelineFormData,
 } from "@/components/inbox/inline-actions";
+import { usePipeline } from "@/hooks/usePipeline";
+import { supabase } from "@/integrations/supabase/client";
+import type { CreatePipelineCompanyMetadata } from "@/types/inboxSuggestions";
 import { copyInboxAttachmentToPipeline } from "@/lib/inbox/copyAttachmentToCompany";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -119,6 +125,7 @@ export function InlineActionPanel({
   const { user } = useAuth();
   const { createTask } = useTasks();
   const { linkCompany } = useInboxItems();
+  const { createCompany } = usePipeline();
   const [isActivityOpen, setIsActivityOpen] = useState(false);
   
   // Active action state
@@ -268,6 +275,72 @@ export function InlineActionPanel({
     }
   };
 
+  // Pipeline company creation
+  const handleConfirmCreatePipeline = async (data: PipelineFormData) => {
+    if (!user) return;
+
+    try {
+      // 1. Create the pipeline company
+      const newCompany = await createCompany({
+        company_name: data.companyName,
+        current_round: data.stage,
+        website: data.domain ? `https://${data.domain.replace(/^https?:\/\//, '')}` : undefined,
+      });
+
+      if (!newCompany) {
+        toast.error("Failed to create pipeline company");
+        return;
+      }
+
+      // 2. Create primary contact if provided
+      if (data.contactName) {
+        await supabase.from("pipeline_contacts").insert({
+          pipeline_company_id: newCompany.id,
+          name: data.contactName,
+          email: data.contactEmail || null,
+          is_primary: true,
+          is_founder: false,
+          created_by: user.id,
+        });
+      }
+
+      // 3. Create initial note if provided
+      if (data.notes || data.source) {
+        const noteContent = [
+          data.notes,
+          data.source ? `Source: ${data.source}` : null,
+        ].filter(Boolean).join("\n\n");
+        
+        if (noteContent) {
+          await supabase.from("pipeline_interactions").insert({
+            pipeline_company_id: newCompany.id,
+            content: noteContent,
+            interaction_type: "note",
+            created_by: user.id,
+          });
+        }
+      }
+
+      // 4. Link the email to the new company
+      linkCompany(item.id, newCompany.id, data.companyName, "pipeline", null);
+
+      // 5. Show success state
+      handleActionSuccess("create_pipeline", {
+        id: newCompany.id,
+        name: data.companyName,
+        link: `/pipeline/${newCompany.id}`,
+      });
+
+      // Auto-dismiss suggestion if applicable
+      if (activeSuggestion) {
+        dismissSuggestion(activeSuggestion.id);
+      }
+    } catch (error) {
+      console.error("Failed to create pipeline company:", error);
+      toast.error("Failed to create pipeline company");
+    }
+  };
+
   // Handle suggestion selection - prefill the form
   const handleSuggestionSelect = (suggestion: StructuredSuggestion) => {
     setActiveSuggestion(suggestion);
@@ -293,11 +366,21 @@ export function InlineActionPanel({
           companyName: suggestion.company_name,
         });
         break;
-      case "CREATE_PIPELINE_COMPANY":
-        // For now, open link company - full pipeline form TBD
-        setActiveAction("link_company");
-        toast.info("Add to Pipeline feature coming soon - use Link Company for now");
+      case "CREATE_PIPELINE_COMPANY": {
+        setActiveAction("create_pipeline");
+        const metadata = suggestion.metadata as unknown as CreatePipelineCompanyMetadata | undefined;
+        setPrefillData({
+          companyName: metadata?.extracted_company_name || "",
+          domain: metadata?.extracted_domain || "",
+          contactName: metadata?.primary_contact_name || "",
+          contactEmail: metadata?.primary_contact_email || "",
+          notes: metadata?.notes_summary || "",
+          source: metadata?.intro_source || "",
+          rationale: suggestion.rationale,
+          confidence: suggestion.confidence,
+        });
         break;
+      }
       default:
         setActiveAction("create_task");
         setPrefillData({ title: suggestion.title });
@@ -390,6 +473,27 @@ export function InlineActionPanel({
                   emailItem={item}
                   prefill={prefillData as any}
                   onConfirm={handleConfirmLinkCompany}
+                  onCancel={handleCancelAction}
+                />
+              )}
+            </AnimatePresence>
+
+            {/* Add to Pipeline */}
+            <ActionButton
+              icon={Plus}
+              label="Add to Pipeline"
+              onClick={() => handleSelectAction("create_pipeline")}
+              isActive={activeAction === "create_pipeline"}
+            />
+            
+            {/* Inline Create Pipeline Form */}
+            <AnimatePresence>
+              {activeAction === "create_pipeline" && (
+                <InlineCreatePipelineForm
+                  emailItem={item}
+                  prefill={prefillData as any}
+                  suggestion={activeSuggestion}
+                  onConfirm={handleConfirmCreatePipeline}
                   onCancel={handleCancelAction}
                 />
               )}
