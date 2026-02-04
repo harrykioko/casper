@@ -1,10 +1,11 @@
-
 import { useTasks, transformTaskForDatabase } from './useTasks';
 import { useCategories } from './useCategories';
+import { useSnooze } from './useSnooze';
 
 export function useTasksManager() {
-  const { tasks, createTask, updateTask, deleteTask, getInboxTasks, getNonInboxTasks, getArchivedTasks, archiveTask, unarchiveTask } = useTasks();
+  const { tasks, createTask, updateTask, deleteTask, getInboxTasks, getNonInboxTasks, getArchivedTasks, archiveTask, unarchiveTask, snoozeTask } = useTasks();
   const { getCategoryIdByName } = useCategories();
+  const { snooze } = useSnooze();
   
   const handleAddTask = (content: string) => {
     // All new tasks go to inbox by default
@@ -53,6 +54,8 @@ export function useTasksManager() {
       category_id: categoryId,
       company_id: updatedTask.company_id || null,
       pipeline_company_id: updatedTask.pipeline_company_id || null,
+      effort_minutes: updatedTask.effort_minutes || null,
+      effort_category: updatedTask.effort_category || null,
       // DB trigger will handle inbox = false when scheduled_for or project_id is set
     });
 
@@ -82,6 +85,22 @@ export function useTasksManager() {
     unarchiveTask(id);
   };
 
+  const handleSnoozeTask = async (id: string, until: Date) => {
+    await snoozeTask(id, until);
+  };
+
+  const handleRescheduleTask = (id: string, date: Date) => {
+    updateTask(id, { scheduled_for: date.toISOString() });
+  };
+
+  const handleUpdateEffort = (id: string, minutes: number, category: string) => {
+    updateTask(id, { effort_minutes: minutes, effort_category: category });
+  };
+
+  const handleUpdatePriority = (id: string, priority: string) => {
+    updateTask(id, { priority });
+  };
+
   return {
     tasks,
     inboxTasks: getInboxTasks(),
@@ -97,5 +116,9 @@ export function useTasksManager() {
     bulkUpdate,
     handleArchiveTask,
     handleUnarchiveTask,
+    handleSnoozeTask,
+    handleRescheduleTask,
+    handleUpdateEffort,
+    handleUpdatePriority,
   };
 }

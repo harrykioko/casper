@@ -1,97 +1,224 @@
 import { useMemo } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Task } from "@/hooks/useTasks";
-import { TaskWorkCard } from "./TaskWorkCard";
-import { parseISO, differenceInDays, isToday, isTomorrow, isPast } from "date-fns";
+import { Calendar, Clock, CalendarDays, CalendarRange } from "lucide-react";
+import type { EnrichedTask } from "@/hooks/useEnrichedTasks";
+import { TaskProcessingCard } from "./TaskProcessingCard";
+import { parseISO, isToday, isTomorrow, isPast, differenceInDays, addDays, format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface TaskGroupedListProps {
-  tasks: Task[];
+  tasks: EnrichedTask[];
+  excludeIds?: Set<string>; // Tasks to exclude (e.g., already in Today lane)
   onTaskComplete: (id: string) => void;
   onTaskDelete: (id: string) => void;
-  onTaskClick: (task: Task) => void;
-  onQuickUpdate?: (id: string, updates: Partial<Task>) => void;
+  onTaskClick: (task: EnrichedTask) => void;
+  onSnooze: (id: string, until: Date) => void;
+  onReschedule: (id: string, date: Date) => void;
+  onUpdatePriority: (id: string, priority: string) => void;
+  onUpdateEffort: (id: string, minutes: number, category: string) => void;
+  onArchive?: (id: string) => void;
 }
 
 interface TaskGroup {
+  id: string;
   label: string;
-  tasks: Task[];
-  priority: number;
+  sublabel?: string;
+  tasks: EnrichedTask[];
+  visualWeight: 'high' | 'medium' | 'low' | 'muted';
+  icon: typeof Calendar;
+  iconColor: string;
 }
 
-function isWithinDays(dateString: string | undefined, days: number): boolean {
-  if (!dateString) return false;
-  const date = parseISO(dateString);
-  const now = new Date();
-  const diff = differenceInDays(date, now);
-  return diff >= -1 && diff <= days; // Include overdue by 1 day
-}
-
-function isOverdue(dateString: string | undefined): boolean {
+function isOverdue(dateString?: string): boolean {
   if (!dateString) return false;
   const date = parseISO(dateString);
   return isPast(date) && !isToday(date);
 }
 
-export function TaskGroupedList({ 
-  tasks, 
-  onTaskComplete, 
-  onTaskDelete, 
+function isDueToday(dateString?: string): boolean {
+  if (!dateString) return false;
+  return isToday(parseISO(dateString));
+}
+
+function isDueTomorrow(dateString?: string): boolean {
+  if (!dateString) return false;
+  return isTomorrow(parseISO(dateString));
+}
+
+function isThisWeek(dateString?: string): boolean {
+  if (!dateString) return false;
+  const date = parseISO(dateString);
+  const daysFromNow = differenceInDays(date, new Date());
+  return daysFromNow >= 2 && daysFromNow <= 7;
+}
+
+function isUpcoming(dateString?: string): boolean {
+  if (!dateString) return false;
+  const date = parseISO(dateString);
+  const daysFromNow = differenceInDays(date, new Date());
+  return daysFromNow > 7;
+}
+
+export function TaskGroupedList({
+  tasks,
+  excludeIds = new Set(),
+  onTaskComplete,
+  onTaskDelete,
   onTaskClick,
-  onQuickUpdate 
+  onSnooze,
+  onReschedule,
+  onUpdatePriority,
+  onUpdateEffort,
+  onArchive,
 }: TaskGroupedListProps) {
   const taskGroups = useMemo(() => {
     const groups: TaskGroup[] = [];
-    const assignedIds = new Set<string>();
+    const assigned = new Set<string>();
 
-    // 1. Due Soon (overdue, today, tomorrow, next 2 days)
-    const dueSoon = tasks.filter(t => {
-      if (assignedIds.has(t.id)) return false;
-      const isDue = isWithinDays(t.scheduledFor, 2) || isOverdue(t.scheduledFor);
-      if (isDue) assignedIds.add(t.id);
-      return isDue;
+    // Filter out excluded tasks (already in Today lane)
+    const availableTasks = tasks.filter(t => !excludeIds.has(t.id));
+
+    // 1. Overdue
+    const overdue = availableTasks.filter(t => {
+      if (assigned.has(t.id)) return false;
+      if (isOverdue(t.scheduledFor)) {
+        assigned.add(t.id);
+        return true;
+      }
+      return false;
     }).sort((a, b) => {
-      // Overdue first, then by date
-      const aOverdue = isOverdue(a.scheduledFor) ? -1 : 0;
-      const bOverdue = isOverdue(b.scheduledFor) ? -1 : 0;
-      if (aOverdue !== bOverdue) return aOverdue - bOverdue;
       const aDate = a.scheduledFor ? parseISO(a.scheduledFor).getTime() : Infinity;
       const bDate = b.scheduledFor ? parseISO(b.scheduledFor).getTime() : Infinity;
       return aDate - bDate;
     });
 
-    if (dueSoon.length > 0) {
-      groups.push({ label: "Due Soon", tasks: dueSoon, priority: 1 });
+    if (overdue.length > 0) {
+      groups.push({
+        id: 'overdue',
+        label: 'Overdue',
+        tasks: overdue,
+        visualWeight: 'high',
+        icon: Clock,
+        iconColor: 'text-destructive',
+      });
     }
 
-    // 2. Next Up (high/medium priority, not in due soon)
-    const nextUp = tasks.filter(t => {
-      if (assignedIds.has(t.id)) return false;
-      const isHighMed = t.priority === "high" || t.priority === "medium";
-      if (isHighMed) assignedIds.add(t.id);
-      return isHighMed;
+    // 2. Due Today
+    const dueToday = availableTasks.filter(t => {
+      if (assigned.has(t.id)) return false;
+      if (isDueToday(t.scheduledFor)) {
+        assigned.add(t.id);
+        return true;
+      }
+      return false;
+    });
+
+    if (dueToday.length > 0) {
+      groups.push({
+        id: 'today',
+        label: 'Today',
+        tasks: dueToday,
+        visualWeight: 'high',
+        icon: Calendar,
+        iconColor: 'text-amber-500',
+      });
+    }
+
+    // 3. Due Tomorrow
+    const dueTomorrow = availableTasks.filter(t => {
+      if (assigned.has(t.id)) return false;
+      if (isDueTomorrow(t.scheduledFor)) {
+        assigned.add(t.id);
+        return true;
+      }
+      return false;
+    });
+
+    if (dueTomorrow.length > 0) {
+      groups.push({
+        id: 'tomorrow',
+        label: 'Tomorrow',
+        sublabel: format(addDays(new Date(), 1), 'EEEE'),
+        tasks: dueTomorrow,
+        visualWeight: 'medium',
+        icon: CalendarDays,
+        iconColor: 'text-sky-500',
+      });
+    }
+
+    // 4. This Week
+    const thisWeek = availableTasks.filter(t => {
+      if (assigned.has(t.id)) return false;
+      if (isThisWeek(t.scheduledFor)) {
+        assigned.add(t.id);
+        return true;
+      }
+      return false;
     }).sort((a, b) => {
+      const aDate = a.scheduledFor ? parseISO(a.scheduledFor).getTime() : Infinity;
+      const bDate = b.scheduledFor ? parseISO(b.scheduledFor).getTime() : Infinity;
+      return aDate - bDate;
+    });
+
+    if (thisWeek.length > 0) {
+      groups.push({
+        id: 'this-week',
+        label: 'This Week',
+        tasks: thisWeek,
+        visualWeight: 'medium',
+        icon: CalendarRange,
+        iconColor: 'text-muted-foreground',
+      });
+    }
+
+    // 5. Upcoming (with date, beyond this week)
+    const upcoming = availableTasks.filter(t => {
+      if (assigned.has(t.id)) return false;
+      if (isUpcoming(t.scheduledFor)) {
+        assigned.add(t.id);
+        return true;
+      }
+      return false;
+    }).sort((a, b) => {
+      const aDate = a.scheduledFor ? parseISO(a.scheduledFor).getTime() : Infinity;
+      const bDate = b.scheduledFor ? parseISO(b.scheduledFor).getTime() : Infinity;
+      return aDate - bDate;
+    });
+
+    if (upcoming.length > 0) {
+      groups.push({
+        id: 'upcoming',
+        label: 'Upcoming',
+        tasks: upcoming,
+        visualWeight: 'low',
+        icon: CalendarRange,
+        iconColor: 'text-muted-foreground/60',
+      });
+    }
+
+    // 6. No Date (backlog) - sorted by priority
+    const noDate = availableTasks.filter(t => !assigned.has(t.id)).sort((a, b) => {
       const priorityOrder = { high: 0, medium: 1, low: 2 };
       const aPrio = priorityOrder[a.priority as keyof typeof priorityOrder] ?? 3;
       const bPrio = priorityOrder[b.priority as keyof typeof priorityOrder] ?? 3;
       return aPrio - bPrio;
     });
 
-    if (nextUp.length > 0) {
-      groups.push({ label: "Next Up", tasks: nextUp, priority: 2 });
-    }
-
-    // 3. Later (everything else)
-    const later = tasks.filter(t => !assignedIds.has(t.id));
-
-    if (later.length > 0) {
-      groups.push({ label: "Later", tasks: later, priority: 3 });
+    if (noDate.length > 0) {
+      groups.push({
+        id: 'no-date',
+        label: 'No Date',
+        tasks: noDate,
+        visualWeight: 'muted',
+        icon: Calendar,
+        iconColor: 'text-muted-foreground/50',
+      });
     }
 
     return groups;
-  }, [tasks]);
+  }, [tasks, excludeIds]);
 
-  if (tasks.length === 0) {
+  if (tasks.length === 0 || taskGroups.every(g => g.tasks.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-4">
@@ -111,12 +238,28 @@ export function TaskGroupedList({
   return (
     <div className="space-y-6">
       {taskGroups.map((group) => (
-        <div key={group.label}>
+        <div key={group.id}>
           {/* Section Header */}
           <div className="flex items-center gap-2 mb-3">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <div className={cn(
+              "flex items-center justify-center w-5 h-5 rounded",
+              group.visualWeight === 'high' && "bg-muted/50",
+              group.visualWeight === 'medium' && "bg-muted/30",
+              (group.visualWeight === 'low' || group.visualWeight === 'muted') && "bg-muted/20"
+            )}>
+              <group.icon className={cn("h-3 w-3", group.iconColor)} />
+            </div>
+            <span className={cn(
+              "text-[11px] font-semibold uppercase tracking-wider",
+              group.visualWeight === 'muted' ? "text-muted-foreground/60" : "text-muted-foreground"
+            )}>
               {group.label}
             </span>
+            {group.sublabel && (
+              <span className="text-[10px] text-muted-foreground/50">
+                {group.sublabel}
+              </span>
+            )}
             <span className="text-[10px] text-muted-foreground/60">
               {group.tasks.length}
             </span>
@@ -126,13 +269,18 @@ export function TaskGroupedList({
           <div className="space-y-2">
             <AnimatePresence mode="popLayout">
               {group.tasks.map((task) => (
-                <TaskWorkCard
+                <TaskProcessingCard
                   key={task.id}
                   task={task}
+                  visualWeight={group.visualWeight}
                   onComplete={onTaskComplete}
                   onDelete={onTaskDelete}
+                  onSnooze={onSnooze}
+                  onReschedule={onReschedule}
+                  onUpdatePriority={onUpdatePriority}
+                  onUpdateEffort={onUpdateEffort}
+                  onArchive={onArchive}
                   onClick={onTaskClick}
-                  onQuickUpdate={onQuickUpdate}
                 />
               ))}
             </AnimatePresence>
