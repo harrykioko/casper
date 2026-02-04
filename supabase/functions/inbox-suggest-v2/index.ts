@@ -1,5 +1,6 @@
 // inbox-suggest-v2: VC-Intent Aware Inbox Suggestions
 // Uses structured suggestion types and candidate company retrieval
+// Forward-aware: uses display_* fields for effective sender/subject/body
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -28,6 +29,25 @@ function isGenericEmailDomain(domain: string | null): boolean {
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Check if two domains are the same or one is a subdomain of the other.
+ * Returns true only if:
+ * - a === b, OR
+ * - a.endsWith("." + b), OR
+ * - b.endsWith("." + a)
+ * 
+ * This prevents "sandboxwealth.com" from matching "wealth.com" (they're different companies).
+ */
+function domainsAreSameOrSubdomain(a: string | null, b: string | null): boolean {
+  if (!a || !b) return false;
+  const aNorm = a.toLowerCase();
+  const bNorm = b.toLowerCase();
+  if (aNorm === bNorm) return true;
+  if (aNorm.endsWith("." + bNorm)) return true;
+  if (bNorm.endsWith("." + aNorm)) return true;
+  return false;
 }
 
 const EMAIL_INTENTS = [
@@ -74,7 +94,7 @@ function normalizeDomain(domain: string | null): string | null {
 
 async function fetchCandidateCompanies(
   supabase: ReturnType<typeof createClient>,
-  senderEmail: string,
+  effectiveSenderEmail: string,
   subject: string,
   bodySnippet: string
 ): Promise<CandidateCompany[]> {
@@ -113,15 +133,15 @@ async function fetchCandidateCompanies(
     }
   }
 
-  const senderDomain = extractDomainFromEmail(senderEmail);
+  const senderDomain = extractDomainFromEmail(effectiveSenderEmail);
   const normalizedSenderDomain = normalizeDomain(senderDomain);
   const candidateMap = new Map<string, CandidateCompany>();
 
-  // Domain matches (score: 100)
+  // Domain matches (score: 100) - support exact match or true subdomain
   if (normalizedSenderDomain) {
     for (const company of companies) {
       const companyDomain = normalizeDomain(company.primary_domain);
-      if (companyDomain && companyDomain === normalizedSenderDomain) {
+      if (companyDomain && domainsAreSameOrSubdomain(normalizedSenderDomain, companyDomain)) {
         candidateMap.set(company.id, {
           id: company.id,
           name: company.name,
@@ -134,10 +154,11 @@ async function fetchCandidateCompanies(
     }
   }
 
-  // Prior links from same sender
+  // Prior links from same sender - now forward-aware
+  // Select display_from_email in addition to from_email
   const { data: priorItems } = await supabase
     .from("inbox_items")
-    .select("from_email, related_company_id")
+    .select("from_email, display_from_email, related_company_id")
     .not("related_company_id", "is", null)
     .limit(50);
 
@@ -147,8 +168,12 @@ async function fetchCandidateCompanies(
         const company = companies.find((c) => c.id === item.related_company_id);
         if (!company) continue;
 
-        const itemDomain = extractDomainFromEmail(item.from_email);
-        if (item.from_email.toLowerCase() === senderEmail.toLowerCase()) {
+        // Use effective email from prior item (forward-aware)
+        const priorEffectiveEmail = (item.display_from_email ?? item.from_email).toLowerCase();
+        const priorEffectiveDomain = extractDomainFromEmail(priorEffectiveEmail);
+        const normalizedPriorDomain = normalizeDomain(priorEffectiveDomain);
+        
+        if (priorEffectiveEmail === effectiveSenderEmail.toLowerCase()) {
           // Exact sender match
           if (!candidateMap.has(company.id)) {
             candidateMap.set(company.id, {
@@ -160,8 +185,13 @@ async function fetchCandidateCompanies(
               match_reason: "prior_link",
             });
           }
-        } else if (itemDomain === senderDomain && !candidateMap.has(company.id)) {
-          // Same domain history
+        } else if (
+          normalizedPriorDomain &&
+          normalizedSenderDomain &&
+          domainsAreSameOrSubdomain(normalizedPriorDomain, normalizedSenderDomain) &&
+          !candidateMap.has(company.id)
+        ) {
+          // Same domain history (using proper subdomain check)
           candidateMap.set(company.id, {
             id: company.id,
             name: company.name,
@@ -195,15 +225,13 @@ async function fetchCandidateCompanies(
       const senderDomainNormalized = normalizeDomain(senderDomain);
       const companyDomainNormalized = normalizeDomain(company.primary_domain);
       
-      // If both have domains and they differ significantly, skip this match
+      // If both have domains and they are NOT the same or subdomain, skip this match
       // (prevents "Wealth" from matching email about "Sandbox Wealth")
       if (
         senderDomainNormalized && 
         !isGenericEmailDomain(senderDomainNormalized) &&
         companyDomainNormalized && 
-        senderDomainNormalized !== companyDomainNormalized &&
-        !senderDomainNormalized.includes(companyDomainNormalized) &&
-        !companyDomainNormalized.includes(senderDomainNormalized)
+        !domainsAreSameOrSubdomain(senderDomainNormalized, companyDomainNormalized)
       ) {
         // Sender domain is professional but different from company domain
         // This is likely a different company (sandboxwealth.com vs wealth.com)
@@ -299,6 +327,7 @@ When suggesting CREATE_WAITING_ON (for emails where someone promises to do somet
 10. CRITICAL: Do not suggest LINK_COMPANY if the sender's email domain differs from the candidate company's domain.
     Example: Email from ray@sandboxwealth.com should NOT link to "Wealth" (wealth.com) - these are different companies.
     In such cases, suggest CREATE_PIPELINE_COMPANY with the correct company name from the email.
+11. When using LINK_COMPANY with a company_id from candidate_companies, use the exact company name and type from that candidate.
 
 ## Response Format
 
@@ -416,10 +445,10 @@ function buildToolSchema() {
 }
 
 async function callOpenAI(
-  subject: string,
-  bodySnippet: string,
-  senderEmail: string,
-  senderName: string | null,
+  effectiveSubject: string,
+  effectiveBody: string,
+  effectiveSenderEmail: string,
+  effectiveSenderName: string | null,
   candidates: CandidateCompany[]
 ): Promise<{
   intent: string;
@@ -445,18 +474,21 @@ async function callOpenAI(
     throw new Error("OPENAI_API_KEY not configured");
   }
 
+  // Enhanced candidate list with domain and match context
   const candidateList = candidates.length > 0
-    ? candidates.map((c) => `- ID: ${c.id}, Name: ${c.name}, Type: ${c.type}`).join("\n")
+    ? candidates.map((c) => 
+        `- ID: ${c.id}, Name: ${c.name}, Type: ${c.type}, Domain: ${c.primary_domain ?? "null"}, Match: ${c.match_reason} (score: ${c.match_score})`
+      ).join("\n")
     : "No candidate companies found.";
 
   const userMessage = `
 ## Email Details
 
-**From:** ${senderName ? `${senderName} <${senderEmail}>` : senderEmail}
-**Subject:** ${subject}
+**From:** ${effectiveSenderName ? `${effectiveSenderName} <${effectiveSenderEmail}>` : effectiveSenderEmail}
+**Subject:** ${effectiveSubject}
 
 **Body:**
-${bodySnippet.slice(0, 1500)}
+${effectiveBody.slice(0, 1500)}
 
 ## Candidate Companies (use these IDs only for LINK_COMPANY)
 
@@ -498,18 +530,34 @@ Analyze this email and provide structured suggestions.`;
   return JSON.parse(toolCall.function.arguments);
 }
 
+/**
+ * Validate company references and normalize company_name/company_type from candidates.
+ * This prevents the AI from hallucinating incorrect names or types.
+ */
 function validateCompanyReferences(
   analysis: Awaited<ReturnType<typeof callOpenAI>>,
   candidates: CandidateCompany[]
 ): typeof analysis {
-  const validIds = new Set(candidates.map((c) => c.id));
+  // Build a map for quick lookup
+  const candidateMap = new Map<string, CandidateCompany>();
+  for (const c of candidates) {
+    candidateMap.set(c.id, c);
+  }
 
   for (const suggestion of analysis.suggestions) {
-    if (suggestion.company_id && !validIds.has(suggestion.company_id)) {
-      console.warn(`Invalid company_id ${suggestion.company_id}, removing`);
-      suggestion.company_id = null;
-      suggestion.company_name = null;
-      suggestion.company_type = null;
+    if (suggestion.company_id) {
+      const candidate = candidateMap.get(suggestion.company_id);
+      if (candidate) {
+        // Normalize name and type from the actual candidate record
+        suggestion.company_name = candidate.name;
+        suggestion.company_type = candidate.type;
+      } else {
+        // Invalid company_id, clear the references
+        console.warn(`Invalid company_id ${suggestion.company_id}, removing`);
+        suggestion.company_id = null;
+        suggestion.company_name = null;
+        suggestion.company_type = null;
+      }
     }
   }
 
@@ -586,10 +634,14 @@ serve(async (req) => {
       }
     }
 
-    // Fetch inbox item
+    // Fetch inbox item - now including display/cleaned fields for forward-awareness
     const { data: item, error: itemError } = await supabase
       .from("inbox_items")
-      .select("id, subject, text_body, from_email, from_name")
+      .select(`
+        id, subject, text_body, from_email, from_name,
+        display_from_email, display_from_name, display_subject,
+        cleaned_text, thread_clean_text
+      `)
       .eq("id", inbox_item_id)
       .single();
 
@@ -600,26 +652,38 @@ serve(async (req) => {
       });
     }
 
-    // Get candidate companies
+    // Compute effective values (forward-aware)
+    const effectiveFromEmail = item.display_from_email ?? item.from_email;
+    const effectiveFromName = item.display_from_name ?? item.from_name;
+    const effectiveSubject = item.display_subject ?? item.subject;
+    const effectiveBody = item.thread_clean_text ?? item.cleaned_text ?? item.text_body ?? "";
+
+    console.log(`Effective sender: ${effectiveFromName ? `${effectiveFromName} <${effectiveFromEmail}>` : effectiveFromEmail}`);
+    console.log(`Effective subject: ${effectiveSubject}`);
+
+    // Get candidate companies using effective sender
     const candidates = await fetchCandidateCompanies(
       supabase,
-      item.from_email,
-      item.subject,
-      item.text_body || ""
+      effectiveFromEmail,
+      effectiveSubject,
+      effectiveBody
     );
 
     console.log(`Found ${candidates.length} candidate companies`);
+    if (candidates.length > 0) {
+      console.log(`Top candidates: ${candidates.slice(0, 3).map(c => `${c.name} (${c.match_reason}:${c.match_score})`).join(", ")}`);
+    }
 
-    // Call OpenAI
+    // Call OpenAI with effective values
     const analysis = await callOpenAI(
-      item.subject,
-      item.text_body || "",
-      item.from_email,
-      item.from_name,
+      effectiveSubject,
+      effectiveBody,
+      effectiveFromEmail,
+      effectiveFromName,
       candidates
     );
 
-    // Validate company references
+    // Validate company references and normalize from candidates
     const validated = validateCompanyReferences(analysis, candidates);
 
     // Add IDs to suggestions
