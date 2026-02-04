@@ -1,223 +1,76 @@
 
 
-# Add "Add to Pipeline" Action to Email Drawer
+# Fix Stage Dropdown in Inline Pipeline Form
 
 ## Problem
 
-The inline action panel in the email drawer is missing a button to create a new pipeline company. The screenshot shows actions for:
-- Create Task
-- Add Note  
-- Link Company
-- Snooze
-- Complete
-- Archive
+The stage dropdown in the "Add to Pipeline" inline form is unresponsive. When clicking the Stage selector, the dropdown menu appears but cannot be interacted with because it renders **behind** the email drawer.
 
-But there's no "Add to Pipeline" action for when a user receives an intro email about a company they want to add to their deal pipeline.
+## Root Cause
+
+**Z-index conflict between the drawer and the Select dropdown:**
+
+| Component | Z-Index | Location |
+|-----------|---------|----------|
+| `GlobalInboxDrawerOverlay` backdrop | `z-[9997]` | Rendered via Portal |
+| `GlobalInboxDrawerOverlay` drawer | `z-[9998]` | Rendered via Portal |
+| `SelectContent` (dropdown) | `z-50` | Rendered via Portal |
+
+Since the `SelectContent` from Radix UI is portalled to `document.body` with `z-50`, it appears **behind** the drawer which has `z-9998`. This makes the dropdown visually present but completely unclickable.
 
 ## Solution
 
-Add the "Add to Pipeline" action button and create an inline form component that mirrors the existing modal functionality but fits within the new inline action pattern.
+Reduce the z-index values of `GlobalInboxDrawerOverlay` to be consistent with standard modal/drawer layering patterns. This allows portalled components like Select dropdowns (which use `z-50`) to render on top.
 
 ---
 
 ## Changes Required
 
-### 1. Create `InlineCreatePipelineForm` Component
+### File: `src/components/inbox/GlobalInboxDrawerOverlay.tsx`
 
-**New File:** `src/components/inbox/inline-actions/InlineCreatePipelineForm.tsx`
+**Line 83** - Backdrop z-index:
+```tsx
+// Before
+className="fixed inset-0 z-[9997] bg-black/20 dark:bg-black/40"
 
-This form will be an inline version of the existing `CreatePipelineFromInboxModal.tsx` with these fields:
-- **Company Name** (required)
-- **Domain** (optional)
-- **Stage/Round** (dropdown: Seed, Series A, B, C, etc.)
-- **Source** (prefilled from email context)
-- **Primary Contact** (name and email)
-- **Notes** (textarea for context)
-
-The form will:
-- Prefill from AI-extracted metadata when available
-- Create the pipeline company via `usePipeline` hook
-- Create a primary contact via `pipeline_contacts` table
-- Create an initial note via `pipeline_interactions` table
-- Show AI rationale if triggered from a suggestion
-- Auto-link the email to the new company after creation
-
-### 2. Update Barrel Export
-
-**File:** `src/components/inbox/inline-actions/index.ts`
-
-Add export for the new component:
-```typescript
-export { InlineCreatePipelineForm } from "./InlineCreatePipelineForm";
+// After
+className="fixed inset-0 z-[48] bg-black/20 dark:bg-black/40"
 ```
 
-### 3. Add Action Button to `InlineActionPanel`
-
-**File:** `src/components/inbox/InlineActionPanel.tsx`
-
-Add import for `Plus` icon and the new form component.
-
-Add a new action button after "Link Company":
+**Line 94** - Drawer z-index:
 ```tsx
-<ActionButton
-  icon={Plus}
-  label="Add to Pipeline"
-  onClick={() => handleSelectAction("create_pipeline")}
-  isActive={activeAction === "create_pipeline"}
-/>
+// Before
+className="fixed inset-y-0 right-0 z-[9998] flex"
 
-{/* Inline Create Pipeline Form */}
-<AnimatePresence>
-  {activeAction === "create_pipeline" && (
-    <InlineCreatePipelineForm
-      emailItem={item}
-      prefill={prefillData as any}
-      suggestion={activeSuggestion}
-      onConfirm={handleConfirmCreatePipeline}
-      onCancel={handleCancelAction}
-    />
-  )}
-</AnimatePresence>
-```
-
-### 4. Add Handler for Pipeline Creation
-
-**File:** `src/components/inbox/InlineActionPanel.tsx`
-
-Add the `handleConfirmCreatePipeline` function that:
-1. Creates the pipeline company using `usePipeline` hook
-2. Creates the primary contact if provided
-3. Creates initial note if provided
-4. Links the inbox item to the new company
-5. Shows success state with link to pipeline detail page
-
-```tsx
-const handleConfirmCreatePipeline = async (data: {
-  companyName: string;
-  domain?: string;
-  stage: RoundEnum;
-  source?: string;
-  contactName?: string;
-  contactEmail?: string;
-  notes?: string;
-}) => {
-  // 1. Create company
-  const newCompany = await createCompany({...});
-  
-  // 2. Create contact if provided
-  if (data.contactName) { ... }
-  
-  // 3. Create initial note if provided
-  if (data.notes) { ... }
-  
-  // 4. Link email to new company
-  linkCompany(item.id, newCompany.id, data.companyName, "pipeline", null);
-  
-  // 5. Show success state
-  handleActionSuccess("create_pipeline", {
-    id: newCompany.id,
-    name: data.companyName,
-    link: `/pipeline/${newCompany.id}`,
-  });
-};
-```
-
-### 5. Update Suggestion Handler
-
-**File:** `src/components/inbox/InlineActionPanel.tsx`
-
-Update the `CREATE_PIPELINE_COMPANY` case in `handleSuggestionSelect` to:
-1. Set the active action to `"create_pipeline"`
-2. Prefill form data from the suggestion metadata:
-   - `extracted_company_name`
-   - `extracted_domain`
-   - `primary_contact_name`
-   - `primary_contact_email`
-   - `description_oneliner`
-   - `notes_summary`
-   - `intro_source`
-
-Current placeholder code:
-```tsx
-case "CREATE_PIPELINE_COMPANY":
-  // For now, open link company - full pipeline form TBD
-  setActiveAction("link_company");
-  toast.info("Add to Pipeline feature coming soon - use Link Company for now");
-  break;
-```
-
-New implementation:
-```tsx
-case "CREATE_PIPELINE_COMPANY":
-  setActiveAction("create_pipeline");
-  const metadata = suggestion.metadata as CreatePipelineCompanyMetadata;
-  setPrefillData({
-    companyName: metadata?.extracted_company_name || "",
-    domain: metadata?.extracted_domain || "",
-    contactName: metadata?.primary_contact_name || "",
-    contactEmail: metadata?.primary_contact_email || "",
-    notes: metadata?.notes_summary || "",
-    source: metadata?.intro_source || "",
-    rationale: suggestion.rationale,
-    confidence: suggestion.confidence,
-  });
-  break;
+// After
+className="fixed inset-y-0 right-0 z-[49] flex"
 ```
 
 ---
 
-## Form Design
+## Why These Z-Index Values
 
-The inline form will be compact but complete:
-
-```
-┌─────────────────────────────────────────┐
-│ + Add to Pipeline                       │
-│                                         │
-│ [AI Rationale if from suggestion]       │
-│                                         │
-│ Company Name *                          │
-│ ┌─────────────────────────────────────┐ │
-│ │ Pine                                │ │
-│ └─────────────────────────────────────┘ │
-│                                         │
-│ Domain          Stage                   │
-│ ┌──────────┐   ┌──────────────────┐    │
-│ │pine.com  │   │ Series B ▾       │    │
-│ └──────────┘   └──────────────────┘    │
-│                                         │
-│ ─── Primary Contact ───                 │
-│ Name            Email                   │
-│ ┌──────────┐   ┌──────────────────┐    │
-│ │Seth      │   │ seth@pine.com    │    │
-│ └──────────┘   └──────────────────┘    │
-│                                         │
-│ Notes (optional)                        │
-│ ┌─────────────────────────────────────┐ │
-│ │ Series B intro from Harrison       │ │
-│ └─────────────────────────────────────┘ │
-│                                         │
-│        [Cancel]  [✓ Add to Pipeline]    │
-└─────────────────────────────────────────┘
-```
+- `z-[48]` for backdrop and `z-[49]` for drawer matches the pattern already used in `TriageInboxDrawer.tsx`
+- `z-50` is the standard for popovers, dropdowns, and selects in shadcn/ui
+- This layering ensures: backdrop (48) < drawer (49) < dropdowns (50)
+- Any dropdown, popover, or tooltip inside the drawer will correctly render on top
 
 ---
 
-## Files Summary
+## Files Changed
 
-| File | Action |
+| File | Change |
 |------|--------|
-| `src/components/inbox/inline-actions/InlineCreatePipelineForm.tsx` | Create |
-| `src/components/inbox/inline-actions/index.ts` | Modify |
-| `src/components/inbox/InlineActionPanel.tsx` | Modify |
+| `src/components/inbox/GlobalInboxDrawerOverlay.tsx` | Update backdrop z-index from `z-[9997]` to `z-[48]`, drawer z-index from `z-[9998]` to `z-[49]` |
 
 ---
 
-## Technical Notes
+## Testing
 
-- Reuse `usePipeline` hook for company creation
-- Reuse `RoundEnum` type for stage dropdown
-- Direct Supabase calls for contact and interaction creation (same pattern as modal)
-- Form follows same motion animation pattern as other inline forms
-- Keyboard shortcuts: Escape to cancel, Cmd+Enter to submit
+After this change:
+1. Open an email in the Inbox
+2. Click "Add to Pipeline" action
+3. Click the Stage dropdown
+4. Verify dropdown appears and options can be selected
+5. Verify selecting a different stage (e.g., "Series A") updates the form
 
