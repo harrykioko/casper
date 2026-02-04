@@ -291,6 +291,23 @@ export default function TriageQueue() {
     [triageActions, advanceToNext]
   );
 
+  // Task quick action handlers
+  const handleTaskTrusted = useCallback(
+    (workItemId: string) => {
+      triageActions.markTrusted(workItemId);
+      advanceToNext();
+    },
+    [triageActions, advanceToNext]
+  );
+
+  const handleTaskNoAction = useCallback(
+    (workItemId: string) => {
+      triageActions.noAction(workItemId);
+      advanceToNext();
+    },
+    [triageActions, advanceToNext]
+  );
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -384,6 +401,8 @@ export default function TriageQueue() {
                     onCommitmentComplete={handleCommitmentQuickComplete}
                     onCalendarTrusted={handleCalendarTrusted}
                     onCalendarNoAction={handleCalendarNoAction}
+                    onTaskTrusted={handleTaskTrusted}
+                    onTaskNoAction={handleTaskNoAction}
                     onSnooze={(id, until) => triageActions.snooze(id, until)}
                   />
                 ))}
