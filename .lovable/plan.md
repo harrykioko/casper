@@ -1,42 +1,44 @@
 
 
-# Fix: Show All Linked Entities in Focus Mode Context Rail
+# Fix: Pipeline Company Not Showing in Context Rail
 
-## Problem
+## Root Cause
 
-The `useEnrichedTasks` hook assigns a single `linkedEntity` to each task using a priority chain (pipeline > portfolio > project > email). The "Follow up with Cash Lafferty" task has both a pipeline company (PandoAlts) and a source email, but only the pipeline company would be selected -- and even that isn't appearing in the Context section.
+`useEnrichedTasks` relies on `useDashboardPipelineFocus` to build its pipeline company lookup map. That hook only fetches companies with `is_top_of_mind = true`. PandoAlts has `is_top_of_mind = false`, so it's missing from the map entirely and gets silently skipped during enrichment.
 
 ## Solution
 
-Add a new `linkedEntities` (plural) array to `EnrichedTask` that captures ALL linked entities for a task, then pass this array to `TodayRail`.
+Update `useEnrichedTasks` to fetch its own complete set of pipeline companies (by collecting the `pipeline_company_id` values from the tasks and querying them directly), rather than depending on the dashboard-scoped hook that filters by top-of-mind.
 
 ## File Changes
 
-### 1. `src/hooks/useEnrichedTasks.ts`
-- Add `linkedEntities: LinkedEntity[]` field to `EnrichedTask`
-- Build an array of all applicable entities (pipeline company, portfolio company, project, email) instead of picking just one
-- Keep the existing singular `linkedEntity` (first item) for backward compatibility with other components like `EntityPill`
+### `src/hooks/useEnrichedTasks.ts`
+- Remove dependency on `useDashboardPipelineFocus`
+- Instead, collect all unique `pipeline_company_id` values from the input tasks
+- Use a small `useEffect` + Supabase query to fetch those specific pipeline companies (only the ones actually referenced by tasks)
+- Similarly, collect all unique `company_id` values and fetch those portfolio companies directly, removing the dependency on `useDashboardPortfolioCompanies`
+- This ensures enrichment works for ALL linked companies, not just those that happen to be "top of mind" or in the dashboard's top-10 list
 
-### 2. `src/components/home/TodayRail.tsx`
-- Change prop from `linkedEntity?: LinkedEntity` to `linkedEntities?: LinkedEntity[]`
-- Render all entities in the Context section (up to 6)
-- Show the section only when the array is non-empty
-
-### 3. `src/pages/Home.tsx`
-- Pass `spotlightTask?.linkedEntities` (plural) to `TodayRail` instead of `spotlightTask?.linkedEntity`
+### No other files change
+- `TodayRail.tsx` and `Home.tsx` already pass and render `linkedEntities` correctly
 
 ## Technical Detail
 
-The enrichment will collect entities into an array like:
-
 ```typescript
-const entities: LinkedEntity[] = [];
-if (task.pipeline_company_id) { /* push pipeline entity */ }
-if (task.company_id) { /* push portfolio entity */ }
-if (task.project) { /* push project entity */ }
-if (task.source_inbox_item_id) { /* push email entity */ }
-return { ...task, linkedEntities: entities, linkedEntity: entities[0] };
+// Pseudocode for the new approach
+const pipelineIds = [...new Set(tasks.map(t => t.pipeline_company_id).filter(Boolean))];
+const portfolioIds = [...new Set(tasks.map(t => t.company_id).filter(Boolean))];
+
+// Fetch only the companies we actually need
+const { data: pipelineData } = await supabase
+  .from('pipeline_companies')
+  .select('id, company_name, logo_url')
+  .in('id', pipelineIds);
+
+const { data: portfolioData } = await supabase
+  .from('companies')
+  .select('id, name, logo_url')
+  .in('id', portfolioIds);
 ```
 
-This preserves backward compatibility while enabling the Context rail to show all linked items.
-
+This is a targeted fix -- fetch exactly the companies referenced by tasks, regardless of their top-of-mind or dashboard status.
