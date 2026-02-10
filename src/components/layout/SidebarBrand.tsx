@@ -1,7 +1,6 @@
 
 import { useTheme } from "@/hooks/use-theme";
 import casperIcon from "/lovable-uploads/casper-icon.png";
-import casperWordmark from "/lovable-uploads/casper-wordmark.png";
 
 interface SidebarBrandProps {
   expanded: boolean;
@@ -14,16 +13,14 @@ export function SidebarBrand({ expanded }: SidebarBrandProps) {
   return (
     <div className="flex flex-col items-center gap-1 mb-8">
       {expanded ? (
-        <img
-          src={casperWordmark}
-          alt="Casper"
-          className={`h-6 w-auto ${invertClass}`}
-        />
+        <span className="text-lg font-medium tracking-wide text-foreground select-none" style={{ fontFamily: "'Inter', sans-serif" }}>
+          casper
+        </span>
       ) : (
         <img
           src={casperIcon}
           alt="Casper"
-          className={`h-7 w-7 rounded-md ${invertClass}`}
+          className={`h-8 w-8 ${invertClass}`}
         />
       )}
     </div>
