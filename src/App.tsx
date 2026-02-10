@@ -15,6 +15,7 @@ import { FloatingNoteProvider } from "@/contexts/FloatingNoteContext";
 import { GlobalInboxDrawerProvider } from "@/contexts/GlobalInboxDrawerContext";
 import { GlobalInboxDrawerOverlay } from "@/components/inbox/GlobalInboxDrawerOverlay";
 import Landing from "./pages/Landing";
+import Home from "./pages/Home";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Tasks from "./pages/Tasks";
@@ -110,6 +111,7 @@ const MainContent = () => {
     <div className={`flex-1 transition-all duration-300 ${expanded ? 'ml-64' : 'ml-16'}`}>
       <AnimatePresence mode="wait">
         <Routes>
+          <Route path="/home" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/projects" element={<Projects />} />
