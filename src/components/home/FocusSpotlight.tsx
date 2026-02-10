@@ -38,7 +38,7 @@ export function FocusSpotlight({ task, onComplete, onSnooze }: FocusSpotlightPro
 
   return (
     <motion.div
-      className="rounded-2xl bg-card/80 backdrop-blur-sm border border-border/40 shadow-lg p-8"
+      className="rounded-2xl bg-card border border-border/50 shadow-xl shadow-black/[0.04] dark:shadow-black/20 p-10"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay: 0.1 }}

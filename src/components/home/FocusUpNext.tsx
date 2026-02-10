@@ -74,7 +74,7 @@ export function FocusUpNext({
           Nothing queued — you're clear.
         </p>
       ) : (
-        <div className="space-y-0.5">
+        <div className="space-y-2">
           {items.map((item) => (
             <FocusUpNextRow
               key={item.id}
