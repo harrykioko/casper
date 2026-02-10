@@ -1,43 +1,48 @@
 
 
-# Dramatic Lavender Gradient + Spotlight Card Glow
+# Command Stream Right Rail Redesign
 
 ## Problem
-The current `bg-home-gradient` is too desaturated -- reads as flat gray. The spotlight card lacks a visible background glow to draw focus.
+
+The current right rail renders two disconnected small cards ("Assist" placeholder and "Today") that feel decorative. They need to become one cohesive panel with a dominant chat-like Assist section and a supporting availability section.
 
 ## Changes
 
-### 1. Background Gradient (`src/index.css`)
+### `src/components/home/CommandAssistPanel.tsx` -- Full Rewrite
 
-Replace the muted radial gradient with a more dramatic white-to-lavender sweep:
+Replace the two disconnected cards with a single cohesive container:
 
-- **Light**: Multi-stop radial with visible lavender tones centered behind the card area, fading to white at edges
-- **Dark**: Deeper purple-blue center fading to near-black
+**Container**: One `rounded-2xl border border-border bg-card shadow-sm` panel, sticky, with `flex flex-col` filling available height via `h-[calc(100vh-12rem)]`.
 
-```css
-.bg-home-gradient {
-  background: 
-    radial-gradient(ellipse at 50% 40%, hsl(250 60% 94%) 0%, hsl(240 40% 96%) 30%, hsl(220 20% 98%) 60%, hsl(0 0% 100%) 100%);
-}
-.dark .bg-home-gradient {
-  background: 
-    radial-gradient(ellipse at 50% 40%, hsl(255 40% 16%) 0%, hsl(245 30% 11%) 30%, hsl(240 15% 7%) 60%, hsl(240 10% 5%) 100%);
-}
-```
+**Section 1 -- Assist (top, dominant, flex-1)**
+- Header row: "Assist" label with a small Sparkles icon, `text-sm font-semibold`
+- Scrollable message area (`flex-1 overflow-y-auto`) with a clean empty state:
+  - A centered muted icon and short line like "What would you like to do?" (no generic "AI suggestions" copy)
+- 2-3 suggested prompt chips below the empty state text:
+  - "Summarize what's urgent"
+  - "What can I do in 15 min?"
+  - "Draft a reply"
+- Chips styled as small rounded pills (`text-xs px-3 py-1.5 rounded-full bg-muted/50 hover:bg-muted`) in a flex-wrap layout
+- Pinned input row at bottom of the Assist section: a disabled input with placeholder "Ask Casper what to do next..." and a muted send icon button
+- Soft separator (`border-t border-border/40`) between Assist and Availability
 
-### 2. Card Glow Effect (`src/components/home/FocusSpotlight.tsx`)
+**Section 2 -- Today's Availability (bottom, supporting, shrink-0)**
+- Header: "Today" with Clock icon, `text-[11px] uppercase tracking-wider`
+- **Prominent countdown**: "Next meeting in Xh Ym" as `text-sm font-medium` -- computed from time until next event
+- Next meeting title + time range on one line, `text-xs text-muted-foreground`
+- 2-4 available windows as compact rows: time range + duration badge (`text-xs`)
+- No meeting state: "No more meetings today" muted text
+- Overall height ~180-200px, the rest goes to Assist
 
-Add a soft lavender glow behind the spotlight card using a pseudo-element approach via a wrapper div or an additional `box-shadow` layer:
+### No other files change
 
-- Add a large, soft lavender box-shadow glow: `shadow-[0_0_80px_-20px_rgba(140,100,255,0.15)]` in light mode, `shadow-[0_0_80px_-20px_rgba(140,100,255,0.12)]` in dark
-- This creates the "emanating light" effect visible in the reference screenshot
-- Keep the existing subtle card shadow for the card edge definition
-- Combine both shadows in the className
+`CommandStreamMode.tsx` already passes `events` to `CommandAssistPanel` -- no prop changes needed.
 
-### Files Changed
+## Technical Details
 
-| File | Change |
-|---|---|
-| `src/index.css` | Replace `.bg-home-gradient` with dramatic lavender radial gradient |
-| `src/components/home/FocusSpotlight.tsx` | Add large soft lavender glow shadow behind the card |
+- Uses existing `date-fns` utilities and `CalendarEvent` type -- no new dependencies
+- `differenceInMinutes` from date-fns for the countdown calculation
+- All prompt chips are non-functional (just visual) -- click handlers can be wired later
+- Input is `disabled` with `opacity-50 cursor-not-allowed`
+- Keeps the existing `useMemo` logic for `todayEvents`, `nextMeeting`, and `availableWindows`
 
