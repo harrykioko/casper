@@ -38,8 +38,8 @@ export function Nonnegotiables({ items }: NonnegotiablesProps) {
   };
 
   return (
-    <div className="bg-white/5 backdrop-blur-md rounded-lg p-4 shadow-sm ring-1 ring-white/10 space-y-3">
-      <h2 className="text-xs uppercase tracking-wide text-zinc-700 dark:text-white/60 pb-2 border-b border-zinc-200 dark:border-white/10">
+    <div className="space-y-3">
+      <h2 className="text-xs uppercase tracking-widest text-muted-foreground font-medium pb-2">
         Nonnegotiables
       </h2>
       

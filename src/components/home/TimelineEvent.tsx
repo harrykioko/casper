@@ -24,8 +24,8 @@ export function TimelineEvent({
   return (
     <div
       className={cn(
-        "relative flex gap-3 pb-4",
-        past && "opacity-45"
+        "relative flex gap-3 pb-6",
+        past && "opacity-40"
       )}
     >
       {/* Dot + line */}
@@ -34,24 +34,30 @@ export function TimelineEvent({
           className={cn(
             "w-2 h-2 rounded-full flex-shrink-0",
             isNow
-              ? "bg-primary ring-2 ring-primary/30"
+              ? "bg-primary ring-4 ring-primary/20"
               : past
                 ? "bg-muted-foreground/40"
                 : "bg-muted-foreground/60 ring-1 ring-border"
           )}
         />
-        <div className="w-px flex-1 bg-border/50 mt-1" />
+        <div className="w-px flex-1 bg-border/30 mt-1" />
       </div>
 
       {/* Content */}
       <div className="min-w-0 pb-1">
-        <p className="text-[11px] text-muted-foreground leading-none mb-1">
+        <p className={cn(
+          "text-[11px] text-muted-foreground leading-none mb-1",
+          isNow && "font-semibold"
+        )}>
           {timeStr}
           {isNow && (
             <span className="ml-1.5 text-primary font-medium">(Now)</span>
           )}
         </p>
-        <p className="text-sm text-foreground truncate">{title}</p>
+        <p className={cn(
+          "text-sm truncate",
+          past ? "text-muted-foreground line-through" : "text-foreground"
+        )}>{title}</p>
       </div>
     </div>
   );
