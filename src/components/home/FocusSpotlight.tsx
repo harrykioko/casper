@@ -38,7 +38,7 @@ export function FocusSpotlight({ task, onComplete, onSnooze }: FocusSpotlightPro
 
   return (
     <motion.div
-      className="rounded-3xl bg-card border border-border/30 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.3)] ring-1 ring-white/40 dark:ring-white/[0.06] p-10"
+      className="rounded-3xl bg-card border border-border/30 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.08),0_0_80px_-20px_rgba(140,100,255,0.15)] dark:shadow-[0_8px_40px_-12px_rgba(0,0,0,0.3),0_0_80px_-20px_rgba(140,100,255,0.12)] ring-1 ring-white/40 dark:ring-white/[0.06] p-10"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2, scale: 1.002 }}
