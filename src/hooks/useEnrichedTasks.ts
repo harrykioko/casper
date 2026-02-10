@@ -1,7 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Task } from './useTasks';
-import { useDashboardPortfolioCompanies } from './useDashboardPortfolioCompanies';
-import { useDashboardPipelineFocus } from './useDashboardPipelineFocus';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface LinkedEntity {
   type: 'portfolio' | 'pipeline' | 'project' | 'email';
@@ -16,14 +15,54 @@ export interface EnrichedTask extends Task {
   linkedEntities: LinkedEntity[];
 }
 
+interface CompanyRecord {
+  id: string;
+  name: string;
+  logo_url: string | null;
+}
+
+interface PipelineRecord {
+  id: string;
+  company_name: string;
+  logo_url: string | null;
+}
+
 export function useEnrichedTasks(tasks: Task[]): EnrichedTask[] {
-  const { companies: portfolioCompanies } = useDashboardPortfolioCompanies();
-  const { companies: pipelineCompanies } = useDashboardPipelineFocus();
+  const [portfolioMap, setPortfolioMap] = useState<Map<string, CompanyRecord>>(new Map());
+  const [pipelineMap, setPipelineMap] = useState<Map<string, PipelineRecord>>(new Map());
+
+  const pipelineIds = useMemo(
+    () => [...new Set(tasks.map(t => t.pipeline_company_id).filter(Boolean))] as string[],
+    [tasks]
+  );
+  const portfolioIds = useMemo(
+    () => [...new Set(tasks.map(t => t.company_id).filter(Boolean))] as string[],
+    [tasks]
+  );
+
+  useEffect(() => {
+    if (pipelineIds.length === 0) { setPipelineMap(new Map()); return; }
+    supabase
+      .from('pipeline_companies')
+      .select('id, company_name, logo_url')
+      .in('id', pipelineIds)
+      .then(({ data }) => {
+        if (data) setPipelineMap(new Map(data.map(c => [c.id, c])));
+      });
+  }, [pipelineIds.join(',')]);
+
+  useEffect(() => {
+    if (portfolioIds.length === 0) { setPortfolioMap(new Map()); return; }
+    supabase
+      .from('companies')
+      .select('id, name, logo_url')
+      .in('id', portfolioIds)
+      .then(({ data }) => {
+        if (data) setPortfolioMap(new Map(data.map(c => [c.id, c])));
+      });
+  }, [portfolioIds.join(',')]);
 
   const enrichedTasks = useMemo(() => {
-    const portfolioMap = new Map(portfolioCompanies.map(c => [c.id, c]));
-    const pipelineMap = new Map(pipelineCompanies.map(c => [c.id, c]));
-
     return tasks.map((task): EnrichedTask => {
       const entities: LinkedEntity[] = [];
 
@@ -67,7 +106,7 @@ export function useEnrichedTasks(tasks: Task[]): EnrichedTask[] {
 
       return { ...task, linkedEntities: entities, linkedEntity: entities[0] };
     });
-  }, [tasks, portfolioCompanies, pipelineCompanies]);
+  }, [tasks, portfolioMap, pipelineMap]);
 
   return enrichedTasks;
 }
