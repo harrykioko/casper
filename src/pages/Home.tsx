@@ -124,7 +124,7 @@ export default function Home() {
     }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+    <div className="min-h-screen bg-home-gradient">
       <div className="px-8 py-6 max-w-[1280px] mx-auto">
         {/* Mode Toggle */}
         <div className="flex justify-center mb-2">

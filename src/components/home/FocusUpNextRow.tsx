@@ -34,7 +34,7 @@ export function FocusUpNextRow({
 
   return (
     <div
-      className="group flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-muted/30 transition-colors cursor-pointer"
+      className="group flex items-center gap-3 px-4 py-3 rounded-xl bg-card border border-border/50 shadow-sm hover:shadow-md hover:shadow-black/[0.04] dark:hover:shadow-black/20 transition-all cursor-pointer"
       onClick={() => onClick(id)}
     >
       {/* Checkbox */}
