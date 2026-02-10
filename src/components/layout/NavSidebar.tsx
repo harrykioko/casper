@@ -2,6 +2,7 @@
 import { useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
+  Home,
   LayoutDashboard,
   Crosshair,
   Inbox,
@@ -29,6 +30,12 @@ export function NavSidebar() {
   const { expanded, toggleSidebar } = useSidebarState();
 
   const workspaceItems = [
+    {
+      icon: Home,
+      path: "/home",
+      label: "Home",
+      active: location.pathname === "/home"
+    },
     { 
       icon: LayoutDashboard, 
       path: "/dashboard", 
