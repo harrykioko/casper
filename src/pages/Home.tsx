@@ -144,7 +144,7 @@ export default function Home() {
             {/* Three-column layout */}
             <FocusModeLayout
               leftRail={
-                <TodayRail linkedEntity={spotlightTask?.linkedEntity} />
+                <TodayRail linkedEntities={spotlightTask?.linkedEntities} />
               }
               center={
                 <>

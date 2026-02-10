@@ -13,6 +13,7 @@ export interface LinkedEntity {
 
 export interface EnrichedTask extends Task {
   linkedEntity?: LinkedEntity;
+  linkedEntities: LinkedEntity[];
 }
 
 export function useEnrichedTasks(tasks: Task[]): EnrichedTask[] {
@@ -24,45 +25,47 @@ export function useEnrichedTasks(tasks: Task[]): EnrichedTask[] {
     const pipelineMap = new Map(pipelineCompanies.map(c => [c.id, c]));
 
     return tasks.map((task): EnrichedTask => {
-      let linkedEntity: LinkedEntity | undefined = undefined;
+      const entities: LinkedEntity[] = [];
 
-      // Priority: pipeline_company > company > project > email
       if (task.pipeline_company_id) {
         const company = pipelineMap.get(task.pipeline_company_id);
         if (company) {
-          linkedEntity = {
+          entities.push({
             type: 'pipeline',
             id: company.id,
             name: company.company_name,
             logo_url: company.logo_url,
-          };
+          });
         }
-      } else if (task.company_id) {
+      }
+      if (task.company_id) {
         const company = portfolioMap.get(task.company_id);
         if (company) {
-          linkedEntity = {
+          entities.push({
             type: 'portfolio',
             id: company.id,
             name: company.name,
             logo_url: company.logo_url,
-          };
+          });
         }
-      } else if (task.project) {
-        linkedEntity = {
+      }
+      if (task.project) {
+        entities.push({
           type: 'project',
           id: task.project.id,
           name: task.project.name,
           color: task.project.color,
-        };
-      } else if (task.source_inbox_item_id) {
-        linkedEntity = {
+        });
+      }
+      if (task.source_inbox_item_id) {
+        entities.push({
           type: 'email',
           id: task.source_inbox_item_id,
           name: 'From email',
-        };
+        });
       }
 
-      return { ...task, linkedEntity };
+      return { ...task, linkedEntities: entities, linkedEntity: entities[0] };
     });
   }, [tasks, portfolioCompanies, pipelineCompanies]);
 
