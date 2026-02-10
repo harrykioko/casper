@@ -8,6 +8,7 @@ import { FocusUpNext } from "@/components/home/FocusUpNext";
 import { TodayRail } from "@/components/home/TodayRail";
 import { TimeRail } from "@/components/home/TimeRail";
 import { PlaceholderMode } from "@/components/home/PlaceholderMode";
+import { CommandStreamMode } from "@/components/home/CommandStreamMode";
 import { useTasks } from "@/hooks/useTasks";
 import { useEnrichedTasks, type EnrichedTask } from "@/hooks/useEnrichedTasks";
 import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
@@ -175,7 +176,7 @@ export default function Home() {
             />
           </motion.div>
         ) : (
-          <PlaceholderMode mode={mode} />
+          mode === "command" ? <CommandStreamMode /> : <PlaceholderMode mode={mode} />
         )}
       </div>
     </div>
