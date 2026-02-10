@@ -195,10 +195,10 @@
 
   /* Home page gradient */
   .bg-home-gradient {
-    background: radial-gradient(ellipse at 20% 0%, hsl(260 60% 95%) 0%, hsl(240 40% 97%) 40%, hsl(0 0% 100%) 100%);
+    background: radial-gradient(ellipse at 50% 35%, hsl(250 30% 96%) 0%, hsl(230 20% 97%) 35%, hsl(220 15% 98%) 100%);
   }
   .dark .bg-home-gradient {
-    background: radial-gradient(ellipse at 20% 0%, hsl(260 50% 14%) 0%, hsl(240 30% 10%) 40%, hsl(240 10% 6%) 100%);
+    background: radial-gradient(ellipse at 50% 35%, hsl(250 30% 13%) 0%, hsl(240 20% 8%) 35%, hsl(240 10% 6%) 100%);
   }
 
   /* Custom scrollbar */
