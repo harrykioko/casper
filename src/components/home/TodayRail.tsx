@@ -5,10 +5,10 @@ import { LinkedEntity } from "@/hooks/useEnrichedTasks";
 import { cn } from "@/lib/utils";
 
 interface TodayRailProps {
-  linkedEntity?: LinkedEntity;
+  linkedEntities?: LinkedEntity[];
 }
 
-export function TodayRail({ linkedEntity }: TodayRailProps) {
+export function TodayRail({ linkedEntities }: TodayRailProps) {
   const now = new Date();
 
   return (
@@ -39,13 +39,15 @@ export function TodayRail({ linkedEntity }: TodayRailProps) {
       </div>
 
       {/* Context section — only if focus task has linked entity */}
-      {linkedEntity && (
+      {linkedEntities && linkedEntities.length > 0 && (
         <div>
           <h3 className="text-xs uppercase tracking-widest text-muted-foreground font-medium mb-3">
             Context
           </h3>
           <div className="space-y-2">
-            <ContextRow entity={linkedEntity} />
+            {linkedEntities.slice(0, 6).map((entity) => (
+              <ContextRow key={`${entity.type}-${entity.id}`} entity={entity} />
+            ))}
           </div>
         </div>
       )}
