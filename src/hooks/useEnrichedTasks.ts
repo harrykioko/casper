@@ -63,11 +63,14 @@ export function useEnrichedTasks(tasks: Task[]): EnrichedTask[] {
   }, [portfolioIds.join(',')]);
 
   const enrichedTasks = useMemo(() => {
+    const safePipelineMap = pipelineMap instanceof Map ? pipelineMap : new Map();
+    const safePortfolioMap = portfolioMap instanceof Map ? portfolioMap : new Map();
+
     return tasks.map((task): EnrichedTask => {
       const entities: LinkedEntity[] = [];
 
       if (task.pipeline_company_id) {
-        const company = pipelineMap.get(task.pipeline_company_id);
+        const company = safePipelineMap.get(task.pipeline_company_id);
         if (company) {
           entities.push({
             type: 'pipeline',
@@ -78,7 +81,7 @@ export function useEnrichedTasks(tasks: Task[]): EnrichedTask[] {
         }
       }
       if (task.company_id) {
-        const company = portfolioMap.get(task.company_id);
+        const company = safePortfolioMap.get(task.company_id);
         if (company) {
           entities.push({
             type: 'portfolio',
