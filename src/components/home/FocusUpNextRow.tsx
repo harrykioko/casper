@@ -1,6 +1,7 @@
 import { ChevronRight, Circle, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { differenceInDays, isPast, isToday, parseISO, startOfDay } from "date-fns";
+import { motion } from "framer-motion";
 
 interface FocusUpNextRowProps {
   id: string;
@@ -33,9 +34,12 @@ export function FocusUpNextRow({
     : 0;
 
   return (
-    <div
-      className="group flex items-center gap-3 px-4 py-3 rounded-xl bg-card border border-border/50 shadow-sm hover:shadow-md hover:shadow-black/[0.04] dark:hover:shadow-black/20 transition-all cursor-pointer"
+    <motion.div
+      className="group flex items-center gap-3 px-4 py-3 rounded-xl bg-card border border-border/50 shadow-sm hover:shadow-md hover:shadow-black/[0.04] dark:hover:shadow-black/20 transition-shadow cursor-pointer"
       onClick={() => onClick(id)}
+      whileHover={{ y: -1, scale: 1.01 }}
+      whileTap={{ scale: 0.995 }}
+      transition={{ duration: 0.15 }}
     >
       {/* Checkbox */}
       <button
@@ -79,6 +83,6 @@ export function FocusUpNextRow({
 
       {/* Chevron */}
       <ChevronRight className="h-4 w-4 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-    </div>
+    </motion.div>
   );
 }
