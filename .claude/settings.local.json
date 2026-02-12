@@ -7,7 +7,11 @@
       "Bash(npx vite build)",
       "Bash(npx tsc:*)",
       "Bash(npm run build:*)",
-      "Bash(ls -la \"C:\\\\Users\\\\HarrisonKioko\\\\OneDrive - Canapi\\\\2025\\\\01. Folio\\\\00. Dev\\\\casper\\\\src\\\\components\\\\focus\"\" | grep -i \"right|assist|today|rail \")"
+      "Bash(ls -la \"C:\\\\Users\\\\HarrisonKioko\\\\OneDrive - Canapi\\\\2025\\\\01. Folio\\\\00. Dev\\\\casper\\\\src\\\\components\\\\focus\"\" | grep -i \"right|assist|today|rail \")",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd Claude Code skills and post-edit hook from insights recommendations\n\n8 custom skills: /plan, /ui-change, /debug, /checkpoint, /validate-data,\n/fix-round-2, /implement-parallel, /audit. Post-edit tsc hook in settings.json\ncatches TypeScript errors immediately after file changes.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }
