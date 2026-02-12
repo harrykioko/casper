@@ -2,6 +2,40 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Overview
+This is a TypeScript project using Supabase (edge functions, RLS, triggers),
+React with hooks, and a component-based UI architecture. Always ensure a clean
+`tsc` build passes before considering work complete.
+
+## UI/UX Guidelines
+When implementing UI changes, never replace existing layout paradigms (vertical
+sidebar, text logos, ambient backgrounds, etc.) without explicit user approval.
+Preserve the current visual structure and make targeted modifications only.
+
+## Database & Supabase
+After implementing any database-related feature (new tables, triggers, edge
+functions, RLS policies), verify:
+1. Existing data is handled (backfill if needed)
+2. RLS policies allow the intended access
+3. Triggers produce valid data for downstream consumers
+
+## Debugging Guidelines
+When debugging production issues, start by reproducing the actual error (check
+logs, network responses, auth tokens) before theorizing about root causes. Do
+not overstate problems that haven't been verified.
+
+## Implementation Patterns
+For multi-phase implementation plans, always include a "data migration/backfill"
+step when new features depend on existing data being present in new tables or formats.
+
+## Fix Iteration
+When the first round of fixes doesn't work, analyze WHY the fix was insufficient
+before attempting round two. Look at actual input data and outputs rather than
+adding more guards.
+
+## Notifications
+When you complete a multi-phase implementation, finish a debugging session, or complete any task that took more than 5 minutes, send a brief completion summary to Harrison via Slack DM.
+
 ## Development Commands
 
 ```bash
