@@ -10,6 +10,16 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -Command \"Invoke-RestMethod -Uri $env:SLACK_WEBHOOK_URL -Method Post -ContentType 'application/json' -Body '{\\\"text\\\":\\\"Claude Code finished a task in Casper\\\"}'\""
+          }
+        ]
+      }
     ]
   }
 }

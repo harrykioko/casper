@@ -22,7 +22,8 @@
       "Bash(wc:*)",
       "Bash(curl:*)",
       "Bash(supabase:*)",
-      "Bash(tsc:*)"
+      "Bash(tsc:*)",
+      "Bash(if not exist \"C:\\\\Users\\\\HarrisonKioko\\\\OneDrive - Canapi\\\\2025\\\\01. Folio\\\\00. Dev\\\\casper\\\\docs\" mkdir \"C:\\\\Users\\\\HarrisonKioko\\\\OneDrive - Canapi\\\\2025\\\\01. Folio\\\\00. Dev\\\\casper\\\\docs\")"
     ],
     "deny": []
   }
