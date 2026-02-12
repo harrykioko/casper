@@ -34,7 +34,7 @@ before attempting round two. Look at actual input data and outputs rather than
 adding more guards.
 
 ## Notifications
-When you complete a multi-phase implementation, finish a debugging session, or complete any task that took more than 5 minutes, send a brief completion summary to Harrison via Slack DM.
+When you complete a multi-phase implementation, finish a debugging session, or complete any task that took more than 5 minutes, send a brief completion summary to Harry Kioko via Slack DM.
 
 ## Development Commands
 
