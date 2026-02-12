@@ -1,10 +1,10 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { CommandStreamLayout } from "./CommandStreamLayout";
 import { CommandFilterPanel } from "./CommandFilterPanel";
 import { CommandActionStream } from "./CommandActionStream";
-import { CommandAssistPanel } from "./CommandAssistPanel";
+import { ActionIntelligenceRail } from "./ActionIntelligenceRail";
 import { useTriageQueue, type TriageQueueItem } from "@/hooks/useTriageQueue";
 import { useTriageActions } from "@/hooks/useTriageActions";
 import { useTriageReadingActions } from "@/hooks/useTriageReadingActions";
@@ -12,6 +12,8 @@ import { useInboxItems } from "@/hooks/useInboxItems";
 import { useOutlookCalendar } from "@/hooks/useOutlookCalendar";
 import { useCommitments } from "@/hooks/useCommitments";
 import { useTasks } from "@/hooks/useTasks";
+import { useMinuteTick } from "@/hooks/useMinuteTick";
+import { useActionIntelligence, type GuidedOverlay, type SuggestedMove } from "@/hooks/useActionIntelligence";
 
 // Drawers
 import { TriageInboxDrawer } from "@/components/focus/TriageInboxDrawer";
@@ -31,6 +33,7 @@ export function CommandStreamMode() {
   // Data
   const {
     items,
+    allItems,
     counts,
     isLoading,
     isAllClear,
@@ -46,8 +49,53 @@ export function CommandStreamMode() {
 
   const { tasks, updateTask, deleteTask } = useTasks();
   const { inboxItems, markComplete, archive: archiveInbox } = useInboxItems();
-  const { events } = useOutlookCalendar();
+  const { events, isConnected, connectOutlook } = useOutlookCalendar();
   const { commitments } = useCommitments({ status: ['open', 'waiting_on', 'delegated'] });
+
+  // Minute tick for live countdown
+  const { tick, now } = useMinuteTick();
+
+  // Action Intelligence
+  const { insights, suggestions } = useActionIntelligence({
+    allItems,
+    counts,
+    events,
+    isCalendarConnected: isConnected,
+    now,
+  });
+
+  // Guided overlay state
+  const [guidedOverlay, setGuidedOverlay] = useState<GuidedOverlay | null>(null);
+
+  // Compute effective items when guided overlay is active (intersection semantics)
+  const effectiveItems = useMemo(() => {
+    if (!guidedOverlay?.active) return items;
+
+    let result = [...items];
+    const f = guidedOverlay.filters;
+
+    if (f.sourceTypes && f.sourceTypes.length > 0) {
+      result = result.filter(i => f.sourceTypes!.includes(i.source_type));
+    }
+    if (f.effortFilter) {
+      result = result.filter(i => i.effortEstimate === f.effortFilter);
+    }
+    if (f.minPriorityScore != null) {
+      result = result.filter(i => i.priorityScore >= f.minPriorityScore!);
+    }
+    if (f.maxPriorityScore != null) {
+      result = result.filter(i => i.priorityScore < f.maxPriorityScore!);
+    }
+
+    return result;
+  }, [items, guidedOverlay]);
+
+  // Auto-expiry: when guided overlay is active but no items match, clear it
+  useEffect(() => {
+    if (guidedOverlay?.active && effectiveItems.length === 0) {
+      setGuidedOverlay(null);
+    }
+  }, [guidedOverlay, effectiveItems.length]);
 
   // Drawer state
   const [selectedItem, setSelectedItem] = useState<TriageQueueItem | null>(null);
@@ -106,6 +154,27 @@ export function CommandStreamMode() {
     },
     [inboxItems, tasks, events, commitments]
   );
+
+  // Action Intelligence move handlers
+  const handleActivateMove = useCallback(
+    (move: SuggestedMove) => {
+      if (move.actionType === "filter-scroll" && move.guidedFilters) {
+        setGuidedOverlay({
+          active: true,
+          moveLabel: move.label,
+          filters: move.guidedFilters,
+        });
+      } else if (move.actionType === "open-item" && move.targetItemId) {
+        const target = allItems.find(i => i.id === move.targetItemId);
+        if (target) handleItemClick(target);
+      }
+    },
+    [allItems, handleItemClick]
+  );
+
+  const handleClearGuided = useCallback(() => {
+    setGuidedOverlay(null);
+  }, []);
 
   // Quick actions
   const handleTrusted = useCallback((workItemId: string) => {
@@ -215,16 +284,29 @@ export function CommandStreamMode() {
         }
         actionStream={
           <CommandActionStream
-            items={items}
+            items={guidedOverlay?.active ? effectiveItems : items}
             isLoading={isLoading}
             onItemClick={handleItemClick}
             onTrusted={handleTrusted}
             onNoAction={handleNoAction}
             onSnooze={handleSnooze}
+            guidedOverlay={guidedOverlay}
+            onClearGuided={handleClearGuided}
           />
         }
         assistPanel={
-          <CommandAssistPanel events={events} />
+          <ActionIntelligenceRail
+            events={events}
+            isCalendarConnected={isConnected}
+            onConnectCalendar={connectOutlook}
+            allItems={allItems}
+            counts={counts}
+            insights={insights}
+            suggestions={suggestions}
+            onActivateMove={handleActivateMove}
+            tick={tick}
+            now={now}
+          />
         }
       />
 

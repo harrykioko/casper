@@ -2,7 +2,9 @@ import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Inbox } from "lucide-react";
 import { CommandActionCard } from "./CommandActionCard";
+import { GuidedBanner } from "./GuidedBanner";
 import type { TriageQueueItem } from "@/hooks/useTriageQueue";
+import type { GuidedOverlay } from "@/hooks/useActionIntelligence";
 
 interface CommandActionStreamProps {
   items: TriageQueueItem[];
@@ -11,6 +13,8 @@ interface CommandActionStreamProps {
   onTrusted: (workItemId: string) => void;
   onNoAction: (workItemId: string) => void;
   onSnooze: (workItemId: string, until: Date) => void;
+  guidedOverlay?: GuidedOverlay | null;
+  onClearGuided?: () => void;
 }
 
 interface ItemGroup {
@@ -25,6 +29,8 @@ export function CommandActionStream({
   onTrusted,
   onNoAction,
   onSnooze,
+  guidedOverlay,
+  onClearGuided,
 }: CommandActionStreamProps) {
   const groups = useMemo<ItemGroup[]>(() => {
     const critical: TriageQueueItem[] = [];
@@ -74,6 +80,13 @@ export function CommandActionStream({
 
   return (
     <div className="max-h-[calc(100vh-12rem)] overflow-y-auto pr-1 space-y-5">
+      {guidedOverlay?.active && onClearGuided && (
+        <GuidedBanner
+          moveLabel={guidedOverlay.moveLabel}
+          remainingCount={items.length}
+          onDismiss={onClearGuided}
+        />
+      )}
       {groups.map(group => (
         <div key={group.label}>
           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2 px-1">

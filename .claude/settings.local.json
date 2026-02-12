@@ -6,7 +6,8 @@
       "Bash(cd:*)",
       "Bash(npx vite build)",
       "Bash(npx tsc:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(ls -la \"C:\\\\Users\\\\HarrisonKioko\\\\OneDrive - Canapi\\\\2025\\\\01. Folio\\\\00. Dev\\\\casper\\\\src\\\\components\\\\focus\"\" | grep -i \"right|assist|today|rail \")"
     ],
     "deny": []
   }

@@ -11,9 +11,9 @@ export function SidebarBrand({ expanded }: SidebarBrandProps) {
   const invertClass = theme === "light" ? "invert" : "";
 
   return (
-    <div className="flex flex-col items-center gap-1 mb-8">
+    <div className="flex flex-col items-center mb-4">
       {expanded ? (
-        <span className="text-lg font-medium tracking-wide text-foreground select-none" style={{ fontFamily: "'Inter', sans-serif" }}>
+        <span className="text-2xl font-semibold tracking-wide text-foreground select-none" style={{ fontFamily: "'Inter', sans-serif" }}>
           casper
         </span>
       ) : (

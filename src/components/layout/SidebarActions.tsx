@@ -1,7 +1,7 @@
 
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { Settings, Sun, Moon, ChevronRight, ChevronLeft, LogOut } from "lucide-react";
+import { Settings, Sun, Moon, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,10 +9,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 interface SidebarActionsProps {
   expanded: boolean;
-  toggleSidebar: () => void;
 }
 
-export function SidebarActions({ expanded, toggleSidebar }: SidebarActionsProps) {
+export function SidebarActions({ expanded }: SidebarActionsProps) {
   const location = useLocation();
   const { theme, setTheme } = useTheme();
   const { signOut } = useAuth();
@@ -29,13 +28,13 @@ export function SidebarActions({ expanded, toggleSidebar }: SidebarActionsProps)
     <div className="mt-auto flex flex-col items-center gap-4 mb-8 w-full">
       <Tooltip delayDuration={300}>
         <TooltipTrigger asChild>
-          <Link 
-            to="/settings" 
+          <Link
+            to="/settings"
             className={cn(
               "flex h-10 items-center rounded-md transition-colors",
               expanded ? "w-[90%] px-4 justify-start" : "w-10 justify-center",
-              location.pathname.startsWith("/settings") 
-                ? "text-zinc-900 dark:text-white bg-white/20 dark:bg-white/10 font-semibold shadow-sm" 
+              location.pathname.startsWith("/settings")
+                ? "text-zinc-900 dark:text-white bg-white/20 dark:bg-white/10 font-semibold shadow-sm"
                 : "text-zinc-700 dark:text-white/70 hover:text-[#FF6A79] dark:hover:text-[#FF6A79]"
             )}
           >
@@ -105,20 +104,6 @@ export function SidebarActions({ expanded, toggleSidebar }: SidebarActionsProps)
           </TooltipContent>
         )}
       </Tooltip>
-
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={toggleSidebar}
-        className="mt-4 text-zinc-700 dark:text-white/70 hover:text-[#415AFF] dark:hover:text-[#415AFF]"
-        aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
-      >
-        {expanded ? (
-          <ChevronLeft className="h-5 w-5" />
-        ) : (
-          <ChevronRight className="h-5 w-5" />
-        )}
-      </Button>
     </div>
   );
 }
